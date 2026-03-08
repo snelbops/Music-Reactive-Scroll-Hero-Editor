@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Scroll Hero Editor | Creative Choreography</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            editor: {
+              bg: '#0a0a0f',
+              panel: 'rgba(255, 255, 255, 0.03)',
+              border: 'rgba(255, 255, 255, 0.1)',
+              accentPurple: '#a855f7',
+              accentTeal: '#14b8a6',
+              accentOrange: '#f97316',
+              accentGreen: '#22c55e',
+              accentBlue: '#3b82f6'
+            }
+          },
+          fontSize: {
+            'xxs': '10px',
+            'xs': '12px',
+            'sm': '13px'
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-glassmorphism">
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+    }
+    .thin-scrollbar::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    .thin-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .thin-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+    }
+    .waveform-bg {
+      background-image: linear-gradient(to right, rgba(249, 115, 22, 0.3) 1px, transparent 1px);
+      background-size: 8px 100%;
+    }
+  </style>
+</head>
+<body class="bg-editor-bg text-gray-300 h-full overflow-hidden font-sans select-none text-sm">
+<!-- BEGIN: Main Layout -->
+<div class="flex flex-col h-screen w-full">
+<!-- Top Nav Placeholder -->
+<header class="h-10 border-b border-editor-border flex items-center px-4 justify-between bg-black/40">
+<div class="flex items-center gap-4">
+<span class="font-bold text-white tracking-tighter text-base">SCROLL HERO EDITOR</span>
+<div class="flex gap-4 text-xxs uppercase tracking-widest text-gray-500">
+<span class="text-editor-accentPurple">Project: Neon_Horizon_01</span>
+<span>Draft Saved 2m ago</span>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<button class="bg-editor-accentPurple/20 hover:bg-editor-accentPurple/40 text-editor-accentPurple px-3 py-1 rounded text-xs transition-colors border border-editor-accentPurple/30">EXPORT JSON</button>
+<div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-teal-500 border border-white/20"></div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- BEGIN: Left Sidebar -->
+<aside class="w-[220px] flex flex-col border-r border-editor-border bg-black/20 p-2 gap-2 overflow-y-auto thin-scrollbar">
+<!-- Presets -->
+<section data-purpose="presets-section">
+<button class="w-full flex justify-between items-center py-1 px-2 text-xxs font-bold text-gray-400 uppercase tracking-tighter mb-1">
+            Presets <span>▾</span>
+</button>
+<div class="grid grid-cols-2 gap-2 mb-4">
+<div class="aspect-video bg-white/5 rounded border border-white/10 hover:border-editor-accentPurple/50 cursor-pointer flex flex-col items-center justify-center text-xxs group">
+<div class="w-6 h-6 rounded-full border border-dashed border-white/20 group-hover:scale-110 transition-transform"></div>
+<span class="mt-1">Parallax</span>
+</div>
+<div class="aspect-video bg-white/5 rounded border border-white/10 hover:border-editor-accentPurple/50 cursor-pointer flex flex-col items-center justify-center text-xxs group">
+<div class="w-6 h-4 bg-white/10 group-hover:bg-editor-accentTeal/40 transition-colors"></div>
+<span class="mt-1">Sticky</span>
+</div>
+</div>
+</section>
+<!-- Assets -->
+<section data-purpose="assets-section">
+<button class="w-full flex justify-between items-center py-1 px-2 text-xxs font-bold text-gray-400 uppercase tracking-tighter mb-1">
+            Assets <span>▾</span>
+</button>
+<div class="space-y-1">
+<div class="flex items-center gap-2 p-1.5 glass-panel text-xxs hover:bg-white/5 cursor-grab">
+<div class="w-6 h-6 bg-editor-accentBlue/20 rounded flex items-center justify-center text-editor-accentBlue">MP4</div>
+<span class="truncate">background_loop.mp4</span>
+</div>
+<div class="flex items-center gap-2 p-1.5 glass-panel text-xxs hover:bg-white/5 cursor-grab">
+<div class="w-6 h-6 bg-editor-accentTeal/20 rounded flex items-center justify-center text-editor-accentTeal">PNG</div>
+<span class="truncate">hero_title_mask.png</span>
+</div>
+</div>
+</section>
+<!-- Layers -->
+<section class="flex-1" data-purpose="layers-section">
+<button class="w-full flex justify-between items-center py-1 px-2 text-xxs font-bold text-gray-400 uppercase tracking-tighter mb-1">
+            Layers <span>▾</span>
+</button>
+<div class="space-y-1">
+<div class="flex items-center gap-2 p-2 rounded bg-editor-accentPurple/10 border border-editor-accentPurple/30 text-xs">
+<span class="w-2 h-2 rounded-full bg-editor-accentPurple"></span>
+<span>Hero Text Mesh</span>
+</div>
+<div class="flex items-center gap-2 p-2 rounded hover:bg-white/5 text-xs text-gray-500">
+<span class="w-2 h-2 rounded-full bg-gray-600"></span>
+<span>Particles Group</span>
+</div>
+<div class="flex items-center gap-2 p-2 rounded hover:bg-white/5 text-xs text-gray-500">
+<span class="w-2 h-2 rounded-full bg-gray-600"></span>
+<span>Camera Path</span>
+</div>
+</div>
+</section>
+</aside>
+<!-- END: Left Sidebar -->
+<!-- BEGIN: Centre Viewport -->
+<main class="flex-1 flex flex-col relative bg-[#050508]">
+<!-- Viewport Controls -->
+<div class="h-10 border-b border-editor-border flex items-center justify-between px-4 z-10 bg-black/40">
+<div class="flex items-center gap-4 text-xs">
+<div class="flex items-center gap-2">
+<span class="text-gray-500">Zoom</span>
+<select class="bg-transparent border-none p-0 text-xs focus:ring-0">
+<option>85% (Fit)</option>
+<option>100%</option>
+<option>200%</option>
+</select>
+</div>
+<div class="h-4 w-[1px] bg-editor-border"></div>
+<div class="flex items-center gap-2">
+<span class="text-gray-500">Ratio</span>
+<button class="px-2 py-0.5 glass-panel text-xxs">16:9</button>
+</div>
+</div>
+<button class="p-1.5 glass-panel hover:bg-white/10">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+</div>
+<!-- Preview Area -->
+<div class="flex-1 relative overflow-hidden group">
+<!-- The Hero Preview -->
+<div class="absolute inset-8 glass-panel overflow-hidden flex flex-col items-center justify-center text-center p-12">
+<div class="absolute inset-0 bg-gradient-to-b from-transparent to-editor-accentPurple/5"></div>
+<h1 class="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-white/20 leading-tight">CHOREOGRAPHED<br/>MOMENTS</h1>
+<p class="text-gray-500 mt-4 max-w-sm">A synthesis of motion and sound, driving user engagement through synchronized storytelling.</p>
+<!-- Mouse Trail Placeholder -->
+<div class="absolute w-32 h-32 rounded-full bg-editor-accentTeal/10 blur-3xl pointer-events-none -translate-x-1/2 -translate-y-1/2 left-1/2 top-1/2 transition-all duration-300"></div>
+</div>
+<!-- Scroll Progress Bar -->
+<div class="absolute right-4 top-1/2 -translate-y-1/2 h-64 w-1 bg-white/5 rounded-full">
+<div class="absolute top-0 w-full h-1/3 bg-editor-accentPurple shadow-[0_0_10px_rgba(168,85,247,0.5)] rounded-full"></div>
+<div class="absolute -left-2 top-1/3 -translate-y-1/2 w-5 h-2 bg-white rounded-sm shadow-xl"></div>
+</div>
+</div>
+</main>
+<!-- END: Centre Viewport -->
+<!-- BEGIN: Right Inspector -->
+<aside class="w-[240px] border-l border-editor-border bg-black/20 flex flex-col p-4 gap-6 overflow-y-auto thin-scrollbar">
+<!-- Transform -->
+<div data-purpose="inspector-transform">
+<label class="text-xxs font-bold text-gray-500 uppercase tracking-widest block mb-3">Transform</label>
+<div class="grid grid-cols-2 gap-3 mb-4">
+<div class="space-y-1">
+<span class="text-[10px] text-gray-500 block">Position X</span>
+<input class="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs focus:border-editor-accentTeal focus:ring-0" type="number" value="120"/>
+</div>
+<div class="space-y-1">
+<span class="text-[10px] text-gray-500 block">Position Y</span>
+<input class="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs focus:border-editor-accentTeal focus:ring-0" type="number" value="45"/>
+</div>
+</div>
+</div>
+<!-- Easing -->
+<div data-purpose="inspector-easing">
+<label class="text-xxs font-bold text-gray-500 uppercase tracking-widest block mb-3">Easing Curve</label>
+<div class="h-24 glass-panel mb-2 relative overflow-hidden flex items-center justify-center p-2">
+<svg class="w-full h-full text-editor-accentTeal" fill="none" viewbox="0 0 100 100">
+<path d="M0,100 C20,100 80,0 100,0" stroke="currentColor" stroke-width="2"></path>
+</svg>
+<div class="absolute bottom-1 right-1 text-xxs text-gray-500">Cubic-Bezier</div>
+</div>
+<div class="flex gap-1">
+<button class="flex-1 py-1 glass-panel text-xxs hover:bg-white/10 active:bg-editor-accentTeal/20">Step</button>
+<button class="flex-1 py-1 glass-panel text-xxs bg-editor-accentTeal/20 border-editor-accentTeal/40">Linear</button>
+<button class="flex-1 py-1 glass-panel text-xxs hover:bg-white/10 active:bg-editor-accentTeal/20">Smooth</button>
+</div>
+</div>
+<!-- Settings -->
+<div data-purpose="inspector-settings">
+<label class="text-xxs font-bold text-gray-500 uppercase tracking-widest block mb-3">Interpolation</label>
+<div class="flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<span class="text-xs">Snap to Beat</span>
+<div class="w-8 h-4 bg-editor-accentPurple rounded-full relative">
+<div class="absolute right-0.5 top-0.5 w-3 h-3 bg-white rounded-full"></div>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-xs">Lane Color</span>
+<div class="flex gap-1">
+<div class="w-4 h-4 rounded-full bg-editor-accentTeal cursor-pointer ring-1 ring-offset-2 ring-offset-black ring-white/20"></div>
+<div class="w-4 h-4 rounded-full bg-editor-accentPurple cursor-pointer"></div>
+<div class="w-4 h-4 rounded-full bg-editor-accentOrange cursor-pointer"></div>
+</div>
+</div>
+</div>
+</div>
+</aside>
+<!-- END: Right Inspector -->
+</div>
+<!-- BEGIN: Bottom Timeline -->
+<footer class="h-[280px] border-t border-editor-border bg-black flex flex-col z-20">
+<!-- Transport Bar -->
+<div class="h-10 border-b border-editor-border flex items-center px-4 justify-between bg-white/5">
+<div class="flex items-center gap-2">
+<button class="p-1 hover:text-white"><svg class="w-5 h-5" fill="currentColor" viewbox="0 0 20 20"><path d="M4.5 3.5v13L16 10l-11.5-6.5z"></path></svg></button>
+<button class="p-1 hover:text-white"><svg class="w-5 h-5" fill="currentColor" viewbox="0 0 20 20"><path d="M4 4h4v12H4V4zm8 0h4v12h-4V4z"></path></svg></button>
+<button class="w-4 h-4 rounded-full bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.5)] mx-2"></button>
+<div class="h-4 w-[1px] bg-editor-border mx-2"></div>
+<button class="text-xs text-gray-500 hover:text-white">LOOP</button>
+</div>
+<div class="flex items-center gap-6 font-mono text-xs">
+<div class="flex flex-col items-center">
+<span class="text-editor-accentTeal">00:14:02</span>
+<span class="text-[9px] text-gray-600">TIME</span>
+</div>
+<div class="flex flex-col items-center">
+<span class="text-white">120 BPM</span>
+<span class="text-[9px] text-gray-600">TEMPO</span>
+</div>
+<div class="flex flex-col items-center">
+<span class="text-white">4/4</span>
+<span class="text-[9px] text-gray-600">SIGNATURE</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 text-xxs text-gray-500">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path></svg>
+<input class="w-24 h-1 bg-white/10 accent-editor-accentPurple appearance-none rounded-full" type="range"/>
+</div>
+</div>
+</div>
+<!-- Lanes Container -->
+<div class="flex-1 overflow-y-auto thin-scrollbar relative">
+<!-- Playhead -->
+<div class="absolute left-[120px] top-0 bottom-0 w-[1px] bg-red-500 z-50 pointer-events-none shadow-[0_0_8px_rgba(239,68,68,0.8)]">
+<div class="w-3 h-3 bg-red-500 absolute -top-1 -left-[5.5px] rotate-45"></div>
+</div>
+<!-- Lane 1: Audio -->
+<div class="flex h-10 border-b border-white/5 group">
+<div class="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
+<span class="text-[10px] uppercase font-bold text-editor-accentOrange truncate">Audio Wave</span>
+<div class="ml-auto flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="text-[10px]">🔒</span>
+<span class="text-[10px]">👁️</span>
+</div>
+</div>
+<div class="flex-1 relative overflow-hidden waveform-bg">
+<!-- Beat Markers -->
+<div class="absolute h-full w-[2px] bg-white/10 left-[80px]"></div>
+<div class="absolute h-full w-[2px] bg-white/10 left-[160px]"></div>
+<div class="absolute h-full w-[2px] bg-white/10 left-[240px]"></div>
+<!-- Waveform Placeholder -->
+<svg class="absolute inset-0 w-full h-full opacity-40 text-editor-accentOrange" preserveaspectratio="none">
+<path d="M0,20 L20,35 L40,15 L60,30 L80,10 L100,25 L120,5 L140,20 L160,10 L180,30 L200,15" fill="none" stroke="currentColor" stroke-width="1.5"></path>
+</svg>
+</div>
+</div>
+<!-- Lane 2: Mouse Movement -->
+<div class="flex h-10 border-b border-white/5 group">
+<div class="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
+<span class="text-[10px] uppercase font-bold text-editor-accentTeal">Mouse X/Y</span>
+</div>
+<div class="flex-1 relative overflow-hidden bg-white/[0.02]">
+<svg class="absolute inset-0 w-full h-full text-editor-accentTeal" preserveaspectratio="none">
+<path d="M0,35 Q50,5 100,35 T200,35 T300,10" fill="none" stroke="currentColor" stroke-width="1"></path>
+</svg>
+</div>
+</div>
+<!-- Lane 3: Clicks -->
+<div class="flex h-10 border-b border-white/5 group">
+<div class="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
+<span class="text-[10px] uppercase font-bold text-white">Click Evts</span>
+</div>
+<div class="flex-1 relative overflow-hidden flex items-center">
+<div class="absolute left-[40px] w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_white]"></div>
+<div class="absolute left-[180px] w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_white]"></div>
+<div class="absolute left-[320px] w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_white]"></div>
+</div>
+</div>
+<!-- Lane 4: Scroll -->
+<div class="flex h-10 border-b border-white/5 group">
+<div class="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
+<span class="text-[10px] uppercase font-bold text-editor-accentPurple">Scroll POS</span>
+</div>
+<div class="flex-1 relative overflow-hidden">
+<svg class="absolute inset-0 w-full h-full text-editor-accentPurple" preserveaspectratio="none">
+<path d="M0,40 L150,20 L300,0" fill="none" stroke="currentColor" stroke-width="2"></path>
+</svg>
+</div>
+</div>
+<!-- Lane 5: Particles -->
+<div class="flex h-10 border-b border-white/5 group">
+<div class="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
+<span class="text-[10px] uppercase font-bold text-editor-accentGreen">Particles</span>
+</div>
+<div class="flex-1 relative overflow-hidden">
+<div class="absolute left-0 right-0 h-1/2 bottom-0 bg-editor-accentGreen/10 border-t border-editor-accentGreen/30"></div>
+</div>
+</div>
+<!-- Lane 6: Opacity -->
+<div class="flex h-10 border-b border-white/5 group">
+<div class="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
+<span class="text-[10px] uppercase font-bold text-editor-accentBlue">CSS OPACITY</span>
+</div>
+<div class="flex-1 relative overflow-hidden">
+<svg class="absolute inset-0 w-full h-full text-editor-accentBlue" preserveaspectratio="none">
+<path d="M0,40 L100,40 L105,0 L300,0" fill="none" stroke="currentColor" stroke-width="1.5"></path>
+</svg>
+</div>
+</div>
+</div>
+</footer>
+<!-- END: Bottom Timeline -->
+</div>
+<!-- END: Main Layout -->
+<!-- BEGIN: Scripts -->
+<script data-purpose="timeline-interaction">
+    // Minimal interaction logic for demo purposes
+    console.log('Scroll Hero Editor initialized');
+  </script>
+<!-- END: Scripts -->
+</body></html>
