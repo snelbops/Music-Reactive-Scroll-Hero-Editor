@@ -30,7 +30,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Creator can change the aspect ratio (16:9, 9:16, 1:1, free) and the scene is constrained with letterboxing matching the selection
   4. Creator can toggle fullscreen mode to expand the viewport to fill the browser window, hiding all editor chrome
   5. All missing dependencies are installed and particle-lab source files are in place so the above works without console errors
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Copy particle-lab files and verify scaffold (SCAF-01, SCAF-02, SCAF-03)
+- [ ] 01-02-PLAN.md — Extend store, wire preset switcher, replace Viewport with conditional renderer (PREV-01, PREV-02, PREV-03)
+- [ ] 01-03-PLAN.md — Aspect ratio letterboxing and fullscreen toggle (PREV-04, PREV-05)
 
 ### Phase 2: Playhead, Transport, and Motion Recording
 **Goal**: Creators can play a Theatre.js sequence, scrub progress manually, and record live scroll curves onto the timeline
@@ -89,7 +94,7 @@ Note: Phase 3 and Phase 4 both depend on Phase 2 and can be worked in either ord
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Live Scene Preview | 0/? | Not started | - |
+| 1. Live Scene Preview | 0/3 | Not started | - |
 | 2. Playhead, Transport, and Motion Recording | 0/? | Not started | - |
 | 3. Curve Editing and Inspector | 0/? | Not started | - |
 | 4. Frame Sequence Video Hero | 0/? | Not started | - |
