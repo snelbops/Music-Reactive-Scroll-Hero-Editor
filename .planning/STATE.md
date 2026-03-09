@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-09T23:03:38.816Z"
+last_updated: "2026-03-09T23:06:11.885Z"
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 9
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-03-08)
 ## Current Position
 
 Phase: 2 of 5 (Playhead, Transport, and Motion Recording)
-Plan: 2 of 4 in current phase
+Plan: 3 of 4 in current phase
 Status: In progress
-Last activity: 2026-03-09 — Plan 02-02 (viewport scrub handle pointer capture; PROG-03, PROG-04) complete
+Last activity: 2026-03-09 — Plan 02-03 (Theatre transport fixes; TL-01 through TL-06) complete
 
 Progress: [████░░░░░░] 40%
 
@@ -49,6 +49,7 @@ Progress: [████░░░░░░] 40%
 
 *Updated after each plan completion*
 | Phase 02 P02 | 2 | 1 tasks | 1 files |
+| Phase 02 P03 | 3 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,8 @@ Recent decisions affecting current work:
 - SceneAdapter (02-01): isLoop imported in TheatreSync now so Plan 03 only needs a wire-up, not a new import
 - [Phase 02]: onPointerUp is a no-op: Theatre.js position already snapped during last onPointerMove, no extra work on release
 - [Phase 02]: transition-all removed from scrub fill bar: smooth CSS transition conflicts with real-time 60fps scrub responsiveness
+- [Phase 02]: resolveJsonModule: true added to tsconfig for JSON import type-checking
+- [Phase 02]: seekTo calls setSceneProgress (not setScrollProgress) so adapter is driven on all scrubs
 
 ### Pending Todos
 
@@ -86,5 +89,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-09
-Stopped at: Completed 02-02-PLAN.md (viewport scrub handle pointer capture; PROG-03, PROG-04 done)
+Stopped at: Completed 02-03-PLAN.md (Theatre transport fixes; TL-01 through TL-06 done)
 Resume file: None
