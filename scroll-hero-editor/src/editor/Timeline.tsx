@@ -22,6 +22,8 @@ export default function Timeline() {
     const isLoop = useStore(state => state.isLoop);
     const setIsLoop = useStore(state => state.setIsLoop);
     const setSceneProgress = useStore(state => state.setSceneProgress);
+    const recordStartPosition = useStore(state => state.recordStartPosition);
+    const setRecordStartPosition = useStore(state => state.setRecordStartPosition);
 
     const [timelineZoom, setTimelineZoom] = useState(1);
     const [lanesWidth, setLanesWidth] = useState(0);
@@ -91,8 +93,14 @@ export default function Timeline() {
     }, [progressFromClientX, setIsPlaying, seekTo]);
 
     const toggleRecording = () => {
-        if (isRecording) { setIsRecording(false); }
-        else { clearRecordedEvents(); setIsRecording(true); }
+        if (isRecording) {
+            setIsRecording(false);
+            seekTo(recordStartPosition);
+        } else {
+            setRecordStartPosition(sheet.sequence.position / SEQUENCE_DURATION);
+            clearRecordedEvents();
+            setIsRecording(true);
+        }
     };
 
     const trackW = lanesWidth ? lanesWidth * timelineZoom - LABEL_W : 0;
@@ -110,8 +118,8 @@ export default function Timeline() {
                     <button className="p-1 hover:text-white" onClick={() => setIsPlaying(!isPlaying)}>
                         {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
                     </button>
-                    {/* Stop: halt at current position — does NOT rewind to 0 */}
-                    <button className="p-1 hover:text-white" onClick={() => setIsPlaying(false)}>
+                    {/* Stop: halt playback; if recording, end recording and restore pre-record position */}
+                    <button className="p-1 hover:text-white" onClick={() => { setIsPlaying(false); if (isRecording) { setIsRecording(false); seekTo(recordStartPosition); } }}>
                         <Square className="w-4 h-4" />
                     </button>
                     <button
@@ -235,7 +243,7 @@ export default function Timeline() {
 
                 {/* Lane 4: Scroll Pos — live curve */}
                 <div className="flex h-12 border-b border-white/5">
-                    <div className="w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 bg-black/40 sticky left-0 z-30 gap-0.5">
+                    <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 bg-black/40 sticky left-0 z-30 gap-0.5 ${isRecording ? 'ring-1 ring-inset ring-editor-accent-purple/60 bg-editor-accent-purple/10' : ''}`}>
                         <span className="text-xxs uppercase font-bold text-editor-accent-purple">Scroll POS</span>
                         <span className="text-[9px] font-mono text-editor-accent-purple/60">{(scrollProgress * 100).toFixed(1)}%</span>
                     </div>
