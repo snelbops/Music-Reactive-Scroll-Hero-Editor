@@ -8,11 +8,10 @@ import { scrollControlsObj, sheet, SEQUENCE_DURATION } from './core';
  * - Wires scrollControlsObj.onValuesChange → setSceneProgress (unified keyframe path)
  * - RAF loop advances sheet.sequence.position during playback; linear fallback
  *   is overwritten by onValuesChange when Theatre.js keyframes exist
- * - Exposes seekTo on the window-level sheet singleton (Timeline uses it too)
+ * - Loop support: when isLoop is true, restarts sequence from 0 at end instead of stopping
  */
 export default function TheatreSync() {
     const isPlaying = useStore((state) => state.isPlaying);
-    // isLoop read here so it's available for Plan 03's diff without a re-import
     const isLoop = useStore((s) => s.isLoop);
 
     // Keyframe path: Theatre.js interpolated values → setSceneProgress (drives adapter + Zustand)
@@ -32,9 +31,16 @@ export default function TheatreSync() {
                 const delta = now - lastTime;
                 const nextPos = sheet.sequence.position + delta / 1000;
                 if (nextPos >= SEQUENCE_DURATION) {
-                    sheet.sequence.position = SEQUENCE_DURATION;
-                    useStore.getState().setScrollProgress(1);
-                    useStore.getState().setIsPlaying(false);
+                    if (isLoop) {
+                        sheet.sequence.position = 0;
+                        useStore.getState().setSceneProgress(0);
+                        lastTime = now; // reset delta to avoid position jump
+                        rafId = requestAnimationFrame(tick);
+                    } else {
+                        sheet.sequence.position = SEQUENCE_DURATION;
+                        useStore.getState().setSceneProgress(1);
+                        useStore.getState().setIsPlaying(false);
+                    }
                     return;
                 }
                 sheet.sequence.position = nextPos;
@@ -46,10 +52,7 @@ export default function TheatreSync() {
         };
         rafId = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(rafId);
-    }, [isPlaying]);
-
-    // Suppress unused variable lint warning — isLoop is read for Plan 03 wiring
-    void isLoop;
+    }, [isPlaying, isLoop]);
 
     return null;
 }
