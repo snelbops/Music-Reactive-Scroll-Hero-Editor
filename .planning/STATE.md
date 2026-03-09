@@ -10,27 +10,27 @@ See: .planning/PROJECT.md (updated 2026-03-08)
 ## Current Position
 
 Phase: 1 of 5 (Live Scene Preview)
-Plan: 2 of ? in current phase
+Plan: 3 of ? in current phase
 Status: In progress
-Last activity: 2026-03-09 — Plan 01-02 (preset switcher wiring) complete
+Last activity: 2026-03-09 — Plan 01-03 (aspect ratio letterbox + fullscreen toggle) complete
 
-Progress: [██░░░░░░░░] 20%
+Progress: [███░░░░░░░] 30%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: 9 min
-- Total execution time: 18 min
+- Total plans completed: 3
+- Average duration: 16 min
+- Total execution time: 48 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-live-scene-preview | 2 | 18 min | 9 min |
+| 01-live-scene-preview | 3 | 48 min | 16 min |
 
 **Recent Trend:**
-- Last 5 plans: 8 min, 10 min
+- Last 5 plans: 8 min, 10 min, 30 min
 - Trend: stable
 
 *Updated after each plan completion*
@@ -51,6 +51,9 @@ Recent decisions affecting current work:
 - Preset wiring (01-02): ScrollyVideoPlayer removed from Viewport centre — it will reappear in Phase 4 context, not the same location
 - Preset wiring (01-02): CHOREOGRAPHED MOMENTS overlay removed — placeholder that blocked live particle canvas view
 - Preset wiring (01-02): Union string literals for PresetId/AspectRatio (no TypeScript enum — erasableSyntaxOnly: true)
+- Letterbox (01-03): RATIO_VALUES const at module level outside component to avoid re-creation on each render
+- Letterbox (01-03): Scroll Progress Bar stays in outer preview div, not inside letterbox stage — always anchors to viewport edge
+- Fullscreen (01-03): Guard pattern — if (isFullscreen) early return fixed overlay before normal layout return
 
 ### Pending Todos
 
@@ -63,5 +66,5 @@ None — SCAF-02 (all 6 deps confirmed) and SCAF-03 (ParticleLab files copied) r
 ## Session Continuity
 
 Last session: 2026-03-09
-Stopped at: Completed 01-02-PLAN.md (preset switcher wiring; PREV-01, PREV-02, PREV-03 done)
+Stopped at: Completed 01-03-PLAN.md (aspect ratio letterbox + fullscreen toggle; PREV-04, PREV-05 done) — awaiting human verification in browser
 Resume file: None

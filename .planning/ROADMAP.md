@@ -12,7 +12,7 @@ Five phases take the project from a scaffold with component shells to a fully fu
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Live Scene Preview** - Particle presets render in viewport; preset switcher, aspect ratio, and fullscreen working
+- [x] **Phase 1: Live Scene Preview** - Particle presets render in viewport; preset switcher, aspect ratio, and fullscreen working (completed 2026-03-09)
 - [ ] **Phase 2: Playhead, Transport, and Motion Recording** - Theatre.js timeline live; creators can scrub, play, arm record, and capture scroll curves
 - [ ] **Phase 3: Curve Editing and Inspector** - Multi-lane parameter automation; right inspector with easing picker wired to keyframes
 - [ ] **Phase 4: Frame Sequence Video Hero** - MP4 upload, ffmpeg WASM extraction, FrameSequenceScene driving progress with no seek latency
@@ -94,7 +94,7 @@ Note: Phase 3 and Phase 4 both depend on Phase 2 and can be worked in either ord
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Live Scene Preview | 2/3 | In Progress|  |
+| 1. Live Scene Preview | 3/3 | Complete   | 2026-03-09 |
 | 2. Playhead, Transport, and Motion Recording | 0/? | Not started | - |
 | 3. Curve Editing and Inspector | 0/? | Not started | - |
 | 4. Frame Sequence Video Hero | 0/? | Not started | - |

@@ -10,8 +10,8 @@
 - [x] **PREV-01**: Creator can see the Orbit particle preset (GithubTestParticleField R3F scene) rendering live in the viewport canvas on app load
 - [x] **PREV-02**: Creator can see the Classic particle preset (iframe) rendering in the viewport when selected
 - [x] **PREV-03**: Creator can click a preset card in the left panel Presets section to switch the active scene in the viewport
-- [ ] **PREV-04**: Creator can switch the viewport aspect ratio (16:9 / 9:16 / 1:1 / free) and see the scene constrained with letterboxing
-- [ ] **PREV-05**: Creator can toggle fullscreen mode to expand the viewport to fill the browser window, hiding editor chrome
+- [x] **PREV-04**: Creator can switch the viewport aspect ratio (16:9 / 9:16 / 1:1 / free) and see the scene constrained with letterboxing
+- [x] **PREV-05**: Creator can toggle fullscreen mode to expand the viewport to fill the browser window, hiding editor chrome
 
 ### Progress Interface (PROG)
 
@@ -111,8 +111,8 @@
 | PREV-01 | Phase 1 | Complete |
 | PREV-02 | Phase 1 | Complete |
 | PREV-03 | Phase 1 | Complete |
-| PREV-04 | Phase 1 | Pending |
-| PREV-05 | Phase 1 | Pending |
+| PREV-04 | Phase 1 | Complete |
+| PREV-05 | Phase 1 | Complete |
 | PROG-01 | Phase 2 | Pending |
 | PROG-02 | Phase 2 | Pending |
 | PROG-03 | Phase 2 | Pending |
