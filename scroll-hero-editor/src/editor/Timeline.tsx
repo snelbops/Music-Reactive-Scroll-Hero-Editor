@@ -3,7 +3,7 @@ import { Play, Pause, Square, Repeat, Circle, ZoomIn, ZoomOut } from 'lucide-rea
 import { onChange } from '@theatre/core';
 import { useStore } from '../store/useStore';
 import { useKickDrumData } from '../packages/useKickDrumData';
-import { sheet, SEQUENCE_DURATION } from '../theatre/core';
+import { sheet, SEQUENCE_DURATION, scrollControlsObj } from '../theatre/core';
 
 const LABEL_W = 120;
 const ZOOM_LEVELS = [1, 2, 4, 8];
@@ -29,6 +29,8 @@ export default function Timeline() {
     const [lanesWidth, setLanesWidth] = useState(0);
     // Reactive time display — updated by onChange so it refreshes each frame during playback
     const [seqTime, setSeqTime] = useState(() => sheet.sequence.position);
+    // Keyframe dots — refreshed when playback or recording ends (after Theatre.js commits them)
+    const [keyframeDots, setKeyframeDots] = useState<Array<{ position: number; value: number; id?: string }>>([]);
     const lanesRef = useRef<HTMLDivElement>(null);
     const scrollHistory = useRef<{ pos: number; val: number }[]>([]);
 
@@ -62,6 +64,16 @@ export default function Timeline() {
         }, 50);
         return () => clearInterval(id);
     }, [isPlaying]);
+
+    // Refresh keyframe dots from Theatre.js when playback or recording ends
+    // __experimental_getKeyframes returns keyframes for the sequenced prop
+    useEffect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const kfs = (sheet.sequence as any).__experimental_getKeyframes(
+            scrollControlsObj.props.position
+        ) as Array<{ position: number; value: number; id?: string }>;
+        setKeyframeDots(kfs ?? []);
+    }, [isPlaying, isRecording]);
 
     // seekTo — canonical scrub: syncs Theatre.js + scene adapter + Zustand + clears history
     const seekTo = useCallback((progress: number) => {
@@ -255,6 +267,43 @@ export default function Timeline() {
                                 <polyline points={scrollPolyline} fill="none" stroke="rgba(168,85,247,0.25)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
                                 <polyline points={scrollPolyline} fill="none" stroke="#a855f7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                             </>}
+                            {/* Recorded keyframes: bezier curve path (TL-01) */}
+                            {keyframeDots.length >= 2 && (() => {
+                                const sorted = [...keyframeDots].sort((a, b) => a.position - b.position);
+                                const pts = sorted.map(kf => ({
+                                    x: (kf.position / SEQUENCE_DURATION) * VB_W,
+                                    y: (1 - kf.value) * VB_H,
+                                }));
+                                let d = `M ${pts[0].x} ${pts[0].y}`;
+                                for (let i = 1; i < pts.length; i++) {
+                                    const prev = pts[i - 1];
+                                    const curr = pts[i];
+                                    const dx = curr.x - prev.x;
+                                    d += ` C ${prev.x + dx / 3} ${prev.y}, ${curr.x - dx / 3} ${curr.y}, ${curr.x} ${curr.y}`;
+                                }
+                                return (
+                                    <path
+                                        d={d}
+                                        fill="none"
+                                        stroke="#a855f7"
+                                        strokeWidth="1.5"
+                                        strokeOpacity="0.8"
+                                    />
+                                );
+                            })()}
+                            {/* Recorded keyframe dots — rendered on top of the curve */}
+                            {keyframeDots.map((kf, i) => (
+                                <circle
+                                    key={kf.id ?? i}
+                                    cx={(kf.position / SEQUENCE_DURATION) * VB_W}
+                                    cy={(1 - kf.value) * VB_H}
+                                    r="4"
+                                    fill="#a855f7"
+                                    stroke="white"
+                                    strokeWidth="1"
+                                    className="cursor-ew-resize"
+                                />
+                            ))}
                             <circle cx={seqPos * VB_W} cy={(1 - scrollProgress) * VB_H} r="4" fill="#a855f7" filter="url(#pglow)"/>
                             <circle cx={seqPos * VB_W} cy={(1 - scrollProgress) * VB_H} r="2.5" fill="white"/>
                         </svg>
