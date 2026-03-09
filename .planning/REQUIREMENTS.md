@@ -17,24 +17,24 @@
 
 - [x] **PROG-01**: The active scene exposes a `setProgress(p: number)` interface (0–1) that all scene types implement as a `SceneAdapter` contract
 - [x] **PROG-02**: The viewport displays a non-interactive progress indicator overlay showing the current value (e.g. `0.47`)
-- [ ] **PROG-03**: Creator can drag a scrub handle in the viewport to manually set `progress` (0–1), overriding the playhead position
-- [ ] **PROG-04**: Releasing the viewport scrub handle snaps the timeline playhead to the matching position
+- [x] **PROG-03**: Creator can drag a scrub handle in the viewport to manually set `progress` (0–1), overriding the playhead position
+- [x] **PROG-04**: Releasing the viewport scrub handle snaps the timeline playhead to the matching position
 
 ### Timeline & Transport (TL)
 
-- [ ] **TL-01**: Creator can see a Scroll Progress automation lane (bezier curve, 0–1, purple accent) in the bottom timeline
-- [ ] **TL-02**: Creator can drag a red playhead spanning all lane rows to set the current time position
-- [ ] **TL-03**: Creator can click Play to advance the Theatre.js sequence, driving `setProgress()` continuously on the active scene
-- [ ] **TL-04**: Creator can click Stop to halt playhead at its current position
-- [ ] **TL-05**: Creator can enable Loop so the playhead jumps back to start when it reaches the sequence end
-- [ ] **TL-06**: The transport bar displays the current playhead time/position numerically
+- [x] **TL-01**: Creator can see a Scroll Progress automation lane (bezier curve, 0–1, purple accent) in the bottom timeline
+- [x] **TL-02**: Creator can drag a red playhead spanning all lane rows to set the current time position
+- [x] **TL-03**: Creator can click Play to advance the Theatre.js sequence, driving `setProgress()` continuously on the active scene
+- [x] **TL-04**: Creator can click Stop to halt playhead at its current position
+- [x] **TL-05**: Creator can enable Loop so the playhead jumps back to start when it reaches the sequence end
+- [x] **TL-06**: The transport bar displays the current playhead time/position numerically
 
 ### Recording (REC)
 
-- [ ] **REC-01**: Creator can click Arm Record (⏺) to arm the Scroll Progress lane, indicated by a red glow on the button and lane highlight
-- [ ] **REC-02**: While armed and Play is running, dragging the viewport scrub handle writes keyframes to the Scroll Progress lane in real time at the current playhead position
-- [ ] **REC-03**: Clicking Stop ends recording and returns the playhead to its pre-record position
-- [ ] **REC-04**: After recording, the captured keyframes are visible as dots connected by a curve on the Scroll Progress lane
+- [x] **REC-01**: Creator can click Arm Record (⏺) to arm the Scroll Progress lane, indicated by a red glow on the button and lane highlight
+- [x] **REC-02**: While armed and Play is running, dragging the viewport scrub handle writes keyframes to the Scroll Progress lane in real time at the current playhead position
+- [x] **REC-03**: Clicking Stop ends recording and returns the playhead to its pre-record position
+- [x] **REC-04**: After recording, the captured keyframes are visible as dots connected by a curve on the Scroll Progress lane
 - [ ] **REC-05**: Creator can drag a recorded keyframe dot left/right on the lane to adjust timing, with the curve and playback updating accordingly
 
 ### Curve Editing & Parameters (CURV)
@@ -115,18 +115,18 @@
 | PREV-05 | Phase 1 | Complete |
 | PROG-01 | Phase 2 | Complete |
 | PROG-02 | Phase 2 | Complete |
-| PROG-03 | Phase 2 | Pending |
-| PROG-04 | Phase 2 | Pending |
-| TL-01 | Phase 2 | Pending |
-| TL-02 | Phase 2 | Pending |
-| TL-03 | Phase 2 | Pending |
-| TL-04 | Phase 2 | Pending |
-| TL-05 | Phase 2 | Pending |
-| TL-06 | Phase 2 | Pending |
-| REC-01 | Phase 2 | Pending |
-| REC-02 | Phase 2 | Pending |
-| REC-03 | Phase 2 | Pending |
-| REC-04 | Phase 2 | Pending |
+| PROG-03 | Phase 2 | Complete |
+| PROG-04 | Phase 2 | Complete |
+| TL-01 | Phase 2 | Complete |
+| TL-02 | Phase 2 | Complete |
+| TL-03 | Phase 2 | Complete |
+| TL-04 | Phase 2 | Complete |
+| TL-05 | Phase 2 | Complete |
+| TL-06 | Phase 2 | Complete |
+| REC-01 | Phase 2 | Complete |
+| REC-02 | Phase 2 | Complete |
+| REC-03 | Phase 2 | Complete |
+| REC-04 | Phase 2 | Complete |
 | REC-05 | Phase 2 | Pending |
 | CURV-01 | Phase 3 | Pending |
 | CURV-02 | Phase 3 | Pending |

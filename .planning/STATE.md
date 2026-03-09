@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-09T23:06:11.885Z"
+last_updated: "2026-03-09T23:10:00.000Z"
 progress:
   total_phases: 2
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 9
-  completed_plans: 6
+  completed_plans: 7
 ---
 
 # Project State
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-08)
 ## Current Position
 
 Phase: 2 of 5 (Playhead, Transport, and Motion Recording)
-Plan: 3 of 4 in current phase
-Status: In progress
-Last activity: 2026-03-09 — Plan 02-03 (Theatre transport fixes; TL-01 through TL-06) complete
+Plan: 4 of 4 in current phase — PHASE COMPLETE
+Status: Phase 2 complete
+Last activity: 2026-03-09 — Plan 02-04 (recording pipeline: keyframe write, bezier curve rendering, pre-record position restore) complete
 
-Progress: [████░░░░░░] 40%
+Progress: [████████░░] 78%
 
 ## Performance Metrics
 
@@ -41,15 +41,16 @@ Progress: [████░░░░░░] 40%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-live-scene-preview | 3 | 48 min | 16 min |
-| 02-playhead-transport-and-motion-recording | 2 | 10 min | 5 min |
+| 02-playhead-transport-and-motion-recording | 4 | 12 min | 3 min |
 
 **Recent Trend:**
-- Last 5 plans: 8 min, 10 min, 30 min, 8 min
-- Trend: stable
+- Last 5 plans: 10 min, 30 min, 8 min, 3 min, 2 min
+- Trend: accelerating
 
 *Updated after each plan completion*
 | Phase 02 P02 | 2 | 1 tasks | 1 files |
 | Phase 02 P03 | 3 | 2 tasks | 5 files |
+| Phase 02 P04 | 2 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -77,6 +78,9 @@ Recent decisions affecting current work:
 - [Phase 02]: transition-all removed from scrub fill bar: smooth CSS transition conflicts with real-time 60fps scrub responsiveness
 - [Phase 02]: resolveJsonModule: true added to tsconfig for JSON import type-checking
 - [Phase 02]: seekTo calls setSceneProgress (not setScrollProgress) so adapter is driven on all scrubs
+- [02-04]: Keyframe write guard: isRecording && isPlaying in RecordMode mousemove — avoids writes during scrub-only arming
+- [02-04]: __experimental_getKeyframes cast as any[] to handle missing TypeScript typings for experimental Theatre.js API
+- [02-04]: Bezier curve uses dx/3 horizontal control point pull — simple smooth approximation without full Catmull-Rom tangent computation
 
 ### Pending Todos
 
@@ -89,5 +93,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-09
-Stopped at: Completed 02-03-PLAN.md (Theatre transport fixes; TL-01 through TL-06 done)
+Stopped at: Completed 02-04-PLAN.md (recording pipeline: keyframe write, bezier curve + dots, pre-record position restore)
 Resume file: None
