@@ -1,0 +1,27 @@
+{
+  "sheetsById": {
+    "Main Sequence": {
+      "staticOverrides": {
+        "byObject": {}
+      },
+      "sequence": {
+        "subUnitsPerUnit": 30,
+        "length": 10,
+        "type": "PositionIMap",
+        "tracksByObject": {
+          "Scroll Controls": {
+            "trackData": {
+              "__KEY_position__": {
+                "type": "BasicKeyframedTrack",
+                "keyframes": []
+              }
+            },
+            "trackIdByPropPath": {
+              "position": "__KEY_position__"
+            }
+          }
+        }
+      }
+    }
+  }
+}
