@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { SceneAdapter } from '../preview/SceneAdapter';
 
 type PresetId = 'orbit' | 'classic';
 type AspectRatio = '16:9' | '9:16' | '1:1' | 'free';
@@ -39,9 +40,25 @@ interface EditorState {
     setAspectRatio: (ratio: AspectRatio) => void;
     isFullscreen: boolean;
     setIsFullscreen: (v: boolean) => void;
+
+    // Transport / loop state (Phase 2)
+    isLoop: boolean;
+    setIsLoop: (v: boolean) => void;
+    recordStartPosition: number;
+    setRecordStartPosition: (v: number) => void;
+
+    // Scene adapter (Phase 2) — the active preset's progress driver
+    activeAdapter: SceneAdapter | null;
+    setActiveAdapter: (adapter: SceneAdapter | null) => void;
+
+    /**
+     * setSceneProgress — unified progress path used by scrub handle, transport, and recording.
+     * Calls activeAdapter.setProgress(p) AND updates scrollProgress in Zustand.
+     */
+    setSceneProgress: (p: number) => void;
 }
 
-export const useStore = create<EditorState>((set) => ({
+export const useStore = create<EditorState>((set, get) => ({
     isPlaying: false,
     setIsPlaying: (playing) => set({ isPlaying: playing }),
 
@@ -66,4 +83,20 @@ export const useStore = create<EditorState>((set) => ({
     setAspectRatio: (ratio) => set({ aspectRatio: ratio }),
     isFullscreen: false,
     setIsFullscreen: (v) => set({ isFullscreen: v }),
+
+    // Transport / loop state
+    isLoop: false,
+    setIsLoop: (v) => set({ isLoop: v }),
+    recordStartPosition: 0,
+    setRecordStartPosition: (v) => set({ recordStartPosition: v }),
+
+    // Scene adapter
+    activeAdapter: null,
+    setActiveAdapter: (adapter) => set({ activeAdapter: adapter }),
+
+    // Unified progress path — drives adapter + Zustand bridge
+    setSceneProgress: (p) => {
+        get().activeAdapter?.setProgress(p);
+        set({ scrollProgress: p });
+    },
 }));
