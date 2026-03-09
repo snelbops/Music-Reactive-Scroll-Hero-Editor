@@ -1,3 +1,16 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: unknown
+last_updated: "2026-03-09T23:03:38.816Z"
+progress:
+  total_phases: 2
+  completed_phases: 1
+  total_plans: 9
+  completed_plans: 5
+---
+
 # Project State
 
 ## Project Reference
@@ -10,31 +23,32 @@ See: .planning/PROJECT.md (updated 2026-03-08)
 ## Current Position
 
 Phase: 2 of 5 (Playhead, Transport, and Motion Recording)
-Plan: 1 of 4 in current phase
+Plan: 2 of 4 in current phase
 Status: In progress
-Last activity: 2026-03-09 — Plan 02-01 (SceneAdapter contract + progress overlay) complete
+Last activity: 2026-03-09 — Plan 02-02 (viewport scrub handle pointer capture; PROG-03, PROG-04) complete
 
 Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: 14 min
-- Total execution time: 56 min
+- Total plans completed: 5
+- Average duration: 12 min
+- Total execution time: 58 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-live-scene-preview | 3 | 48 min | 16 min |
-| 02-playhead-transport-and-motion-recording | 1 | 8 min | 8 min |
+| 02-playhead-transport-and-motion-recording | 2 | 10 min | 5 min |
 
 **Recent Trend:**
 - Last 5 plans: 8 min, 10 min, 30 min, 8 min
 - Trend: stable
 
 *Updated after each plan completion*
+| Phase 02 P02 | 2 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -58,6 +72,8 @@ Recent decisions affecting current work:
 - SceneAdapter (02-01): OrbitAdapter setProgress is a no-op callback — scrollProgress in Zustand already drives GithubTestParticleField progress prop; adapter contract satisfied without redundant state write
 - SceneAdapter (02-01): GithubTestParticleField progress prop optional + backward-compatible; absent = internal time-based intro animation
 - SceneAdapter (02-01): isLoop imported in TheatreSync now so Plan 03 only needs a wire-up, not a new import
+- [Phase 02]: onPointerUp is a no-op: Theatre.js position already snapped during last onPointerMove, no extra work on release
+- [Phase 02]: transition-all removed from scrub fill bar: smooth CSS transition conflicts with real-time 60fps scrub responsiveness
 
 ### Pending Todos
 
@@ -70,5 +86,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-09
-Stopped at: Completed 02-01-PLAN.md (SceneAdapter contract + progress overlay; PROG-01, PROG-02 done)
+Stopped at: Completed 02-02-PLAN.md (viewport scrub handle pointer capture; PROG-03, PROG-04 done)
 Resume file: None
