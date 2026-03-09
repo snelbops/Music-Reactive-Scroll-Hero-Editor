@@ -35,7 +35,7 @@
 - [x] **REC-02**: While armed and Play is running, dragging the viewport scrub handle writes keyframes to the Scroll Progress lane in real time at the current playhead position
 - [x] **REC-03**: Clicking Stop ends recording and returns the playhead to its pre-record position
 - [x] **REC-04**: After recording, the captured keyframes are visible as dots connected by a curve on the Scroll Progress lane
-- [ ] **REC-05**: Creator can drag a recorded keyframe dot left/right on the lane to adjust timing, with the curve and playback updating accordingly
+- [x] **REC-05**: Creator can drag a recorded keyframe dot left/right on the lane to adjust timing, with the curve and playback updating accordingly
 
 ### Curve Editing & Parameters (CURV)
 
@@ -127,7 +127,7 @@
 | REC-02 | Phase 2 | Complete |
 | REC-03 | Phase 2 | Complete |
 | REC-04 | Phase 2 | Complete |
-| REC-05 | Phase 2 | Pending |
+| REC-05 | Phase 2 | Complete |
 | CURV-01 | Phase 3 | Pending |
 | CURV-02 | Phase 3 | Pending |
 | CURV-03 | Phase 3 | Pending |

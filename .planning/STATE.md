@@ -8,7 +8,7 @@ progress:
   total_phases: 2
   completed_phases: 2
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 8
 ---
 
 # Project State
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-08)
 ## Current Position
 
 Phase: 2 of 5 (Playhead, Transport, and Motion Recording)
-Plan: 4 of 4 in current phase — PHASE COMPLETE
+Plan: 5 of 5 in current phase — PHASE COMPLETE
 Status: Phase 2 complete
-Last activity: 2026-03-09 — Plan 02-04 (recording pipeline: keyframe write, bezier curve rendering, pre-record position restore) complete
+Last activity: 2026-03-09 — Plan 02-05 (draggable keyframe dots on Scroll POS lane with pointer capture and studio.scrub) complete
 
-Progress: [████████░░] 78%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Progress: [████████░░] 78%
 | Phase 02 P02 | 2 | 1 tasks | 1 files |
 | Phase 02 P03 | 3 | 2 tasks | 5 files |
 | Phase 02 P04 | 2 | 2 tasks | 2 files |
+| Phase 02 P05 | 5 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -81,6 +82,9 @@ Recent decisions affecting current work:
 - [02-04]: Keyframe write guard: isRecording && isPlaying in RecordMode mousemove — avoids writes during scrub-only arming
 - [02-04]: __experimental_getKeyframes cast as any[] to handle missing TypeScript typings for experimental Theatre.js API
 - [02-04]: Bezier curve uses dx/3 horizontal control point pull — simple smooth approximation without full Catmull-Rom tangent computation
+- [02-05]: studio.scrub() preferred over studio.transaction for drag — scrub.capture() replaces the preview each frame, preventing duplicate keyframe accumulation during move
+- [02-05]: draggingKfRef stores kf.value at drag start — keeps scroll value constant while only time position shifts
+- [02-05]: setPointerCapture on SVGCircleElement routes pointer events to the dragging circle even when cursor leaves it
 
 ### Pending Todos
 
@@ -93,5 +97,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-09
-Stopped at: Completed 02-04-PLAN.md (recording pipeline: keyframe write, bezier curve + dots, pre-record position restore)
+Stopped at: Completed 02-05-PLAN.md (draggable keyframe dots on Scroll POS lane with pointer capture and studio.scrub)
 Resume file: None
