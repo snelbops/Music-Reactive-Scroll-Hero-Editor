@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Maximize2 } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
 import { GithubTestParticleField } from '../presets/ParticleLab';
@@ -6,6 +6,7 @@ import GhostTrailCanvas from './GhostTrailCanvas';
 import RecordMode from './RecordMode';
 import { useStore } from '../store/useStore';
 import { OrbitAdapter, ClassicAdapter } from './SceneAdapter';
+import { sheet, SEQUENCE_DURATION } from '../theatre/core';
 
 const RATIO_VALUES: Record<string, number | null> = {
     '16:9': 16 / 9,
@@ -22,9 +23,30 @@ export default function Viewport() {
     const setAspectRatio = useStore(state => state.setAspectRatio);
     const setIsFullscreen = useStore(state => state.setIsFullscreen);
     const setActiveAdapter = useStore(state => state.setActiveAdapter);
+    const setSceneProgress = useStore(s => s.setSceneProgress);
 
     // Ref for the classic iframe element
     const iframeRef = useRef<HTMLIFrameElement>(null);
+
+    // Ref for the scrub handle track (vertical bar on the right)
+    const trackRef = useRef<HTMLDivElement>(null);
+
+    // Pointer capture handlers for the scrub handle
+    const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+    }, []);
+
+    const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+        if (!(e.buttons & 1)) return;
+        const rect = trackRef.current!.getBoundingClientRect();
+        const p = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+        sheet.sequence.position = p * SEQUENCE_DURATION;
+        setSceneProgress(p);
+    }, [setSceneProgress]);
+
+    const onPointerUp = useCallback((_e: React.PointerEvent<HTMLDivElement>) => {
+        // Position already snapped to Theatre.js during last onPointerMove — no action needed
+    }, []);
 
     // Wire the appropriate adapter whenever activePreset changes
     useEffect(() => {
@@ -129,9 +151,15 @@ export default function Viewport() {
                 </div>
 
                 {/* Scroll Progress Bar — right side, outside the letterbox stage */}
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 h-64 w-1 bg-white/5 rounded-full z-20">
+                <div
+                    ref={trackRef}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 h-64 w-1 bg-white/5 rounded-full z-30 cursor-ns-resize"
+                    onPointerDown={onPointerDown}
+                    onPointerMove={onPointerMove}
+                    onPointerUp={onPointerUp}
+                >
                     <div
-                        className="absolute top-0 w-full bg-editor-accent-purple shadow-[0_0_10px_rgba(168,85,247,0.5)] rounded-full transition-all"
+                        className="absolute top-0 w-full bg-editor-accent-purple shadow-[0_0_10px_rgba(168,85,247,0.5)] rounded-full"
                         style={{ height: `${scrollProgress * 100}%` }}
                     ></div>
                     <div
