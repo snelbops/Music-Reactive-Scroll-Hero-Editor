@@ -21,7 +21,7 @@ export default function Layout() {
 
     if (isFullscreen) {
         return (
-            <div className="fixed inset-0 z-[9999] bg-[#050508]">
+            <div className="fixed inset-0 z-[9999] bg-[#050508] flex">
                 <Viewport />
                 <button
                     onClick={() => setIsFullscreen(false)}

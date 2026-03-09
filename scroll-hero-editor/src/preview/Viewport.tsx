@@ -61,10 +61,9 @@ export default function Viewport() {
                     className={`relative overflow-hidden ${isRecording ? 'ring-2 ring-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.15)]' : ''}`}
                     style={{
                         aspectRatio: RATIO_VALUES[aspectRatio] ?? undefined,
-                        width: RATIO_VALUES[aspectRatio] ? undefined : '100%',
-                        height: RATIO_VALUES[aspectRatio] ? undefined : '100%',
+                        width: RATIO_VALUES[aspectRatio] ? 'auto' : '100%',
+                        height: '100%',
                         maxWidth: '100%',
-                        maxHeight: '100%',
                     }}
                 >
                     {/* Orbit: R3F Canvas */}

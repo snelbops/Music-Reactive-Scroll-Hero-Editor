@@ -105,6 +105,15 @@ None - no external service configuration required.
 - TypeScript clean (npx tsc --noEmit exits 0)
 - npm run dev should show particle canvas immediately on load
 
+## Self-Check: PASSED
+
+- FOUND: scroll-hero-editor/src/store/useStore.ts
+- FOUND: scroll-hero-editor/src/editor/LeftPanel.tsx
+- FOUND: scroll-hero-editor/src/preview/Viewport.tsx
+- FOUND: .planning/phases/01-live-scene-preview/01-02-SUMMARY.md
+- FOUND commit: 7df4e2b (Task 1)
+- FOUND commit: d60fcd8 (Task 2)
+
 ---
 *Phase: 01-live-scene-preview*
 *Completed: 2026-03-09*
