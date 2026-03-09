@@ -1,6 +1,7 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { Play, Pause, Square, Repeat, Circle, ZoomIn, ZoomOut } from 'lucide-react';
 import { onChange } from '@theatre/core';
+import studio from '@theatre/studio';
 import { useStore } from '../store/useStore';
 import { useKickDrumData } from '../packages/useKickDrumData';
 import { sheet, SEQUENCE_DURATION, scrollControlsObj } from '../theatre/core';
@@ -33,6 +34,8 @@ export default function Timeline() {
     const [keyframeDots, setKeyframeDots] = useState<Array<{ position: number; value: number; id?: string }>>([]);
     const lanesRef = useRef<HTMLDivElement>(null);
     const scrollHistory = useRef<{ pos: number; val: number }[]>([]);
+    // Tracks an in-progress keyframe drag: scrub batches position writes; value is the keyframe's scroll value
+    const draggingKfRef = useRef<{ scrub: ReturnType<typeof studio.scrub>; value: number; svgEl: SVGSVGElement } | null>(null);
 
     const { beats, waveform, isReady } = useKickDrumData(audioUrl);
 
@@ -260,7 +263,7 @@ export default function Timeline() {
                         <span className="text-[9px] font-mono text-editor-accent-purple/60">{(scrollProgress * 100).toFixed(1)}%</span>
                     </div>
                     <div className="flex-1 relative overflow-hidden bg-editor-accent-purple/[0.03]">
-                        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none">
+                        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
                             <defs><filter id="pglow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
                             <line x1="0" y1={VB_H} x2={VB_W} y2="0" stroke="rgba(168,85,247,0.12)" strokeWidth="1" strokeDasharray="4 4"/>
                             {scrollPolyline && <>
@@ -291,17 +294,52 @@ export default function Timeline() {
                                     />
                                 );
                             })()}
-                            {/* Recorded keyframe dots — rendered on top of the curve */}
+                            {/* Recorded keyframe dots — draggable left/right to shift timing */}
                             {keyframeDots.map((kf, i) => (
                                 <circle
                                     key={kf.id ?? i}
                                     cx={(kf.position / SEQUENCE_DURATION) * VB_W}
                                     cy={(1 - kf.value) * VB_H}
-                                    r="4"
+                                    r="6"
                                     fill="#a855f7"
                                     stroke="white"
-                                    strokeWidth="1"
+                                    strokeWidth="1.5"
                                     className="cursor-ew-resize"
+                                    style={{ pointerEvents: 'all' }}
+                                    onPointerDown={(e) => {
+                                        e.stopPropagation(); // prevent lane playhead drag from triggering
+                                        (e.target as SVGCircleElement).setPointerCapture(e.pointerId);
+                                        const svgEl = (e.target as SVGCircleElement).ownerSVGElement!;
+                                        draggingKfRef.current = {
+                                            scrub: studio.scrub(),
+                                            value: kf.value,
+                                            svgEl,
+                                        };
+                                    }}
+                                    onPointerMove={(e) => {
+                                        if (!draggingKfRef.current || !(e.buttons & 1)) return;
+                                        const { scrub, value, svgEl } = draggingKfRef.current;
+                                        // Convert client X to SVG viewBox X
+                                        const rect = svgEl.getBoundingClientRect();
+                                        const svgX = ((e.clientX - rect.left) / rect.width) * VB_W;
+                                        const newTime = Math.max(0, Math.min(SEQUENCE_DURATION, (svgX / VB_W) * SEQUENCE_DURATION));
+                                        scrub.capture(({ set }) => {
+                                            sheet.sequence.position = newTime;
+                                            set(scrollControlsObj.props.position, value);
+                                        });
+                                    }}
+                                    onPointerUp={() => {
+                                        if (!draggingKfRef.current) return;
+                                        draggingKfRef.current.scrub.commit();
+                                        draggingKfRef.current = null;
+                                        // Refresh dots after commit so the circle appears at the new position
+                                        setKeyframeDots(
+                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                            (sheet.sequence as any).__experimental_getKeyframes(
+                                                scrollControlsObj.props.position
+                                            ) as Array<{ position: number; value: number; id?: string }>
+                                        );
+                                    }}
                                 />
                             ))}
                             <circle cx={seqPos * VB_W} cy={(1 - scrollProgress) * VB_H} r="4" fill="#a855f7" filter="url(#pglow)"/>
