@@ -66,9 +66,9 @@
 
 ### Codebase Scaffold (SCAF)
 
-- [ ] **SCAF-01**: `useKickDrumData` hook is present at `src/packages/useKickDrumData.ts`, typed, exports correctly, and is not wired into any UI (marked `// deferred: audio sync — v2`)
-- [ ] **SCAF-02**: All missing dependencies installed: `@theatre/studio`, `@theatre/r3f`, `@react-three/fiber`, `@react-three/drei`, `three`, `gsap`
-- [ ] **SCAF-03**: `particle-lab-package` source files copied into `src/presets/ParticleLab/`
+- [x] **SCAF-01**: `useKickDrumData` hook is present at `src/packages/useKickDrumData.ts`, typed, exports correctly, and is not wired into any UI (marked `// deferred: audio sync — v2`)
+- [x] **SCAF-02**: All missing dependencies installed: `@theatre/studio`, `@theatre/r3f`, `@react-three/fiber`, `@react-three/drei`, `three`, `gsap`
+- [x] **SCAF-03**: `particle-lab-package` source files copied into `src/presets/ParticleLab/`
 
 ## v2 Requirements
 
@@ -105,9 +105,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SCAF-01 | Phase 1 | Pending |
-| SCAF-02 | Phase 1 | Pending |
-| SCAF-03 | Phase 1 | Pending |
+| SCAF-01 | Phase 1 | Complete |
+| SCAF-02 | Phase 1 | Complete |
+| SCAF-03 | Phase 1 | Complete |
 | PREV-01 | Phase 1 | Pending |
 | PREV-02 | Phase 1 | Pending |
 | PREV-03 | Phase 1 | Pending |

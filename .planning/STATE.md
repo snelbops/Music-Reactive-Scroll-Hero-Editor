@@ -10,27 +10,27 @@ See: .planning/PROJECT.md (updated 2026-03-08)
 ## Current Position
 
 Phase: 1 of 5 (Live Scene Preview)
-Plan: 0 of ? in current phase
-Status: Ready to plan
-Last activity: 2026-03-08 — Roadmap created; 38 v1 requirements mapped across 5 phases
+Plan: 1 of ? in current phase
+Status: In progress
+Last activity: 2026-03-09 — Plan 01-01 (SCAF scaffold) complete
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 10%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: -
+- Total plans completed: 1
+- Average duration: 8 min
+- Total execution time: 8 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 01-live-scene-preview | 1 | 8 min | 8 min |
 
 **Recent Trend:**
-- Last 5 plans: -
+- Last 5 plans: 8 min
 - Trend: -
 
 *Updated after each plan completion*
@@ -46,6 +46,8 @@ Recent decisions affecting current work:
 - Architecture: ffmpeg WASM in Web Worker so frame extraction is non-blocking
 - Architecture: Theatre.js Studio is dev-only; strips to @theatre/core in export bundle
 - Constraint: Phase 4 (Video) and Phase 3 (Curves) both unblock from Phase 2 — can be ordered either way; Phase 5 needs both
+- Scaffold (01-01): Do not copy GithubTestView.tsx — only GithubTestParticleField.tsx and TouchTexture.ts are needed
+- Scaffold (01-01): Deferred hook pattern — annotate audio hooks with '// deferred: audio sync — v2' before wiring in v2
 
 ### Pending Todos
 
@@ -53,11 +55,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- Key deps not yet installed: `@theatre/studio`, `@theatre/r3f`, `@react-three/fiber`, `@react-three/drei`, `three`, `gsap` — Phase 1 plan must address first (SCAF-02)
-- ParticleLab preset source files not yet copied into `src/presets/ParticleLab/` — needed before PREV-01 can render (SCAF-03)
+None — SCAF-02 (all 6 deps confirmed) and SCAF-03 (ParticleLab files copied) resolved in plan 01-01.
 
 ## Session Continuity
 
-Last session: 2026-03-08
-Stopped at: Roadmap written; ready to run /gsd:plan-phase 1
+Last session: 2026-03-09
+Stopped at: Completed 01-01-PLAN.md (scaffold phase complete; SCAF-01, SCAF-02, SCAF-03 done)
 Resume file: None
