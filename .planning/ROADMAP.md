@@ -47,7 +47,15 @@ Plans:
   3. Creator can drag the viewport scrub handle to set progress (0-1) manually and release it to snap the timeline playhead to that position
   4. Creator can click Arm Record, press Play, drag the scrub handle, stop, and see the captured motion appear as keyframe dots connected by a curve on the Scroll Progress lane
   5. Creator can drag a recorded keyframe dot left or right to shift its timing and see the curve update immediately
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — SceneAdapter contract, store foundation, TheatreSync wiring, progress overlay (PROG-01, PROG-02)
+- [ ] 02-02-PLAN.md — Interactive viewport scrub handle with pointer capture (PROG-03, PROG-04)
+- [ ] 02-03-PLAN.md — Theatre.js state.json, transport Stop/Loop fixes, reactive time display (TL-01, TL-02, TL-03, TL-04, TL-05, TL-06)
+- [ ] 02-04-PLAN.md — Arm Record with keyframe write, pre-record position restore, keyframe dots (REC-01, REC-02, REC-03, REC-04)
+- [ ] 02-05-PLAN.md — Draggable keyframe dot timing adjustment (REC-05)
+- [ ] 02-06-PLAN.md — Human verification of full Phase 2 workflow
 
 ### Phase 3: Curve Editing and Inspector
 **Goal**: Creators can animate scene parameters across multiple lanes and fine-tune keyframe easing from the right inspector
@@ -95,7 +103,7 @@ Note: Phase 3 and Phase 4 both depend on Phase 2 and can be worked in either ord
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Live Scene Preview | 3/3 | Complete   | 2026-03-09 |
-| 2. Playhead, Transport, and Motion Recording | 0/? | Not started | - |
+| 2. Playhead, Transport, and Motion Recording | 1/6 | In Progress|  |
 | 3. Curve Editing and Inspector | 0/? | Not started | - |
 | 4. Frame Sequence Video Hero | 0/? | Not started | - |
 | 5. Export Standalone Hero | 0/? | Not started | - |

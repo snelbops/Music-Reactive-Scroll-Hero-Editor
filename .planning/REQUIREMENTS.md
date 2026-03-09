@@ -15,8 +15,8 @@
 
 ### Progress Interface (PROG)
 
-- [ ] **PROG-01**: The active scene exposes a `setProgress(p: number)` interface (0–1) that all scene types implement as a `SceneAdapter` contract
-- [ ] **PROG-02**: The viewport displays a non-interactive progress indicator overlay showing the current value (e.g. `0.47`)
+- [x] **PROG-01**: The active scene exposes a `setProgress(p: number)` interface (0–1) that all scene types implement as a `SceneAdapter` contract
+- [x] **PROG-02**: The viewport displays a non-interactive progress indicator overlay showing the current value (e.g. `0.47`)
 - [ ] **PROG-03**: Creator can drag a scrub handle in the viewport to manually set `progress` (0–1), overriding the playhead position
 - [ ] **PROG-04**: Releasing the viewport scrub handle snaps the timeline playhead to the matching position
 
@@ -113,8 +113,8 @@
 | PREV-03 | Phase 1 | Complete |
 | PREV-04 | Phase 1 | Complete |
 | PREV-05 | Phase 1 | Complete |
-| PROG-01 | Phase 2 | Pending |
-| PROG-02 | Phase 2 | Pending |
+| PROG-01 | Phase 2 | Complete |
+| PROG-02 | Phase 2 | Complete |
 | PROG-03 | Phase 2 | Pending |
 | PROG-04 | Phase 2 | Pending |
 | TL-01 | Phase 2 | Pending |
