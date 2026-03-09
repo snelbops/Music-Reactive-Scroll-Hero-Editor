@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-03-08)
 ## Current Position
 
 Phase: 1 of 5 (Live Scene Preview)
-Plan: 1 of ? in current phase
+Plan: 2 of ? in current phase
 Status: In progress
-Last activity: 2026-03-09 — Plan 01-01 (SCAF scaffold) complete
+Last activity: 2026-03-09 — Plan 01-02 (preset switcher wiring) complete
 
-Progress: [█░░░░░░░░░] 10%
+Progress: [██░░░░░░░░] 20%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 8 min
-- Total execution time: 8 min
+- Total plans completed: 2
+- Average duration: 9 min
+- Total execution time: 18 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-live-scene-preview | 1 | 8 min | 8 min |
+| 01-live-scene-preview | 2 | 18 min | 9 min |
 
 **Recent Trend:**
-- Last 5 plans: 8 min
-- Trend: -
+- Last 5 plans: 8 min, 10 min
+- Trend: stable
 
 *Updated after each plan completion*
 
@@ -48,6 +48,9 @@ Recent decisions affecting current work:
 - Constraint: Phase 4 (Video) and Phase 3 (Curves) both unblock from Phase 2 — can be ordered either way; Phase 5 needs both
 - Scaffold (01-01): Do not copy GithubTestView.tsx — only GithubTestParticleField.tsx and TouchTexture.ts are needed
 - Scaffold (01-01): Deferred hook pattern — annotate audio hooks with '// deferred: audio sync — v2' before wiring in v2
+- Preset wiring (01-02): ScrollyVideoPlayer removed from Viewport centre — it will reappear in Phase 4 context, not the same location
+- Preset wiring (01-02): CHOREOGRAPHED MOMENTS overlay removed — placeholder that blocked live particle canvas view
+- Preset wiring (01-02): Union string literals for PresetId/AspectRatio (no TypeScript enum — erasableSyntaxOnly: true)
 
 ### Pending Todos
 
@@ -60,5 +63,5 @@ None — SCAF-02 (all 6 deps confirmed) and SCAF-03 (ParticleLab files copied) r
 ## Session Continuity
 
 Last session: 2026-03-09
-Stopped at: Completed 01-01-PLAN.md (scaffold phase complete; SCAF-01, SCAF-02, SCAF-03 done)
+Stopped at: Completed 01-02-PLAN.md (preset switcher wiring; PREV-01, PREV-02, PREV-03 done)
 Resume file: None
