@@ -167,9 +167,11 @@ interface GithubTestParticleFieldProps {
     depth?: number;
     size?: number;
     touchRadius?: number;
+    /** Optional external progress (0–1). When provided, drives uAssemble instead of the internal timer. */
+    progress?: number;
 }
 
-export const GithubTestParticleField = ({ imageUrl, theme, rotationSpeed = 0.1, depth = 2.0, size = 1.4, touchRadius = 0.15 }: GithubTestParticleFieldProps) => {
+export const GithubTestParticleField = ({ imageUrl, theme, rotationSpeed = 0.1, depth = 2.0, size = 1.4, touchRadius = 0.15, progress }: GithubTestParticleFieldProps) => {
     const meshRef = useRef<THREE.Mesh>(null);
     const matRef = useRef<THREE.RawShaderMaterial>(null);
     const touchRef = useRef<TouchTexture | null>(null);
@@ -277,7 +279,9 @@ export const GithubTestParticleField = ({ imageUrl, theme, rotationSpeed = 0.1, 
         const u = matRef.current.uniforms;
         timeRef.current += delta;
         u.uTime.value = timeRef.current;
-        u.uAssemble.value = Math.min(1.0, timeRef.current / 2.0);
+        // When an external progress prop is provided (scrub/transport), use it directly.
+        // Otherwise fall back to the internal time-based intro animation.
+        u.uAssemble.value = progress !== undefined ? progress : Math.min(1.0, timeRef.current / 2.0);
         u.uInvert.value = isDark ? 0.0 : 1.0;
         u.uDepth.value = depth;
         u.uSize.value = size;

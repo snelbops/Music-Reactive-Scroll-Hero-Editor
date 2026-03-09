@@ -1,9 +1,11 @@
+import { useEffect, useRef } from 'react';
 import { Maximize2 } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
 import { GithubTestParticleField } from '../presets/ParticleLab';
 import GhostTrailCanvas from './GhostTrailCanvas';
 import RecordMode from './RecordMode';
 import { useStore } from '../store/useStore';
+import { OrbitAdapter, ClassicAdapter } from './SceneAdapter';
 
 const RATIO_VALUES: Record<string, number | null> = {
     '16:9': 16 / 9,
@@ -19,6 +21,29 @@ export default function Viewport() {
     const aspectRatio = useStore(state => state.aspectRatio);
     const setAspectRatio = useStore(state => state.setAspectRatio);
     const setIsFullscreen = useStore(state => state.setIsFullscreen);
+    const setActiveAdapter = useStore(state => state.setActiveAdapter);
+
+    // Ref for the classic iframe element
+    const iframeRef = useRef<HTMLIFrameElement>(null);
+
+    // Wire the appropriate adapter whenever activePreset changes
+    useEffect(() => {
+        if (activePreset === 'orbit') {
+            // OrbitAdapter forwards progress to scrollProgress (already in Zustand,
+            // GithubTestParticleField reads it via the progress prop below)
+            setActiveAdapter(new OrbitAdapter((v) => {
+                // setSceneProgress has already updated scrollProgress in Zustand;
+                // this callback is intentionally a no-op since the progress prop
+                // on GithubTestParticleField reads scrollProgress directly.
+                void v;
+            }));
+        } else {
+            setActiveAdapter(new ClassicAdapter(iframeRef));
+        }
+        return () => {
+            setActiveAdapter(null);
+        };
+    }, [activePreset, setActiveAdapter]);
 
     return (
         <main className="flex-1 flex flex-col relative bg-[#050508]">
@@ -75,6 +100,7 @@ export default function Viewport() {
                             <GithubTestParticleField
                                 imageUrl="/github-test-app/images/sample-01.png"
                                 theme="dark"
+                                progress={scrollProgress}
                             />
                         </Canvas>
                     )}
@@ -82,15 +108,17 @@ export default function Viewport() {
                     {/* Classic: iframe */}
                     {activePreset === 'classic' && (
                         <iframe
+                            ref={iframeRef}
                             src="/github-test-app/index.html"
                             style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
                             title="Classic Particles"
                         />
                     )}
 
-                    {/* Debug Overlay */}
-                    <div className="absolute top-4 left-4 z-50 bg-black/80 text-green-400 font-mono text-xs px-2 py-1 rounded border border-green-400/30 shadow-[0_0_10px_rgba(34,197,94,0.2)] pointer-events-none">
-                        DEBUG: Scroll Progress = {scrollProgress.toFixed(3)}
+                    {/* Progress Overlay — replaces old DEBUG label */}
+                    <div className="absolute top-4 left-4 z-50 bg-black/70 text-white font-mono text-sm px-3 py-1.5 rounded pointer-events-none">
+                        <span className="text-editor-accent-purple">{scrollProgress.toFixed(3)}</span>
+                        <span className="text-[9px] text-gray-500 ml-1">PROGRESS</span>
                     </div>
 
                     {/* Ghost Trail Canvas */}
