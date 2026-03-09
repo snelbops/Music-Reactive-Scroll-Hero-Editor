@@ -5,10 +5,20 @@ import GhostTrailCanvas from './GhostTrailCanvas';
 import RecordMode from './RecordMode';
 import { useStore } from '../store/useStore';
 
+const RATIO_VALUES: Record<string, number | null> = {
+    '16:9': 16 / 9,
+    '9:16': 9 / 16,
+    '1:1': 1,
+    'free': null,
+};
+
 export default function Viewport() {
     const scrollProgress = useStore(state => state.scrollProgress);
     const isRecording = useStore(state => state.isRecording);
     const activePreset = useStore(state => state.activePreset);
+    const aspectRatio = useStore(state => state.aspectRatio);
+    const setAspectRatio = useStore(state => state.setAspectRatio);
+    const setIsFullscreen = useStore(state => state.setIsFullscreen);
 
     return (
         <main className="flex-1 flex flex-col relative bg-[#050508]">
@@ -25,20 +35,37 @@ export default function Viewport() {
                     <div className="h-4 w-[1px] bg-editor-border"></div>
                     <div className="flex items-center gap-2">
                         <span className="text-gray-500">Ratio</span>
-                        <button className="px-2 py-0.5 glass-panel text-xxs">16:9</button>
+                        {(['16:9', '9:16', '1:1', 'free'] as const).map((r) => (
+                            <button
+                                key={r}
+                                onClick={() => setAspectRatio(r)}
+                                className={`px-2 py-0.5 text-xxs border rounded transition-colors
+                                    ${aspectRatio === r
+                                        ? 'bg-editor-accent-purple/20 border-editor-accent-purple/50 text-editor-accent-purple'
+                                        : 'glass-panel border-transparent hover:bg-white/10'}`}
+                            >
+                                {r}
+                            </button>
+                        ))}
                     </div>
                 </div>
-                <button className="p-1.5 glass-panel hover:bg-white/10">
+                <button onClick={() => setIsFullscreen(true)} className="p-1.5 glass-panel hover:bg-white/10">
                     <Maximize2 className="w-4 h-4" />
                 </button>
             </div>
 
             {/* Preview Area */}
-            <div className="flex-1 flex items-center justify-center overflow-hidden bg-black/60">
-                {/* Stage — fills available space (aspect ratio constrained in Plan 03) */}
+            <div className="flex-1 flex items-center justify-center overflow-hidden bg-black/60 relative">
+                {/* Letterbox Stage */}
                 <div
-                    className={`relative overflow-hidden w-full h-full ${isRecording ? 'ring-2 ring-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.15)]' : ''}`}
-                    style={{ position: 'relative' }}
+                    className={`relative overflow-hidden ${isRecording ? 'ring-2 ring-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.15)]' : ''}`}
+                    style={{
+                        aspectRatio: RATIO_VALUES[aspectRatio] ?? undefined,
+                        width: RATIO_VALUES[aspectRatio] ? undefined : '100%',
+                        height: RATIO_VALUES[aspectRatio] ? undefined : '100%',
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                    }}
                 >
                     {/* Orbit: R3F Canvas */}
                     {activePreset === 'orbit' && (
@@ -74,7 +101,7 @@ export default function Viewport() {
                     <RecordMode />
                 </div>
 
-                {/* Scroll Progress Bar — right side */}
+                {/* Scroll Progress Bar — right side, outside the letterbox stage */}
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 h-64 w-1 bg-white/5 rounded-full z-20">
                     <div
                         className="absolute top-0 w-full bg-editor-accent-purple shadow-[0_0_10px_rgba(168,85,247,0.5)] rounded-full transition-all"
@@ -89,4 +116,3 @@ export default function Viewport() {
         </main>
     );
 }
-
