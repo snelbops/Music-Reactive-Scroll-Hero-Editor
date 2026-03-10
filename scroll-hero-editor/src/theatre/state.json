@@ -8,7 +8,7 @@
       "sequence": {
         "subUnitsPerUnit": 30,
         "length": 10,
-        "type": "PositionIMap",
+        "type": "PositionalSequence",
         "tracksByObject": {
           "Scroll Controls": {
             "trackData": {

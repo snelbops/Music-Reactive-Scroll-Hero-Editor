@@ -1,12 +1,11 @@
 import { getProject, types } from '@theatre/core';
 import studio from '@theatre/studio';
-import projectState from './state.json';
 
 /** Total sequence length in seconds. scrollProgress 0→1 maps across this duration. */
 export const SEQUENCE_DURATION = 10;
 
-// Initialize Theatre.js project and sheet — pre-seeded state marks position as sequenced
-export const project = getProject('Scroll Hero Editor', { state: projectState });
+// Initialize Theatre.js project — studio persists state in localStorage automatically
+export const project = getProject('Scroll Hero Editor');
 export const sheet = project.sheet('Main Sequence');
 
 // Initialize Studio in dev so studio.transaction is available for recording
