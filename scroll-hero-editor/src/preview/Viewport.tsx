@@ -187,12 +187,12 @@ export default function Viewport() {
                         </Canvas>
                     )}
 
-                    {/* Classic: iframe */}
+                    {/* Classic: iframe — inverted (white bg, dark particles) */}
                     {activePreset === 'classic' && (
                         <iframe
                             ref={iframeRef}
                             src="/github-test-app/index.html"
-                            style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+                            style={{ width: '100%', height: '100%', border: 'none', display: 'block', filter: 'invert(1)' }}
                             title="Classic Particles"
                         />
                     )}

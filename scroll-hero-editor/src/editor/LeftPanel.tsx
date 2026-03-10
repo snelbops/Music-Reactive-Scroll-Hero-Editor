@@ -6,7 +6,7 @@ import { extractFrames } from '../packages/ffmpegExtractor';
 const PARTICLE_LAB_PRESETS = [
     { id: 'orbit' as const, label: 'Orbit', description: 'Dark bg · white particles' },
     { id: 'light' as const, label: 'Light', description: 'White bg · dark particles' },
-    { id: 'classic' as const, label: 'Classic', description: 'iframe scene' },
+    { id: 'classic' as const, label: 'Classic', description: 'White bg · dark particles' },
 ] as const;
 
 export default function LeftPanel() {
