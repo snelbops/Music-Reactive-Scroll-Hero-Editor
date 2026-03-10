@@ -7,8 +7,7 @@ const PARTICLE_LAB_PRESETS = [
     { id: 'orbit' as const,            label: 'Orbit',             description: 'Dark bg · white particles' },
     { id: 'light' as const,            label: 'Light',             description: 'White bg · dark particles' },
     { id: 'classic-dark' as const,     label: 'Classic Dark',      description: 'Original · dark bg' },
-    { id: 'classic-inverted' as const, label: 'Classic Inverted',  description: 'CSS negative · white bg' },
-    { id: 'classic' as const,          label: 'Classic Light',     description: 'Shader · white bg · clearer' },
+    { id: 'classic-inverted' as const, label: 'Classic Inverted',  description: 'White bg · dark particles' },
 ] as const;
 
 export default function LeftPanel() {

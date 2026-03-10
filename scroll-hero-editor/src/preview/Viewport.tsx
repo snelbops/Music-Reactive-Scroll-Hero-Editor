@@ -76,7 +76,7 @@ export default function Viewport() {
 
     // Wire the appropriate adapter whenever activePreset changes
     useEffect(() => {
-        if (activePreset === 'orbit' || activePreset === 'light' || activePreset === 'classic') {
+        if (activePreset === 'orbit' || activePreset === 'light') {
             // OrbitAdapter forwards progress to scrollProgress (already in Zustand,
             // GithubTestParticleField reads it via the progress prop below)
             setActiveAdapter(new OrbitAdapter((v) => {
