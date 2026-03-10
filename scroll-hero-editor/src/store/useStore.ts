@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { SceneAdapter } from '../preview/SceneAdapter';
 
-type PresetId = 'orbit' | 'classic' | 'frames';
+type PresetId = 'orbit' | 'light' | 'classic' | 'frames';
 type AspectRatio = '16:9' | '9:16' | '1:1' | 'free';
 
 export interface RecordedEvent {

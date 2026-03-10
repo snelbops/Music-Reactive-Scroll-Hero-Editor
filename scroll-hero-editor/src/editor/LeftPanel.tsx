@@ -1,10 +1,17 @@
 import { useState, useRef } from 'react';
 import { useStore } from '../store/useStore';
-import { ChevronDown, ChevronRight, UploadCloud, Video, Film } from 'lucide-react';
+import { ChevronDown, ChevronRight, UploadCloud, Video, Film, Layers } from 'lucide-react';
 import { extractFrames } from '../packages/ffmpegExtractor';
 
+const PARTICLE_LAB_PRESETS = [
+    { id: 'orbit' as const, label: 'Orbit', description: 'Dark bg · white particles' },
+    { id: 'light' as const, label: 'Light', description: 'White bg · dark particles' },
+    { id: 'classic' as const, label: 'Classic', description: 'iframe scene' },
+] as const;
+
 export default function LeftPanel() {
-    const [isPresetsOpen, setIsPresetsOpen] = useState(true);
+    const [isComponentsOpen, setIsComponentsOpen] = useState(true);
+    const [isParticleLabOpen, setIsParticleLabOpen] = useState(true);
     const [isAssetsOpen, setIsAssetsOpen] = useState(true);
 
     const activePreset = useStore(state => state.activePreset);
@@ -47,29 +54,50 @@ export default function LeftPanel() {
 
     return (
         <aside className="w-[220px] flex flex-col border-r border-editor-border bg-black/20 p-2 gap-2 overflow-y-auto thin-scrollbar">
-            {/* Presets */}
+            {/* Components */}
             <section>
                 <button
-                    onClick={() => setIsPresetsOpen(!isPresetsOpen)}
+                    onClick={() => setIsComponentsOpen(!isComponentsOpen)}
                     className="w-full flex justify-between items-center py-1 px-2 text-xxs font-bold text-gray-400 uppercase tracking-tighter mb-1 hover:text-white"
                 >
-                    Presets {isPresetsOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                    Components {isComponentsOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                 </button>
-                {isPresetsOpen && (
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                        {(['orbit', 'classic'] as const).map((preset) => (
+                {isComponentsOpen && (
+                    <div className="space-y-1 mb-2">
+                        {/* Particle Lab */}
+                        <div className="rounded border border-white/5 bg-white/2 overflow-hidden">
                             <button
-                                key={preset}
-                                onClick={() => setActivePreset(preset)}
-                                className={`aspect-video rounded border cursor-pointer flex flex-col items-center justify-center text-xxs transition-colors ${
-                                    activePreset === preset
-                                        ? 'bg-editor-accent-purple/10 border-editor-accent-purple/70'
-                                        : 'bg-white/5 border-white/10 hover:border-editor-accent-purple/50'
-                                }`}
+                                onClick={() => setIsParticleLabOpen(!isParticleLabOpen)}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 text-xxs text-gray-300 hover:bg-white/5 transition-colors"
                             >
-                                <span className="capitalize">{preset}</span>
+                                <Layers className="w-3 h-3 text-editor-accent-purple shrink-0" />
+                                <span className="flex-1 text-left font-medium">Particle Lab</span>
+                                {isParticleLabOpen ? <ChevronDown className="w-3 h-3 text-gray-500" /> : <ChevronRight className="w-3 h-3 text-gray-500" />}
                             </button>
-                        ))}
+                            {isParticleLabOpen && (
+                                <div className="px-2 pb-2 space-y-1">
+                                    {PARTICLE_LAB_PRESETS.map(({ id, label, description }) => (
+                                        <button
+                                            key={id}
+                                            onClick={() => setActivePreset(id)}
+                                            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-left transition-colors ${
+                                                activePreset === id
+                                                    ? 'bg-editor-accent-purple/15 border border-editor-accent-purple/50 text-white'
+                                                    : 'bg-white/3 border border-white/5 text-gray-400 hover:bg-white/8 hover:text-gray-200'
+                                            }`}
+                                        >
+                                            <span className={`w-2 h-2 rounded-full shrink-0 ${
+                                                id === 'light' ? 'bg-gray-200 border border-gray-400' : 'bg-editor-accent-purple'
+                                            }`} />
+                                            <div className="min-w-0">
+                                                <div className="text-xxs font-medium leading-tight">{label}</div>
+                                                <div className="text-[9px] text-gray-500 leading-tight truncate">{description}</div>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </section>

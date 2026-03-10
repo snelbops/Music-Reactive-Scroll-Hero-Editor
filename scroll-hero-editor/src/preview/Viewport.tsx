@@ -76,7 +76,7 @@ export default function Viewport() {
 
     // Wire the appropriate adapter whenever activePreset changes
     useEffect(() => {
-        if (activePreset === 'orbit') {
+        if (activePreset === 'orbit' || activePreset === 'light') {
             // OrbitAdapter forwards progress to scrollProgress (already in Zustand,
             // GithubTestParticleField reads it via the progress prop below)
             setActiveAdapter(new OrbitAdapter((v) => {
@@ -142,7 +142,7 @@ export default function Viewport() {
                         opacity: cssOpacity,
                     }}
                 >
-                    {/* Orbit: R3F Canvas */}
+                    {/* Orbit: R3F Canvas — dark particles */}
                     {activePreset === 'orbit' && (
                         <Canvas
                             camera={{ position: [0, 0, 5], fov: 50 }}
@@ -151,6 +151,23 @@ export default function Viewport() {
                             <GithubTestParticleField
                                 imageUrl="/github-test-app/images/sample-01.png"
                                 theme="dark"
+                                progress={scrollProgress}
+                                rotationSpeed={rotationSpeed}
+                                depth={particleDepth}
+                                size={particleSize}
+                            />
+                        </Canvas>
+                    )}
+
+                    {/* Light: R3F Canvas — white bg, dark particles */}
+                    {activePreset === 'light' && (
+                        <Canvas
+                            camera={{ position: [0, 0, 5], fov: 50 }}
+                            style={{ width: '100%', height: '100%', background: 'white', display: 'block' }}
+                        >
+                            <GithubTestParticleField
+                                imageUrl="/github-test-app/images/sample-01.png"
+                                theme="light"
                                 progress={scrollProgress}
                                 rotationSpeed={rotationSpeed}
                                 depth={particleDepth}
