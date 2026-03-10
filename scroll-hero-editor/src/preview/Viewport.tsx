@@ -21,15 +21,39 @@ export default function Viewport() {
     const activePreset = useStore(state => state.activePreset);
     const aspectRatio = useStore(state => state.aspectRatio);
     const setAspectRatio = useStore(state => state.setAspectRatio);
+    const isFullscreen = useStore(state => state.isFullscreen);
     const setIsFullscreen = useStore(state => state.setIsFullscreen);
     const setActiveAdapter = useStore(state => state.setActiveAdapter);
     const setSceneProgress = useStore(s => s.setSceneProgress);
+    const rotationSpeed = useStore(s => s.rotationSpeed);
+    const particleDepth = useStore(s => s.particleDepth);
+    const particleSize = useStore(s => s.particleSize);
+    const cssOpacity = useStore(s => s.cssOpacity);
 
     // Ref for the classic iframe element
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
     // Ref for the scrub handle track (vertical bar on the right)
     const trackRef = useRef<HTMLDivElement>(null);
+
+    // Ref for the preview area — used for wheel scrub
+    const previewRef = useRef<HTMLDivElement>(null);
+
+    // Mouse wheel → scrub progress (passive:false required for preventDefault)
+    useEffect(() => {
+        const el = previewRef.current;
+        if (!el) return;
+        const onWheel = (e: WheelEvent) => {
+            e.preventDefault();
+            const delta = e.deltaY / 800;
+            const current = useStore.getState().scrollProgress;
+            const next = Math.max(0, Math.min(1, current + delta));
+            sheet.sequence.position = next * SEQUENCE_DURATION;
+            useStore.getState().setSceneProgress(next);
+        };
+        el.addEventListener('wheel', onWheel, { passive: false });
+        return () => el.removeEventListener('wheel', onWheel);
+    }, []);
 
     // Pointer capture handlers for the scrub handle
     const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -69,8 +93,8 @@ export default function Viewport() {
 
     return (
         <main className="flex-1 flex flex-col relative bg-[#050508]">
-            {/* Viewport Controls */}
-            <div className="h-10 border-b border-editor-border flex items-center justify-between px-4 z-10 bg-black/40">
+            {/* Viewport Controls — hidden in fullscreen */}
+            {!isFullscreen && <div className="h-10 border-b border-editor-border flex items-center justify-between px-4 z-10 bg-black/40">
                 <div className="flex items-center gap-4 text-xs">
                     <div className="flex items-center gap-2">
                         <span className="text-gray-500">Zoom</span>
@@ -99,10 +123,10 @@ export default function Viewport() {
                 <button onClick={() => setIsFullscreen(true)} className="p-1.5 glass-panel hover:bg-white/10">
                     <Maximize2 className="w-4 h-4" />
                 </button>
-            </div>
+            </div>}
 
             {/* Preview Area */}
-            <div className="flex-1 flex items-center justify-center overflow-hidden bg-black/60 relative">
+            <div ref={previewRef} className="flex-1 flex items-center justify-center overflow-hidden bg-black/60 relative">
                 {/* Letterbox Stage */}
                 <div
                     className={`relative overflow-hidden ${isRecording ? 'ring-2 ring-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.15)]' : ''}`}
@@ -111,6 +135,7 @@ export default function Viewport() {
                         width: RATIO_VALUES[aspectRatio] ? 'auto' : '100%',
                         height: '100%',
                         maxWidth: '100%',
+                        opacity: cssOpacity,
                     }}
                 >
                     {/* Orbit: R3F Canvas */}
@@ -123,6 +148,9 @@ export default function Viewport() {
                                 imageUrl="/github-test-app/images/sample-01.png"
                                 theme="dark"
                                 progress={scrollProgress}
+                                rotationSpeed={rotationSpeed}
+                                depth={particleDepth}
+                                size={particleSize}
                             />
                         </Canvas>
                     )}

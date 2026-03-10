@@ -1,4 +1,5 @@
 import { getProject, types } from '@theatre/core';
+import studio from '@theatre/studio';
 import projectState from './state.json';
 
 /** Total sequence length in seconds. scrollProgress 0→1 maps across this duration. */
@@ -10,9 +11,7 @@ export const sheet = project.sheet('Main Sequence');
 
 // Initialize Studio in dev so studio.transaction is available for recording
 if (import.meta.env.DEV) {
-    import('@theatre/studio').then(({ default: studio }) => {
-        studio.initialize();
-    });
+    studio.initialize();
 }
 
 // Define our core scroll control parameters as a Theatre object.
@@ -39,4 +38,16 @@ export const mouseInputObj = sheet.object('Mouse Input', {
     mouseX: types.number(0.5, { range: [0, 1] }),
     mouseY: types.number(0.5, { range: [0, 1] }),
     click: types.number(0, { range: [0, 1] }),
+});
+
+// Scene parameter lanes — drive GithubTestParticleField props via Theatre.js
+export const sceneParamsObj = sheet.object('Scene Parameters', {
+    rotationSpeed: types.number(0.1, { range: [0, 2] }),
+    depth: types.number(2.0, { range: [0, 10] }),
+    size: types.number(1.4, { range: [0.1, 5] }),
+});
+
+// CSS Opacity lane — fades the entire scene in/out
+export const cssOpacityObj = sheet.object('CSS Opacity', {
+    opacity: types.number(1, { range: [0, 1] }),
 });

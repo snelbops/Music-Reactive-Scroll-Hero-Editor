@@ -25,6 +25,10 @@ export default function Timeline() {
     const setSceneProgress = useStore(state => state.setSceneProgress);
     const recordStartPosition = useStore(state => state.recordStartPosition);
     const setRecordStartPosition = useStore(state => state.setRecordStartPosition);
+    const rotationSpeed = useStore(s => s.rotationSpeed);
+    const particleDepth = useStore(s => s.particleDepth);
+    const particleSize = useStore(s => s.particleSize);
+    const cssOpacity = useStore(s => s.cssOpacity);
 
     const [timelineZoom, setTimelineZoom] = useState(1);
     const [lanesWidth, setLanesWidth] = useState(0);
@@ -348,7 +352,95 @@ export default function Timeline() {
                     </div>
                 </div>
 
-                {/* Lane 5: Scroll Speed */}
+                {/* Lane 5: Rotation Speed */}
+                <div className="flex h-10 border-b border-white/5 group">
+                    <div className="w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 bg-black/40 sticky left-0 z-30 gap-0.5">
+                        <span className="text-xxs uppercase font-bold text-editor-accent-teal">Rotation Speed</span>
+                        <span className="text-[9px] font-mono text-editor-accent-teal/60">{rotationSpeed.toFixed(3)}</span>
+                    </div>
+                    <div className="flex-1 relative overflow-hidden">
+                        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none">
+                            {/* reference: current value as horizontal line; range [0, 2] */}
+                            {(() => {
+                                const y = (1 - rotationSpeed / 2) * VB_H;
+                                return (
+                                    <>
+                                        <line x1="0" y1={y} x2={VB_W} y2={y} stroke="rgba(20,184,166,0.2)" strokeWidth="1" strokeDasharray="4 4"/>
+                                        <circle cx={(sheet.sequence.position / SEQUENCE_DURATION) * VB_W} cy={y} r="3" fill="#14b8a6" opacity="0.8"/>
+                                    </>
+                                );
+                            })()}
+                        </svg>
+                    </div>
+                </div>
+
+                {/* Lane 6: Particle Depth */}
+                <div className="flex h-10 border-b border-white/5 group">
+                    <div className="w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 bg-black/40 sticky left-0 z-30 gap-0.5">
+                        <span className="text-xxs uppercase font-bold text-editor-accent-green">Particle Depth</span>
+                        <span className="text-[9px] font-mono text-editor-accent-green/60">{particleDepth.toFixed(2)}</span>
+                    </div>
+                    <div className="flex-1 relative overflow-hidden">
+                        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none">
+                            {/* range [0, 10] */}
+                            {(() => {
+                                const y = (1 - particleDepth / 10) * VB_H;
+                                return (
+                                    <>
+                                        <line x1="0" y1={y} x2={VB_W} y2={y} stroke="rgba(34,197,94,0.2)" strokeWidth="1" strokeDasharray="4 4"/>
+                                        <circle cx={(sheet.sequence.position / SEQUENCE_DURATION) * VB_W} cy={y} r="3" fill="#22c55e" opacity="0.8"/>
+                                    </>
+                                );
+                            })()}
+                        </svg>
+                    </div>
+                </div>
+
+                {/* Lane 7: Particle Size */}
+                <div className="flex h-10 border-b border-white/5 group">
+                    <div className="w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 bg-black/40 sticky left-0 z-30 gap-0.5">
+                        <span className="text-xxs uppercase font-bold text-editor-accent-green">Particle Size</span>
+                        <span className="text-[9px] font-mono text-editor-accent-green/60">{particleSize.toFixed(2)}</span>
+                    </div>
+                    <div className="flex-1 relative overflow-hidden">
+                        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none">
+                            {/* range [0.1, 5] */}
+                            {(() => {
+                                const y = (1 - (particleSize - 0.1) / 4.9) * VB_H;
+                                return (
+                                    <>
+                                        <line x1="0" y1={y} x2={VB_W} y2={y} stroke="rgba(34,197,94,0.2)" strokeWidth="1" strokeDasharray="4 4"/>
+                                        <circle cx={(sheet.sequence.position / SEQUENCE_DURATION) * VB_W} cy={y} r="3" fill="#22c55e" opacity="0.8"/>
+                                    </>
+                                );
+                            })()}
+                        </svg>
+                    </div>
+                </div>
+
+                {/* Lane 8: CSS Opacity */}
+                <div className="flex h-10 border-b border-white/5 group">
+                    <div className="w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 bg-black/40 sticky left-0 z-30 gap-0.5">
+                        <span className="text-xxs uppercase font-bold text-editor-accent-blue">CSS Opacity</span>
+                        <span className="text-[9px] font-mono text-editor-accent-blue/60">{cssOpacity.toFixed(2)}</span>
+                    </div>
+                    <div className="flex-1 relative overflow-hidden">
+                        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none">
+                            {/* range [0, 1] */}
+                            {(() => {
+                                const y = (1 - cssOpacity) * VB_H;
+                                return (
+                                    <>
+                                        <line x1="0" y1={y} x2={VB_W} y2={y} stroke="rgba(59,130,246,0.2)" strokeWidth="1" strokeDasharray="4 4"/>
+                                        <circle cx={(sheet.sequence.position / SEQUENCE_DURATION) * VB_W} cy={y} r="3" fill="#3b82f6" opacity="0.8"/>
+                                    </>
+                                );
+                            })()}
+                        </svg>
+                    </div>
+                </div>
+
+                {/* Lane 9: Scroll Speed (mock) */}
                 <div className="flex h-10 border-b border-white/5 group">
                     <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
                         <span className="text-[10px] uppercase font-bold text-editor-accent-teal">Scroll Speed</span>
@@ -360,7 +452,7 @@ export default function Timeline() {
                     </div>
                 </div>
 
-                {/* Lane 6: Scroll Dir */}
+                {/* Lane 10: Scroll Dir */}
                 <div className="flex h-10 border-b border-white/5 group">
                     <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
                         <span className="text-[10px] uppercase font-bold text-editor-accent-blue">Scroll DIR</span>
@@ -375,7 +467,7 @@ export default function Timeline() {
                     </div>
                 </div>
 
-                {/* Lane 7: Click Events */}
+                {/* Lane 11: Click Events */}
                 <div className="flex h-10 border-b border-white/5 group">
                     <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
                         <span className="text-[10px] uppercase font-bold text-red-400 truncate">Clicks</span>

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { scrollControlsObj, sheet, SEQUENCE_DURATION } from './core';
+import { scrollControlsObj, sceneParamsObj, cssOpacityObj, sheet, SEQUENCE_DURATION } from './core';
 
 /**
  * TheatreSync — logic-only component mounted at the app root.
@@ -18,6 +18,22 @@ export default function TheatreSync() {
     useEffect(() => {
         return scrollControlsObj.onValuesChange((values) => {
             useStore.getState().setSceneProgress(values.position);
+        });
+    }, []);
+
+    // Scene parameter lanes → Zustand (drives GithubTestParticleField props)
+    useEffect(() => {
+        return sceneParamsObj.onValuesChange((values) => {
+            useStore.getState().setRotationSpeed(values.rotationSpeed);
+            useStore.getState().setParticleDepth(values.depth);
+            useStore.getState().setParticleSize(values.size);
+        });
+    }, []);
+
+    // CSS Opacity lane → Zustand
+    useEffect(() => {
+        return cssOpacityObj.onValuesChange((values) => {
+            useStore.getState().setCssOpacity(values.opacity);
         });
     }, []);
 

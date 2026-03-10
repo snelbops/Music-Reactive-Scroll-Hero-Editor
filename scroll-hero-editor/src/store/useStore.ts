@@ -47,6 +47,16 @@ interface EditorState {
     recordStartPosition: number;
     setRecordStartPosition: (v: number) => void;
 
+    // Scene parameter lanes (Epic 3)
+    rotationSpeed: number;
+    setRotationSpeed: (v: number) => void;
+    particleDepth: number;
+    setParticleDepth: (v: number) => void;
+    particleSize: number;
+    setParticleSize: (v: number) => void;
+    cssOpacity: number;
+    setCssOpacity: (v: number) => void;
+
     // Scene adapter (Phase 2) — the active preset's progress driver
     activeAdapter: SceneAdapter | null;
     setActiveAdapter: (adapter: SceneAdapter | null) => void;
@@ -89,6 +99,16 @@ export const useStore = create<EditorState>((set, get) => ({
     setIsLoop: (v) => set({ isLoop: v }),
     recordStartPosition: 0,
     setRecordStartPosition: (v) => set({ recordStartPosition: v }),
+
+    // Scene parameter lanes
+    rotationSpeed: 0.1,
+    setRotationSpeed: (v) => set({ rotationSpeed: v }),
+    particleDepth: 2.0,
+    setParticleDepth: (v) => set({ particleDepth: v }),
+    particleSize: 1.4,
+    setParticleSize: (v) => set({ particleSize: v }),
+    cssOpacity: 1,
+    setCssOpacity: (v) => set({ cssOpacity: v }),
 
     // Scene adapter
     activeAdapter: null,
