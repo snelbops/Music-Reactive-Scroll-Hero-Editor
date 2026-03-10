@@ -76,7 +76,7 @@ export default function Viewport() {
 
     // Wire the appropriate adapter whenever activePreset changes
     useEffect(() => {
-        if (activePreset === 'orbit' || activePreset === 'light') {
+        if (activePreset === 'orbit' || activePreset === 'light' || activePreset === 'classic') {
             // OrbitAdapter forwards progress to scrollProgress (already in Zustand,
             // GithubTestParticleField reads it via the progress prop below)
             setActiveAdapter(new OrbitAdapter((v) => {
@@ -85,7 +85,7 @@ export default function Viewport() {
                 // on GithubTestParticleField reads scrollProgress directly.
                 void v;
             }));
-        } else if (activePreset === 'classic') {
+        } else if (activePreset === 'classic-dark' || activePreset === 'classic-inverted') {
             setActiveAdapter(new ClassicAdapter(iframeRef));
         } else {
             setActiveAdapter(new FrameSequenceAdapter());
@@ -187,13 +187,40 @@ export default function Viewport() {
                         </Canvas>
                     )}
 
-                    {/* Classic: iframe — inverted (white bg, dark particles) */}
+                    {/* Classic Light: Three.js shader, white bg — clearest rendering */}
                     {activePreset === 'classic' && (
+                        <Canvas
+                            camera={{ position: [0, 0, 5], fov: 50 }}
+                            style={{ width: '100%', height: '100%', background: 'white', display: 'block' }}
+                        >
+                            <GithubTestParticleField
+                                imageUrl="/github-test-app/images/sample-01.png"
+                                theme="light"
+                                progress={scrollProgress}
+                                rotationSpeed={rotationSpeed}
+                                depth={particleDepth}
+                                size={particleSize}
+                            />
+                        </Canvas>
+                    )}
+
+                    {/* Classic Dark: original iframe, dark bg */}
+                    {activePreset === 'classic-dark' && (
+                        <iframe
+                            ref={iframeRef}
+                            src="/github-test-app/index.html"
+                            style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+                            title="Classic Particles Dark"
+                        />
+                    )}
+
+                    {/* Classic Inverted: CSS negative of the iframe */}
+                    {activePreset === 'classic-inverted' && (
                         <iframe
                             ref={iframeRef}
                             src="/github-test-app/index.html"
                             style={{ width: '100%', height: '100%', border: 'none', display: 'block', filter: 'invert(1)' }}
-                            title="Classic Particles"
+                            title="Classic Particles Inverted"
                         />
                     )}
 
