@@ -29,6 +29,10 @@ export default function Timeline() {
     const particleDepth = useStore(s => s.particleDepth);
     const particleSize = useStore(s => s.particleSize);
     const cssOpacity = useStore(s => s.cssOpacity);
+    const setSelectedLane = useStore(s => s.setSelectedLane);
+    const setSelectedKeyframe = useStore(s => s.setSelectedKeyframe);
+    const selectedLane = useStore(s => s.selectedLane);
+    const selectedKeyframe = useStore(s => s.selectedKeyframe);
 
     const [timelineZoom, setTimelineZoom] = useState(1);
     const [lanesWidth, setLanesWidth] = useState(0);
@@ -262,7 +266,10 @@ export default function Timeline() {
 
                 {/* Lane 4: Scroll Pos — live curve */}
                 <div className="flex h-12 border-b border-white/5">
-                    <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 bg-black/40 sticky left-0 z-30 gap-0.5 ${isRecording ? 'ring-1 ring-inset ring-editor-accent-purple/60 bg-editor-accent-purple/10' : ''}`}>
+                    <div
+                        className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${isRecording ? 'ring-1 ring-inset ring-editor-accent-purple/60 bg-editor-accent-purple/10' : selectedLane === 'scrollPos' ? 'bg-editor-accent-purple/15' : 'bg-black/40 hover:bg-white/5'}`}
+                        onClick={() => setSelectedLane('scrollPos')}
+                    >
                         <span className="text-xxs uppercase font-bold text-editor-accent-purple">Scroll POS</span>
                         <span className="text-[9px] font-mono text-editor-accent-purple/60">{(scrollProgress * 100).toFixed(1)}%</span>
                     </div>
@@ -298,18 +305,24 @@ export default function Timeline() {
                                     />
                                 );
                             })()}
-                            {/* Recorded keyframe dots — draggable left/right to shift timing */}
-                            {keyframeDots.map((kf, i) => (
+                            {/* Recorded keyframe dots — draggable left/right to shift timing; click to select */}
+                            {keyframeDots.map((kf, i) => {
+                                const isSelected = selectedKeyframe?.laneId === 'scrollPos' && Math.abs(selectedKeyframe.position - kf.position) < 0.01;
+                                return (
                                 <circle
                                     key={kf.id ?? i}
                                     cx={(kf.position / SEQUENCE_DURATION) * VB_W}
                                     cy={(1 - kf.value) * VB_H}
                                     r="6"
-                                    fill="#a855f7"
-                                    stroke="white"
+                                    fill={isSelected ? 'white' : '#a855f7'}
+                                    stroke={isSelected ? '#a855f7' : 'white'}
                                     strokeWidth="1.5"
                                     className="cursor-ew-resize"
                                     style={{ pointerEvents: 'all' }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedKeyframe({ laneId: 'scrollPos', position: kf.position, value: kf.value });
+                                    }}
                                     onPointerDown={(e) => {
                                         e.stopPropagation(); // prevent lane playhead drag from triggering
                                         (e.target as SVGCircleElement).setPointerCapture(e.pointerId);
@@ -345,7 +358,8 @@ export default function Timeline() {
                                         );
                                     }}
                                 />
-                            ))}
+                                );
+                            })}
                             <circle cx={seqPos * VB_W} cy={(1 - scrollProgress) * VB_H} r="4" fill="#a855f7" filter="url(#pglow)"/>
                             <circle cx={seqPos * VB_W} cy={(1 - scrollProgress) * VB_H} r="2.5" fill="white"/>
                         </svg>
@@ -354,7 +368,7 @@ export default function Timeline() {
 
                 {/* Lane 5: Rotation Speed */}
                 <div className="flex h-10 border-b border-white/5 group">
-                    <div className="w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 bg-black/40 sticky left-0 z-30 gap-0.5">
+                    <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${selectedLane === 'rotationSpeed' ? 'bg-teal-500/10' : 'bg-black/40 hover:bg-white/5'}`} onClick={() => setSelectedLane('rotationSpeed')}>
                         <span className="text-xxs uppercase font-bold text-editor-accent-teal">Rotation Speed</span>
                         <span className="text-[9px] font-mono text-editor-accent-teal/60">{rotationSpeed.toFixed(3)}</span>
                     </div>
@@ -376,7 +390,7 @@ export default function Timeline() {
 
                 {/* Lane 6: Particle Depth */}
                 <div className="flex h-10 border-b border-white/5 group">
-                    <div className="w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 bg-black/40 sticky left-0 z-30 gap-0.5">
+                    <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${selectedLane === 'depth' ? 'bg-green-500/10' : 'bg-black/40 hover:bg-white/5'}`} onClick={() => setSelectedLane('depth')}>
                         <span className="text-xxs uppercase font-bold text-editor-accent-green">Particle Depth</span>
                         <span className="text-[9px] font-mono text-editor-accent-green/60">{particleDepth.toFixed(2)}</span>
                     </div>
@@ -398,7 +412,7 @@ export default function Timeline() {
 
                 {/* Lane 7: Particle Size */}
                 <div className="flex h-10 border-b border-white/5 group">
-                    <div className="w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 bg-black/40 sticky left-0 z-30 gap-0.5">
+                    <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${selectedLane === 'size' ? 'bg-green-500/10' : 'bg-black/40 hover:bg-white/5'}`} onClick={() => setSelectedLane('size')}>
                         <span className="text-xxs uppercase font-bold text-editor-accent-green">Particle Size</span>
                         <span className="text-[9px] font-mono text-editor-accent-green/60">{particleSize.toFixed(2)}</span>
                     </div>
@@ -420,7 +434,7 @@ export default function Timeline() {
 
                 {/* Lane 8: CSS Opacity */}
                 <div className="flex h-10 border-b border-white/5 group">
-                    <div className="w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 bg-black/40 sticky left-0 z-30 gap-0.5">
+                    <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${selectedLane === 'cssOpacity' ? 'bg-blue-500/10' : 'bg-black/40 hover:bg-white/5'}`} onClick={() => setSelectedLane('cssOpacity')}>
                         <span className="text-xxs uppercase font-bold text-editor-accent-blue">CSS Opacity</span>
                         <span className="text-[9px] font-mono text-editor-accent-blue/60">{cssOpacity.toFixed(2)}</span>
                     </div>

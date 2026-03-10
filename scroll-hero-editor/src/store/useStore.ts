@@ -47,6 +47,12 @@ interface EditorState {
     recordStartPosition: number;
     setRecordStartPosition: (v: number) => void;
 
+    // Inspector selection state (Story 3.3)
+    selectedLane: string | null;
+    setSelectedLane: (id: string | null) => void;
+    selectedKeyframe: { laneId: string; position: number; value: number } | null;
+    setSelectedKeyframe: (kf: { laneId: string; position: number; value: number } | null) => void;
+
     // Scene parameter lanes (Epic 3)
     rotationSpeed: number;
     setRotationSpeed: (v: number) => void;
@@ -99,6 +105,12 @@ export const useStore = create<EditorState>((set, get) => ({
     setIsLoop: (v) => set({ isLoop: v }),
     recordStartPosition: 0,
     setRecordStartPosition: (v) => set({ recordStartPosition: v }),
+
+    // Inspector selection state
+    selectedLane: null,
+    setSelectedLane: (id) => set({ selectedLane: id, selectedKeyframe: null }),
+    selectedKeyframe: null,
+    setSelectedKeyframe: (kf) => set({ selectedKeyframe: kf, selectedLane: kf?.laneId ?? null }),
 
     // Scene parameter lanes
     rotationSpeed: 0.1,
