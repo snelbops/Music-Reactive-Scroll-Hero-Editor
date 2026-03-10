@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@theme {
+  --color-editor-bg: #0a0a0f;
+  --color-editor-panel: rgba(255, 255, 255, 0.03);
+  --color-editor-border: rgba(255, 255, 255, 0.1);
+  --color-editor-accent-purple: #a855f7;
+  --color-editor-accent-teal: #14b8a6;
+  --color-editor-accent-orange: #f97316;
+  --color-editor-accent-green: #22c55e;
+  --color-editor-accent-blue: #3b82f6;
+
+  --text-xxs: 10px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+}
+
+@layer utilities {
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+  }
+  .thin-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  .thin-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .thin-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+  }
+  .waveform-bg {
+    background-image: linear-gradient(to right, rgba(249, 115, 22, 0.3) 1px, transparent 1px);
+    background-size: 8px 100%;
+  }
+}

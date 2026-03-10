@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { SceneAdapter } from '../preview/SceneAdapter';
 
-type PresetId = 'orbit' | 'classic';
+type PresetId = 'orbit' | 'classic' | 'frames';
 type AspectRatio = '16:9' | '9:16' | '1:1' | 'free';
 
 export interface RecordedEvent {
@@ -46,6 +46,16 @@ interface EditorState {
     setIsLoop: (v: boolean) => void;
     recordStartPosition: number;
     setRecordStartPosition: (v: number) => void;
+
+    // Frame extraction state (Epic 4)
+    mp4Asset: { name: string; url: string } | null;
+    setMp4Asset: (asset: { name: string; url: string } | null) => void;
+    extractedFrames: Blob[];
+    setExtractedFrames: (frames: Blob[]) => void;
+    extractionProgress: number;
+    setExtractionProgress: (p: number) => void;
+    extractionStatus: 'idle' | 'extracting' | 'done' | 'error';
+    setExtractionStatus: (s: 'idle' | 'extracting' | 'done' | 'error') => void;
 
     // Inspector selection state (Story 3.3)
     selectedLane: string | null;
@@ -105,6 +115,16 @@ export const useStore = create<EditorState>((set, get) => ({
     setIsLoop: (v) => set({ isLoop: v }),
     recordStartPosition: 0,
     setRecordStartPosition: (v) => set({ recordStartPosition: v }),
+
+    // Frame extraction state
+    mp4Asset: null,
+    setMp4Asset: (asset) => set({ mp4Asset: asset }),
+    extractedFrames: [],
+    setExtractedFrames: (frames) => set({ extractedFrames: frames }),
+    extractionProgress: 0,
+    setExtractionProgress: (p) => set({ extractionProgress: p }),
+    extractionStatus: 'idle',
+    setExtractionStatus: (s) => set({ extractionStatus: s }),
 
     // Inspector selection state
     selectedLane: null,

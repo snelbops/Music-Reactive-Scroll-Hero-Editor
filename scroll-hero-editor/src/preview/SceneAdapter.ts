@@ -45,3 +45,14 @@ export class ClassicAdapter implements SceneAdapter {
         this.iframeRef.current?.contentWindow?.postMessage({ type: 'setProgress', value: p }, '*');
     }
 }
+
+/**
+ * FrameSequenceAdapter — drives the FrameSequenceScene preset.
+ * Progress is already in Zustand via setSceneProgress; FrameSequenceScene
+ * reads scrollProgress from the store directly, so setProgress is a no-op here.
+ */
+export class FrameSequenceAdapter implements SceneAdapter {
+    setProgress(_p: number): void {
+        // no-op — FrameSequenceScene reads scrollProgress from Zustand
+    }
+}

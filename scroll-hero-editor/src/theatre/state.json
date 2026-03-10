@@ -1,4 +1,5 @@
 {
+  "__version": 2,
   "sheetsById": {
     "Main Sequence": {
       "staticOverrides": {
@@ -17,7 +18,7 @@
               }
             },
             "trackIdByPropPath": {
-              "position": "__KEY_position__"
+              "\"position\"": "__KEY_position__"
             }
           }
         }

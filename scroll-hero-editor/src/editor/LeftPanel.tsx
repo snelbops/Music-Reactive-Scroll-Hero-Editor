@@ -1,25 +1,48 @@
 import { useState, useRef } from 'react';
 import { useStore } from '../store/useStore';
-import { ChevronDown, ChevronRight, UploadCloud, Video, Image } from 'lucide-react';
+import { ChevronDown, ChevronRight, UploadCloud, Video, Film } from 'lucide-react';
+import { extractFrames } from '../packages/ffmpegExtractor';
 
 export default function LeftPanel() {
     const [isPresetsOpen, setIsPresetsOpen] = useState(true);
     const [isAssetsOpen, setIsAssetsOpen] = useState(true);
-    const [isLayersOpen, setIsLayersOpen] = useState(true);
 
-    const setVideoUrl = useStore(state => state.setVideoUrl);
     const activePreset = useStore(state => state.activePreset);
     const setActivePreset = useStore(state => state.setActivePreset);
-    const [importedVideoName, setImportedVideoName] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const mp4Asset = useStore(s => s.mp4Asset);
+    const setMp4Asset = useStore(s => s.setMp4Asset);
+    const extractedFrames = useStore(s => s.extractedFrames);
+    const setExtractedFrames = useStore(s => s.setExtractedFrames);
+    const extractionProgress = useStore(s => s.extractionProgress);
+    const setExtractionProgress = useStore(s => s.setExtractionProgress);
+    const extractionStatus = useStore(s => s.extractionStatus);
+    const setExtractionStatus = useStore(s => s.setExtractionStatus);
 
-    const handleImportVideo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const mp4InputRef = useRef<HTMLInputElement>(null);
+
+    const handleMp4Upload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-
         const url = URL.createObjectURL(file);
-        setVideoUrl(url);
-        setImportedVideoName(file.name);
+        setMp4Asset({ name: file.name, url });
+        setExtractedFrames([]);
+        setExtractionStatus('idle');
+        setExtractionProgress(0);
+    };
+
+    const handleExtract = async () => {
+        const file = mp4InputRef.current?.files?.[0];
+        if (!file) return;
+        setExtractionStatus('extracting');
+        setExtractionProgress(0);
+        try {
+            const frames = await extractFrames(file, (p) => setExtractionProgress(p));
+            setExtractedFrames(frames);
+            setExtractionStatus('done');
+        } catch (err) {
+            console.error('ffmpeg extraction failed:', err);
+            setExtractionStatus('error');
+        }
     };
 
     return (
@@ -60,78 +83,77 @@ export default function LeftPanel() {
                     Assets {isAssetsOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                 </button>
                 {isAssetsOpen && (
-                    <div className="space-y-1">
-                        <input
-                            type="file"
-                            accept="video/mp4,video/webm"
-                            className="hidden"
-                            ref={fileInputRef}
-                            onChange={handleImportVideo}
-                        />
-                        <input
-                            type="file"
-                            accept="audio/*"
-                            className="hidden"
-                            id="audio-upload"
-                            onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                useStore.getState().setAudioUrl(URL.createObjectURL(file));
-                            }}
-                        />
-                        <div className="flex gap-2 mb-2">
-                            <button
-                                onClick={() => fileInputRef.current?.click()}
-                                className="flex-1 flex items-center justify-center gap-1 p-1 glass-panel text-xxs text-gray-300 hover:bg-white/10 hover:text-white transition-colors border border-dashed border-white/20"
-                            >
+                    <div className="space-y-2">
+                        {/* Hidden inputs */}
+                        <input type="file" accept="video/mp4" className="hidden" ref={mp4InputRef} onChange={handleMp4Upload} />
+                        <input type="file" accept="audio/*" className="hidden" id="audio-upload"
+                            onChange={(e) => { const f = e.target.files?.[0]; if (f) useStore.getState().setAudioUrl(URL.createObjectURL(f)); }} />
+
+                        {/* Upload buttons */}
+                        <div className="flex gap-2">
+                            <button onClick={() => mp4InputRef.current?.click()}
+                                className="flex-1 flex items-center justify-center gap-1 p-1 glass-panel text-xxs text-gray-300 hover:bg-white/10 border border-dashed border-white/20">
                                 <UploadCloud className="w-3 h-3" /> MP4
                             </button>
-                            <button
-                                onClick={() => document.getElementById('audio-upload')?.click()}
-                                className="flex-1 flex items-center justify-center gap-1 p-1 glass-panel text-xxs text-gray-300 hover:bg-white/10 hover:text-white transition-colors border border-dashed border-white/20"
-                            >
+                            <button onClick={() => document.getElementById('audio-upload')?.click()}
+                                className="flex-1 flex items-center justify-center gap-1 p-1 glass-panel text-xxs text-gray-300 hover:bg-white/10 border border-dashed border-white/20">
                                 <UploadCloud className="w-3 h-3" /> Audio
                             </button>
                         </div>
 
-                        <div className="flex items-center gap-2 p-1.5 glass-panel text-xxs hover:bg-white/5 cursor-grab">
-                            <div className="w-6 h-6 bg-editor-accent-blue/20 rounded flex items-center justify-center text-editor-accent-blue">
-                                <Video className="w-3 h-3" />
-                            </div>
-                            <span className="truncate">{importedVideoName || "goldengate.mp4"}</span>
-                        </div>
-                        <div className="flex items-center gap-2 p-1.5 glass-panel text-xxs hover:bg-white/5 cursor-grab opacity-50">
-                            <div className="w-6 h-6 bg-editor-accent-teal/20 rounded flex items-center justify-center text-editor-accent-teal">
-                                <Image className="w-3 h-3" />
-                            </div>
-                            <span className="truncate">hero_title_mask.png</span>
-                        </div>
-                    </div>
-                )}
-            </section>
+                        {/* MP4 asset card */}
+                        {mp4Asset && (
+                            <div className="glass-panel rounded p-2 space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 bg-editor-accent-blue/20 rounded flex items-center justify-center text-editor-accent-blue shrink-0">
+                                        <Video className="w-3 h-3" />
+                                    </div>
+                                    <span className="truncate text-xxs text-gray-300 flex-1">{mp4Asset.name}</span>
+                                </div>
 
-            {/* Layers */}
-            <section className="flex-1 mt-2">
-                <button
-                    onClick={() => setIsLayersOpen(!isLayersOpen)}
-                    className="w-full flex justify-between items-center py-1 px-2 text-xxs font-bold text-gray-400 uppercase tracking-tighter mb-1 hover:text-white"
-                >
-                    Layers {isLayersOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                </button>
-                {isLayersOpen && (
-                    <div className="space-y-1">
-                        <div className="flex items-center gap-2 p-2 rounded bg-editor-accent-purple/10 border border-editor-accent-purple/30 text-xs">
-                            <span className="w-2 h-2 rounded-full bg-editor-accent-purple"></span>
-                            <span>Hero Text Mesh</span>
-                        </div>
-                        <div className="flex items-center gap-2 p-2 rounded hover:bg-white/5 text-xs text-gray-500">
-                            <span className="w-2 h-2 rounded-full bg-gray-600"></span>
-                            <span>Particles Group</span>
-                        </div>
-                        <div className="flex items-center gap-2 p-2 rounded hover:bg-white/5 text-xs text-gray-500">
-                            <span className="w-2 h-2 rounded-full bg-gray-600"></span>
-                            <span>Camera Path</span>
-                        </div>
+                                {/* Extraction progress */}
+                                {extractionStatus === 'extracting' && (
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between text-[9px] text-gray-500">
+                                            <span className="animate-pulse">Extracting frames…</span>
+                                            <span>{Math.round(extractionProgress * 100)}%</span>
+                                        </div>
+                                        <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                                            <div className="h-full bg-editor-accent-orange rounded-full transition-all" style={{ width: `${extractionProgress * 100}%` }} />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {extractionStatus === 'error' && (
+                                    <p className="text-[9px] text-red-400">Extraction failed. Try again.</p>
+                                )}
+
+                                {extractionStatus === 'done' && (
+                                    <p className="text-[9px] text-editor-accent-green">{extractedFrames.length} frames extracted</p>
+                                )}
+
+                                {/* Action buttons */}
+                                <div className="flex gap-1.5">
+                                    {extractionStatus !== 'done' && extractionStatus !== 'extracting' && (
+                                        <button onClick={handleExtract}
+                                            className="flex-1 flex items-center justify-center gap-1 py-1 text-[9px] bg-editor-accent-orange/20 border border-editor-accent-orange/40 text-editor-accent-orange rounded hover:bg-editor-accent-orange/30 transition-colors">
+                                            <Film className="w-2.5 h-2.5" /> Extract Frames
+                                        </button>
+                                    )}
+                                    {extractionStatus === 'done' && (
+                                        <button
+                                            onClick={() => setActivePreset('frames')}
+                                            className={`flex-1 py-1 text-[9px] rounded border transition-colors ${
+                                                activePreset === 'frames'
+                                                    ? 'bg-editor-accent-purple/20 border-editor-accent-purple/50 text-editor-accent-purple'
+                                                    : 'bg-white/5 border-white/20 text-gray-300 hover:bg-white/10'
+                                            }`}>
+                                            {activePreset === 'frames' ? '✓ Loaded' : 'Load as Scene'}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </section>

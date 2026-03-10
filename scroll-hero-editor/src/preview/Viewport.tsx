@@ -4,8 +4,9 @@ import { Canvas } from '@react-three/fiber';
 import { GithubTestParticleField } from '../presets/ParticleLab';
 import GhostTrailCanvas from './GhostTrailCanvas';
 import RecordMode from './RecordMode';
+import FrameSequenceScene from './FrameSequenceScene';
 import { useStore } from '../store/useStore';
-import { OrbitAdapter, ClassicAdapter } from './SceneAdapter';
+import { OrbitAdapter, ClassicAdapter, FrameSequenceAdapter } from './SceneAdapter';
 import { sheet, SEQUENCE_DURATION } from '../theatre/core';
 
 const RATIO_VALUES: Record<string, number | null> = {
@@ -29,6 +30,7 @@ export default function Viewport() {
     const particleDepth = useStore(s => s.particleDepth);
     const particleSize = useStore(s => s.particleSize);
     const cssOpacity = useStore(s => s.cssOpacity);
+    const extractedFrames = useStore(s => s.extractedFrames);
 
     // Ref for the classic iframe element
     const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -83,8 +85,10 @@ export default function Viewport() {
                 // on GithubTestParticleField reads scrollProgress directly.
                 void v;
             }));
-        } else {
+        } else if (activePreset === 'classic') {
             setActiveAdapter(new ClassicAdapter(iframeRef));
+        } else {
+            setActiveAdapter(new FrameSequenceAdapter());
         }
         return () => {
             setActiveAdapter(null);
@@ -152,6 +156,17 @@ export default function Viewport() {
                                 depth={particleDepth}
                                 size={particleSize}
                             />
+                        </Canvas>
+                    )}
+
+                    {/* Frames: R3F Canvas with FrameSequenceScene */}
+                    {activePreset === 'frames' && (
+                        <Canvas
+                            orthographic
+                            camera={{ near: 0.1, far: 10, position: [0, 0, 1] }}
+                            style={{ width: '100%', height: '100%', background: '#000', display: 'block' }}
+                        >
+                            <FrameSequenceScene frames={extractedFrames} progress={scrollProgress} />
                         </Canvas>
                     )}
 
