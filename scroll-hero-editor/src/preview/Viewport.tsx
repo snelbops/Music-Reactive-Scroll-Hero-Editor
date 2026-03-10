@@ -187,23 +187,6 @@ export default function Viewport() {
                         </Canvas>
                     )}
 
-                    {/* Classic Light: Three.js shader, white bg — clearest rendering */}
-                    {activePreset === 'classic' && (
-                        <Canvas
-                            camera={{ position: [0, 0, 5], fov: 50 }}
-                            style={{ width: '100%', height: '100%', background: 'white', display: 'block' }}
-                        >
-                            <GithubTestParticleField
-                                imageUrl="/github-test-app/images/sample-01.png"
-                                theme="light"
-                                progress={scrollProgress}
-                                rotationSpeed={rotationSpeed}
-                                depth={particleDepth}
-                                size={particleSize}
-                            />
-                        </Canvas>
-                    )}
-
                     {/* Classic Dark: original iframe, dark bg */}
                     {activePreset === 'classic-dark' && (
                         <iframe

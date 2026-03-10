@@ -279,9 +279,9 @@ export const GithubTestParticleField = ({ imageUrl, theme, rotationSpeed = 0.1, 
         const u = matRef.current.uniforms;
         timeRef.current += delta;
         u.uTime.value = timeRef.current;
-        // When an external progress prop is provided (scrub/transport), use it directly.
-        // Otherwise fall back to the internal time-based intro animation.
-        u.uAssemble.value = progress !== undefined ? progress : Math.min(1.0, timeRef.current / 2.0);
+        // Always use the internal timer for assembly — particles animate in on mount.
+        // Scroll progress drives scene params (rotationSpeed, depth, size) via Theatre.js lanes.
+        u.uAssemble.value = Math.min(1.0, timeRef.current / 2.0);
         u.uInvert.value = isDark ? 0.0 : 1.0;
         u.uDepth.value = depth;
         u.uSize.value = size;
