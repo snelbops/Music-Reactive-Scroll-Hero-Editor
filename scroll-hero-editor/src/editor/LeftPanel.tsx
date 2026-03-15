@@ -28,7 +28,7 @@ const PARTICLE_LAB_PRESETS = [
     { id: 'classic-inverted' as const, label: 'Rain Light',        description: 'White bg · dark particles' },
 ] as const;
 
-export default function LeftPanel() {
+export default function LeftPanel({ width = 220 }: { width?: number }) {
     const [isComponentsOpen, setIsComponentsOpen] = useState(true);
     const [isParticleLabOpen, setIsParticleLabOpen] = useState(true);
     const [isAssetsOpen, setIsAssetsOpen] = useState(true);
@@ -98,7 +98,7 @@ export default function LeftPanel() {
     }, []);
 
     return (
-        <aside className="w-[220px] flex flex-col border-r border-editor-border bg-black/20 p-2 gap-2 overflow-y-auto thin-scrollbar">
+        <aside className="flex flex-col border-r border-editor-border bg-black/20 p-2 gap-2 overflow-y-auto thin-scrollbar" style={{ width }}>
             {/* Components */}
             <section>
                 <button

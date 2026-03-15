@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Minimize2 } from 'lucide-react';
 import studio from '@theatre/studio';
 import LeftPanel from './LeftPanel';
@@ -17,6 +17,32 @@ export default function Layout() {
     const extractionStatus = useStore(state => state.extractionStatus);
 
     const [isExportingHtml, setIsExportingHtml] = useState(false);
+    const [timelineH, setTimelineH] = useState(280);
+    const [leftW, setLeftW] = useState(220);
+    const [rightW, setRightW] = useState(240);
+
+    const startDrag = useCallback((
+        e: React.PointerEvent<HTMLDivElement>,
+        setter: (v: number) => void,
+        current: number,
+        min: number,
+        max: number,
+        axis: 'x' | 'y',
+        sign: 1 | -1,
+    ) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        const start = axis === 'x' ? e.clientX : e.clientY;
+        const onMove = (ev: PointerEvent) => {
+            const delta = (axis === 'x' ? ev.clientX : ev.clientY) - start;
+            setter(Math.max(min, Math.min(max, current + sign * delta)));
+        };
+        const onUp = () => {
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', onUp);
+        };
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+    }, []);
 
     const handleExportJson = () => {
         const state = studio.createContentOfSaveFile('Scroll Hero Editor');
@@ -91,12 +117,24 @@ export default function Layout() {
             </header>
 
             <div className="flex flex-1 overflow-hidden">
-                <LeftPanel />
+                <LeftPanel width={leftW} />
+                <div
+                    className="w-1 shrink-0 cursor-col-resize bg-editor-border hover:bg-editor-accent-purple/60 active:bg-editor-accent-purple transition-colors"
+                    onPointerDown={(e) => startDrag(e, setLeftW, leftW, 120, 420, 'x', 1)}
+                />
                 <Viewport />
-                <Inspector />
+                <div
+                    className="w-1 shrink-0 cursor-col-resize bg-editor-border hover:bg-editor-accent-purple/60 active:bg-editor-accent-purple transition-colors"
+                    onPointerDown={(e) => startDrag(e, setRightW, rightW, 120, 420, 'x', -1)}
+                />
+                <Inspector width={rightW} />
             </div>
 
-            <Timeline />
+            <div
+                className="h-1 shrink-0 cursor-row-resize bg-editor-border hover:bg-editor-accent-purple/60 active:bg-editor-accent-purple transition-colors"
+                onPointerDown={(e) => startDrag(e, setTimelineH, timelineH, 80, 600, 'y', -1)}
+            />
+            <Timeline height={timelineH} />
         </div>
     );
 }

@@ -53,6 +53,10 @@ export default function TheatreSync() {
     // RAF play loop — advances sequence position and drives scroll via custom keyframes
     useEffect(() => {
         if (!isPlaying) return;
+        // If we're at the end, restart from beginning
+        if (sheet.sequence.position >= SEQUENCE_DURATION) {
+            sheet.sequence.position = 0;
+        }
         let lastTime: number | null = null;
         let rafId: number;
         const tick = (now: number) => {
@@ -71,6 +75,7 @@ export default function TheatreSync() {
                         const kfs = useStore.getState().scrollKeyframes;
                         useStore.getState().setSceneProgress(interpolateScrollAt(kfs, SEQUENCE_DURATION));
                         useStore.getState().setIsPlaying(false);
+                        useStore.getState().setIsRecording(false);
                     }
                     return;
                 }

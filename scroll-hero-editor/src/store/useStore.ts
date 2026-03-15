@@ -16,6 +16,7 @@ interface EditorState {
     videoUrl: string | null; setVideoUrl: (url: string | null) => void;
     audioUrl: string | null; setAudioUrl: (url: string | null) => void;
     isRecording: boolean; setIsRecording: (rec: boolean) => void;
+    recordCountdown: number | null; setRecordCountdown: (n: number | null) => void;
     recordedEvents: RecordedEvent[]; pushRecordedEvent: (ev: RecordedEvent) => void; clearRecordedEvents: () => void;
     scrollProgress: number; setScrollProgress: (progress: number) => void;
     activePreset: PresetId; setActivePreset: (preset: PresetId) => void;
@@ -28,7 +29,9 @@ interface EditorState {
     extractionProgress: number; setExtractionProgress: (p: number) => void;
     extractionStatus: 'idle' | 'extracting' | 'done' | 'error'; setExtractionStatus: (s: 'idle' | 'extracting' | 'done' | 'error') => void;
     scrollKeyframes: { time: number; value: number }[];
-    addScrollKeyframe: (time: number, value: number) => void;
+    // rangeStart: if provided, clears all existing keyframes in [rangeStart, time] before inserting.
+    // Omitting it falls back to ±16ms deduplication only (useful for the future "average overdub" mode).
+    addScrollKeyframe: (time: number, value: number, rangeStart?: number) => void;
     clearScrollKeyframes: () => void;
     setScrollKeyframes: (kfs: { time: number; value: number }[]) => void;
     selectedLane: string | null; setSelectedLane: (id: string | null) => void;
@@ -51,6 +54,7 @@ export const useStore = create<EditorState>((set, get) => ({
     videoUrl: 'https://scrollyvideo.js.org/goldengate.mp4', setVideoUrl: (url) => set({ videoUrl: url }),
     audioUrl: null, setAudioUrl: (url) => set({ audioUrl: url }),
     isRecording: false, setIsRecording: (rec) => set({ isRecording: rec }),
+    recordCountdown: null, setRecordCountdown: (n) => set({ recordCountdown: n }),
     recordedEvents: [], pushRecordedEvent: (ev) => set((s) => ({ recordedEvents: [...s.recordedEvents, ev] })), clearRecordedEvents: () => set({ recordedEvents: [] }),
     scrollProgress: 0, setScrollProgress: (progress) => set({ scrollProgress: progress }),
     activePreset: 'orbit', setActivePreset: (preset) => set({ activePreset: preset }),
@@ -63,9 +67,12 @@ export const useStore = create<EditorState>((set, get) => ({
     extractionProgress: 0, setExtractionProgress: (p) => set({ extractionProgress: p }),
     extractionStatus: 'idle', setExtractionStatus: (s) => set({ extractionStatus: s }),
     scrollKeyframes: [],
-    addScrollKeyframe: (time, value) => set((s) => {
-        const eps = 0.016;
-        const filtered = s.scrollKeyframes.filter(kf => Math.abs(kf.time - time) > eps);
+    addScrollKeyframe: (time, value, rangeStart?) => set((s) => {
+        const filtered = rangeStart !== undefined
+            // Range clear: wipe everything between the previous sample and now for clean overdub
+            ? s.scrollKeyframes.filter(kf => kf.time < rangeStart - 0.001 || kf.time > time + 0.001)
+            // Fallback: ±16ms deduplication only (future "average" overdub mode)
+            : s.scrollKeyframes.filter(kf => Math.abs(kf.time - time) > 0.016);
         return { scrollKeyframes: [...filtered, { time, value }].sort((a, b) => a.time - b.time) };
     }),
     clearScrollKeyframes: () => set({ scrollKeyframes: [] }),

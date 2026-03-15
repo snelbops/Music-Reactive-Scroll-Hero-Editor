@@ -19,6 +19,7 @@ const RATIO_VALUES: Record<string, number | null> = {
 export default function Viewport() {
     const scrollProgress = useStore(state => state.scrollProgress);
     const isRecording = useStore(state => state.isRecording);
+    const recordCountdown = useStore(s => s.recordCountdown);
     const activePreset = useStore(state => state.activePreset);
     const aspectRatio = useStore(state => state.aspectRatio);
     const setAspectRatio = useStore(state => state.setAspectRatio);
@@ -45,6 +46,14 @@ export default function Viewport() {
     // Ref for the preview area — used for wheel scrub
     const previewRef = useRef<HTMLDivElement>(null);
 
+    // Tracks the sequence time of the last recorded sample — used for range-clear overdub
+    const lastRecordedTimeRef = useRef<number | null>(null);
+
+    // Reset lastRecordedTime whenever recording stops
+    useEffect(() => {
+        if (!isRecording) lastRecordedTimeRef.current = null;
+    }, [isRecording]);
+
     // Mouse wheel → scrub progress (passive:false required for preventDefault)
     useEffect(() => {
         const el = previewRef.current;
@@ -56,10 +65,11 @@ export default function Viewport() {
             const next = Math.max(0, Math.min(1, current + delta));
             sheet.sequence.position = next * SEQUENCE_DURATION;
             useStore.getState().setSceneProgress(next);
-            // Record wheel movement when armed + playing
             const { isRecording, isPlaying } = useStore.getState();
             if (isRecording && isPlaying) {
-                useStore.getState().addScrollKeyframe(sheet.sequence.position, next);
+                const t = sheet.sequence.position;
+                useStore.getState().addScrollKeyframe(t, next, lastRecordedTimeRef.current ?? t);
+                lastRecordedTimeRef.current = t;
             }
         };
         el.addEventListener('wheel', onWheel, { passive: false });
@@ -75,12 +85,12 @@ export default function Viewport() {
         if (!(e.buttons & 1)) return;
         const rect = trackRef.current!.getBoundingClientRect();
         const p = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-        // Scrub handle = scroll position (Playhead 2) — never seeks time
         setSceneProgress(p);
-        // Read directly from store — avoids stale React closure values
         const { isRecording, isPlaying } = useStore.getState();
         if (isRecording && isPlaying) {
-            addScrollKeyframe(sheet.sequence.position, p);
+            const t = sheet.sequence.position;
+            addScrollKeyframe(t, p, lastRecordedTimeRef.current ?? t);
+            lastRecordedTimeRef.current = t;
         }
     }, [setSceneProgress, addScrollKeyframe]);
 
@@ -311,6 +321,25 @@ export default function Viewport() {
 
                     {/* Recording Mode Overlay */}
                     <RecordMode />
+
+                    {/* Countdown Overlay */}
+                    {recordCountdown !== null && (
+                        <div className="absolute inset-0 z-[60] flex items-center justify-center pointer-events-none">
+                            <div className="flex flex-col items-center gap-3">
+                                <span
+                                    key={recordCountdown}
+                                    className="text-[120px] font-black text-white leading-none tabular-nums"
+                                    style={{
+                                        textShadow: '0 0 60px rgba(220,38,38,0.8), 0 0 20px rgba(220,38,38,0.6)',
+                                        animation: 'countdown-pop 0.9s ease-out forwards',
+                                    }}
+                                >
+                                    {recordCountdown}
+                                </span>
+                                <span className="text-xs font-bold uppercase tracking-widest text-red-400 opacity-80">Get ready...</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Scroll Progress Bar — right side, outside the letterbox stage */}

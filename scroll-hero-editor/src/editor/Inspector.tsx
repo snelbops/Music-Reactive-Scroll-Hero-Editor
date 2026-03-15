@@ -191,12 +191,12 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
 }
 
 // ── Root Inspector ────────────────────────────────────────────────────────────
-export default function Inspector() {
+export default function Inspector({ width = 240 }: { width?: number }) {
     const selectedLane = useStore(s => s.selectedLane);
     const selectedKeyframe = useStore(s => s.selectedKeyframe);
 
     return (
-        <aside className="w-[240px] border-l border-editor-border bg-black/20 flex flex-col overflow-y-auto thin-scrollbar">
+        <aside className="border-l border-editor-border bg-black/20 flex flex-col overflow-y-auto thin-scrollbar" style={{ width }}>
             <div className="h-10 border-b border-editor-border flex items-center px-4 shrink-0">
                 <span className="text-xxs font-bold text-gray-500 uppercase tracking-widest">Inspector</span>
             </div>

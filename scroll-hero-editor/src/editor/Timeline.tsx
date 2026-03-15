@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
+import type React from 'react';
 import { Play, Pause, Square, Repeat, Circle, ZoomIn, ZoomOut } from 'lucide-react';
 import { onChange } from '@theatre/core';
 import { useStore } from '../store/useStore';
@@ -10,7 +11,7 @@ const ZOOM_LEVELS = [1, 2, 4, 8];
 const VB_W = 1000;
 const VB_H = 40;
 
-export default function Timeline() {
+export default function Timeline({ height = 280 }: { height?: number }) {
     const isPlaying = useStore(state => state.isPlaying);
     const setIsPlaying = useStore(state => state.setIsPlaying);
     const scrollProgress = useStore(state => state.scrollProgress);
@@ -37,12 +38,25 @@ export default function Timeline() {
     const scrollKeyframes = useStore(s => s.scrollKeyframes);
     const setScrollKeyframes = useStore(s => s.setScrollKeyframes);
     const clearScrollKeyframes = useStore(s => s.clearScrollKeyframes);
+    const recordCountdown = useStore(s => s.recordCountdown);
+    const setRecordCountdown = useStore(s => s.setRecordCountdown);
 
     const [timelineZoom, setTimelineZoom] = useState(1);
     const [lanesWidth, setLanesWidth] = useState(0);
     // Reactive time display — updated by onChange so it refreshes each frame during playback
     const [seqTime, setSeqTime] = useState(() => sheet.sequence.position);
-    const [scrollLaneExpanded, setScrollLaneExpanded] = useState(false);
+    const [laneHeights, setLaneHeights] = useState<Record<string, number>>({});
+    const laneH = (id: string, def = 40) => laneHeights[id] ?? def;
+    const makeLaneDrag = (id: string, def = 40) => (e: React.PointerEvent<HTMLDivElement>) => {
+        e.stopPropagation();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        const startY = e.clientY;
+        const startH = laneHeights[id] ?? def;
+        const onMove = (ev: PointerEvent) => setLaneHeights(prev => ({ ...prev, [id]: Math.max(def, startH + (ev.clientY - startY)) }));
+        const onUp = () => { document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp); };
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+    };
     const lanesRef = useRef<HTMLDivElement>(null);
     const scrollHistory = useRef<{ pos: number; val: number }[]>([]);
     // Tracks an in-progress keyframe drag: origTime of the dragged keyframe
@@ -108,20 +122,38 @@ export default function Timeline() {
         document.addEventListener('mouseup', onUp);
     }, [progressFromClientX, setIsPlaying, seekTo]);
 
-    const toggleRecording = () => {
-        if (isRecording) {
-            setIsRecording(false);
-        } else {
+    // Countdown → record start
+    useEffect(() => {
+        if (recordCountdown === null) return;
+        if (recordCountdown === 0) {
+            setRecordCountdown(null);
             setRecordStartPosition(sheet.sequence.position / SEQUENCE_DURATION);
             clearRecordedEvents();
             setIsRecording(true);
+            // Stop first so isPlaying always transitions false→true,
+            // guaranteeing TheatreSync's RAF effect re-runs
+            setIsPlaying(false);
+            setTimeout(() => setIsPlaying(true), 0);
+            return;
+        }
+        const t = setTimeout(() => setRecordCountdown(recordCountdown - 1), 1000);
+        return () => clearTimeout(t);
+    }, [recordCountdown, setRecordCountdown, setRecordStartPosition, clearRecordedEvents, setIsRecording, setIsPlaying]);
+
+    const toggleRecording = () => {
+        if (isRecording) {
+            setIsRecording(false);
+        } else if (recordCountdown !== null) {
+            setRecordCountdown(null); // cancel countdown
+        } else {
+            setRecordCountdown(3);
         }
     };
 
     const trackW = lanesWidth ? lanesWidth * timelineZoom - LABEL_W : 0;
     const seqPos = sheet.sequence.position / SEQUENCE_DURATION;
     const playheadLeft = lanesWidth ? LABEL_W + seqPos * trackW : LABEL_W;
-    const scrollVbH = scrollLaneExpanded ? 120 : 40;
+    const scrollVbH = laneH('scrollPos', 48);
     const scrollPolyline = scrollHistory.current.length > 1
         ? scrollHistory.current.map(p => `${p.pos * VB_W},${(1 - p.val) * scrollVbH}`).join(' ')
         : '';
@@ -145,7 +177,7 @@ export default function Timeline() {
     })();
 
     return (
-        <footer className="h-[280px] border-t border-editor-border bg-black flex flex-col z-20">
+        <footer className="border-t border-editor-border bg-black flex flex-col z-20" style={{ height }}>
             {/* Transport Bar */}
             <div className="h-10 border-b border-editor-border flex items-center px-4 justify-between bg-white/5 shrink-0">
                 <div className="flex items-center gap-1">
@@ -156,7 +188,6 @@ export default function Timeline() {
                     <button
                         className="p-1 hover:text-white"
                         onClick={() => { setIsPlaying(false); if (isRecording) setIsRecording(false); }}
-                        onDoubleClick={() => { setIsPlaying(false); if (isRecording) setIsRecording(false); seekTo(0); }}
                     >
                         <Square className="w-4 h-4" />
                     </button>
@@ -205,7 +236,7 @@ export default function Timeline() {
                 <div style={{ width: timelineZoom > 1 ? `${timelineZoom * 100}%` : '100%', minHeight: '100%' }}>
 
                 {/* Lane 1: Audio */}
-                <div className="flex h-10 border-b border-white/5 group">
+                <div className="flex border-b border-white/5 group relative" style={{ height: laneH('audio') }}>
                     <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
                         <span className="text-[10px] uppercase font-bold text-editor-accent-orange truncate">Audio Wave</span>
                     </div>
@@ -235,11 +266,12 @@ export default function Timeline() {
                             </>
                         )}
                     </div>
+                    <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-purple/40 z-40" onPointerDown={makeLaneDrag('audio')} />
                 </div>
 
                 {/* Lane 2: Video Frames — only shown when frames are extracted */}
                 {extractedFrames.length > 0 && (
-                <div className="flex h-10 border-b border-white/5 group">
+                <div className="flex border-b border-white/5 group relative" style={{ height: laneH('videoFrames') }}>
                     <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${activePreset === 'frames' ? 'bg-editor-accent-blue/15 ring-1 ring-inset ring-editor-accent-blue/40' : 'bg-black/40 hover:bg-white/5'}`}>
                         <span className="text-xxs uppercase font-bold text-editor-accent-blue">Video Frames</span>
                         <span className="text-[9px] font-mono text-editor-accent-blue/60">{extractedFrames.length} frames</span>
@@ -253,11 +285,12 @@ export default function Timeline() {
                             </span>
                         </div>
                     </div>
+                    <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-purple/40 z-40" onPointerDown={makeLaneDrag('videoFrames')} />
                 </div>
                 )}
 
                 {/* Lane 3: Mouse X */}
-                <div className="flex h-10 border-b border-white/5 group">
+                <div className="flex border-b border-white/5 group relative" style={{ height: laneH('mouseX') }}>
                     <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
                         <span className="text-[10px] uppercase font-bold text-pink-400 truncate">Mouse X</span>
                     </div>
@@ -275,10 +308,11 @@ export default function Timeline() {
                             </svg>
                         )}
                     </div>
+                    <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-purple/40 z-40" onPointerDown={makeLaneDrag('mouseX')} />
                 </div>
 
-                {/* Lane 3: Mouse Y */}
-                <div className="flex h-10 border-b border-white/5 group">
+                {/* Lane 4: Mouse Y */}
+                <div className="flex border-b border-white/5 group relative" style={{ height: laneH('mouseY') }}>
                     <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
                         <span className="text-[10px] uppercase font-bold text-amber-400 truncate">Mouse Y</span>
                     </div>
@@ -296,11 +330,12 @@ export default function Timeline() {
                             </svg>
                         )}
                     </div>
+                    <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-purple/40 z-40" onPointerDown={makeLaneDrag('mouseY')} />
                 </div>
 
                 {/* Lane 4: Scroll Pos — live curve */}
-                {/* Lane 4: Scroll POS — expandable, with audio waveform ghost guide */}
-                <div className={`flex border-b border-white/5 transition-all duration-200 ${scrollLaneExpanded ? 'h-[120px]' : 'h-12'}`}>
+                {/* Lane 4: Scroll POS — draggable height, with audio waveform ghost guide */}
+                <div className="flex border-b border-white/5 group relative" style={{ height: scrollVbH }}>
                     <div
                         className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${isRecording ? 'ring-1 ring-inset ring-editor-accent-purple/60 bg-editor-accent-purple/10' : selectedLane === 'scrollPos' ? 'bg-editor-accent-purple/15' : 'bg-black/40 hover:bg-white/5'}`}
                         onClick={() => setSelectedLane('scrollPos')}
@@ -315,15 +350,10 @@ export default function Timeline() {
                                         onClick={(e) => { e.stopPropagation(); clearScrollKeyframes(); }}
                                     >✕</button>
                                 )}
-                                <button
-                                    className="text-[9px] text-editor-accent-purple/50 hover:text-editor-accent-purple transition-colors leading-none"
-                                    title={scrollLaneExpanded ? 'Collapse lane' : 'Expand lane'}
-                                    onClick={(e) => { e.stopPropagation(); setScrollLaneExpanded(v => !v); }}
-                                >{scrollLaneExpanded ? '▴' : '▾'}</button>
                             </div>
                         </div>
                         <span className="text-[9px] font-mono text-editor-accent-purple/60">{(scrollProgress * 100).toFixed(1)}%</span>
-                        {scrollLaneExpanded && audioUrl && (
+                        {audioUrl && scrollVbH > 60 && (
                             <span className="text-[8px] text-editor-accent-orange/40 font-mono mt-0.5">♫ audio guide</span>
                         )}
                     </div>
@@ -341,12 +371,11 @@ export default function Timeline() {
                                     strokeWidth="0.5"
                                 />
                             )}
-                            {/* Live recording trail */}
-                            {scrollPolyline && <>
-                                <polyline points={scrollPolyline} fill="none" stroke="rgba(168,85,247,0.25)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
-                                <polyline points={scrollPolyline} fill="none" stroke="#a855f7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            </>}
-                            {/* Recorded keyframes: bezier curve */}
+                            {/* Live recording trail — faded ghost behind the keyframe curve */}
+                            {scrollPolyline && (
+                                <polyline points={scrollPolyline} fill="none" stroke="rgba(168,85,247,0.2)" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
+                            )}
+                            {/* Keyframe curve — prominent performed-back line */}
                             {scrollKeyframes.length >= 2 && (() => {
                                 const pts = scrollKeyframes.map(kf => ({
                                     x: (kf.time / SEQUENCE_DURATION) * VB_W,
@@ -359,7 +388,7 @@ export default function Timeline() {
                                     const dx = curr.x - prev.x;
                                     d += ` C ${prev.x + dx / 3} ${prev.y}, ${curr.x - dx / 3} ${curr.y}, ${curr.x} ${curr.y}`;
                                 }
-                                return <path d={d} fill="none" stroke="#a855f7" strokeWidth="1.5" strokeOpacity="0.8"/>;
+                                return <path d={d} fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2" strokeLinecap="round"/>;
                             })()}
                             {/* Keyframe dots */}
                             {scrollKeyframes.map((kf, i) => {
@@ -408,10 +437,11 @@ export default function Timeline() {
                             <circle cx={seqPos * VB_W} cy={(1 - scrollProgress) * scrollVbH} r="2.5" fill="white"/>
                         </svg>
                     </div>
+                    <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-purple/40 z-40" onPointerDown={makeLaneDrag('scrollPos', 48)} />
                 </div>
 
                 {/* Lane 5: Rotation Speed */}
-                <div className="flex h-10 border-b border-white/5 group">
+                <div className="flex border-b border-white/5 group relative" style={{ height: laneH('rotationSpeed') }}>
                     <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${selectedLane === 'rotationSpeed' ? 'bg-teal-500/10' : 'bg-black/40 hover:bg-white/5'}`} onClick={() => setSelectedLane('rotationSpeed')}>
                         <span className="text-xxs uppercase font-bold text-editor-accent-teal">Rotation Speed</span>
                         <span className="text-[9px] font-mono text-editor-accent-teal/60">{rotationSpeed.toFixed(3)}</span>
@@ -430,10 +460,11 @@ export default function Timeline() {
                             })()}
                         </svg>
                     </div>
+                    <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-purple/40 z-40" onPointerDown={makeLaneDrag('rotationSpeed')} />
                 </div>
 
                 {/* Lane 6: Particle Depth */}
-                <div className="flex h-10 border-b border-white/5 group">
+                <div className="flex border-b border-white/5 group relative" style={{ height: laneH('depth') }}>
                     <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${selectedLane === 'depth' ? 'bg-green-500/10' : 'bg-black/40 hover:bg-white/5'}`} onClick={() => setSelectedLane('depth')}>
                         <span className="text-xxs uppercase font-bold text-editor-accent-green">Particle Depth</span>
                         <span className="text-[9px] font-mono text-editor-accent-green/60">{particleDepth.toFixed(2)}</span>
@@ -452,10 +483,11 @@ export default function Timeline() {
                             })()}
                         </svg>
                     </div>
+                    <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-purple/40 z-40" onPointerDown={makeLaneDrag('depth')} />
                 </div>
 
                 {/* Lane 7: Particle Size */}
-                <div className="flex h-10 border-b border-white/5 group">
+                <div className="flex border-b border-white/5 group relative" style={{ height: laneH('size') }}>
                     <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${selectedLane === 'size' ? 'bg-green-500/10' : 'bg-black/40 hover:bg-white/5'}`} onClick={() => setSelectedLane('size')}>
                         <span className="text-xxs uppercase font-bold text-editor-accent-green">Particle Size</span>
                         <span className="text-[9px] font-mono text-editor-accent-green/60">{particleSize.toFixed(2)}</span>
@@ -474,10 +506,11 @@ export default function Timeline() {
                             })()}
                         </svg>
                     </div>
+                    <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-purple/40 z-40" onPointerDown={makeLaneDrag('size')} />
                 </div>
 
                 {/* Lane 8: CSS Opacity */}
-                <div className="flex h-10 border-b border-white/5 group">
+                <div className="flex border-b border-white/5 group relative" style={{ height: laneH('cssOpacity') }}>
                     <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${selectedLane === 'cssOpacity' ? 'bg-blue-500/10' : 'bg-black/40 hover:bg-white/5'}`} onClick={() => setSelectedLane('cssOpacity')}>
                         <span className="text-xxs uppercase font-bold text-editor-accent-blue">CSS Opacity</span>
                         <span className="text-[9px] font-mono text-editor-accent-blue/60">{cssOpacity.toFixed(2)}</span>
@@ -496,10 +529,11 @@ export default function Timeline() {
                             })()}
                         </svg>
                     </div>
+                    <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-purple/40 z-40" onPointerDown={makeLaneDrag('cssOpacity')} />
                 </div>
 
                 {/* Lane 9: Scroll Speed (mock) */}
-                <div className="flex h-10 border-b border-white/5 group">
+                <div className="flex border-b border-white/5 group relative" style={{ height: laneH('scrollSpeed') }}>
                     <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
                         <span className="text-[10px] uppercase font-bold text-editor-accent-teal">Scroll Speed</span>
                     </div>
@@ -508,6 +542,7 @@ export default function Timeline() {
                             <path d="M0,20 Q150,20 300,5" fill="none" stroke="currentColor" strokeWidth="2"></path>
                         </svg>
                     </div>
+                    <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-purple/40 z-40" onPointerDown={makeLaneDrag('scrollSpeed')} />
                 </div>
 
                 {/* Lane 10: Scroll Dir */}
