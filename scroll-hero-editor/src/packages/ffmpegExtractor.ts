@@ -7,7 +7,7 @@ import { fetchFile, toBlobURL } from '@ffmpeg/util';
  * Extracts up to 120 frames at 10fps from the first 12 seconds.
  */
 export async function extractFrames(
-    file: File,
+    file: File | string,
     onProgress: (progress: number, current: number) => void,
 ): Promise<Blob[]> {
     const ffmpeg = new FFmpeg();

@@ -1,10 +1,9 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { Play, Pause, Square, Repeat, Circle, ZoomIn, ZoomOut } from 'lucide-react';
 import { onChange } from '@theatre/core';
-import studio from '@theatre/studio';
 import { useStore } from '../store/useStore';
 import { useKickDrumData } from '../packages/useKickDrumData';
-import { sheet, SEQUENCE_DURATION, scrollControlsObj } from '../theatre/core';
+import { sheet, SEQUENCE_DURATION } from '../theatre/core';
 
 const LABEL_W = 120;
 const ZOOM_LEVELS = [1, 2, 4, 8];
@@ -35,18 +34,19 @@ export default function Timeline() {
     const setSelectedKeyframe = useStore(s => s.setSelectedKeyframe);
     const selectedLane = useStore(s => s.selectedLane);
     const selectedKeyframe = useStore(s => s.selectedKeyframe);
-    const keyframeVersion = useStore(s => s.keyframeVersion);
+    const scrollKeyframes = useStore(s => s.scrollKeyframes);
+    const setScrollKeyframes = useStore(s => s.setScrollKeyframes);
+    const clearScrollKeyframes = useStore(s => s.clearScrollKeyframes);
 
     const [timelineZoom, setTimelineZoom] = useState(1);
     const [lanesWidth, setLanesWidth] = useState(0);
     // Reactive time display — updated by onChange so it refreshes each frame during playback
     const [seqTime, setSeqTime] = useState(() => sheet.sequence.position);
-    // Keyframe dots — refreshed when playback or recording ends (after Theatre.js commits them)
-    const [keyframeDots, setKeyframeDots] = useState<Array<{ position: number; value: number; id?: string }>>([]);
+    const [scrollLaneExpanded, setScrollLaneExpanded] = useState(false);
     const lanesRef = useRef<HTMLDivElement>(null);
     const scrollHistory = useRef<{ pos: number; val: number }[]>([]);
-    // Tracks an in-progress keyframe drag: scrub batches position writes; value is the keyframe's scroll value
-    const draggingKfRef = useRef<{ scrub: ReturnType<typeof studio.scrub>; value: number; svgEl: SVGSVGElement } | null>(null);
+    // Tracks an in-progress keyframe drag: origTime of the dragged keyframe
+    const draggingKfRef = useRef<{ origTime: number; value: number } | null>(null);
 
     const { beats, waveform, isReady } = useKickDrumData(audioUrl);
 
@@ -78,15 +78,6 @@ export default function Timeline() {
         }, 50);
         return () => clearInterval(id);
     }, [isPlaying]);
-
-    // Refresh keyframe dots whenever a keyframe is written or play/record state changes
-    useEffect(() => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const kfs = (sheet.sequence as any).__experimental_getKeyframes(
-            scrollControlsObj.props.position
-        ) as Array<{ position: number; value: number; id?: string }>;
-        setKeyframeDots(kfs ?? []);
-    }, [isPlaying, isRecording, keyframeVersion]);
 
     // seekTo — canonical scrub: syncs Theatre.js + scene adapter + Zustand + clears history
     const seekTo = useCallback((progress: number) => {
@@ -120,7 +111,6 @@ export default function Timeline() {
     const toggleRecording = () => {
         if (isRecording) {
             setIsRecording(false);
-            seekTo(recordStartPosition);
         } else {
             setRecordStartPosition(sheet.sequence.position / SEQUENCE_DURATION);
             clearRecordedEvents();
@@ -131,9 +121,28 @@ export default function Timeline() {
     const trackW = lanesWidth ? lanesWidth * timelineZoom - LABEL_W : 0;
     const seqPos = sheet.sequence.position / SEQUENCE_DURATION;
     const playheadLeft = lanesWidth ? LABEL_W + seqPos * trackW : LABEL_W;
+    const scrollVbH = scrollLaneExpanded ? 120 : 40;
     const scrollPolyline = scrollHistory.current.length > 1
-        ? scrollHistory.current.map(p => `${p.pos * VB_W},${(1 - p.val) * VB_H}`).join(' ')
+        ? scrollHistory.current.map(p => `${p.pos * VB_W},${(1 - p.val) * scrollVbH}`).join(' ')
         : '';
+
+    // Waveform ghost — downsampled to 300 pts, symmetric fill around center for amplitude guide
+    const waveformBgPath = (() => {
+        if (!isReady || waveform.length === 0) return null;
+        const samples = 300;
+        const step = waveform.length / samples;
+        const cy = scrollVbH / 2;
+        const maxAmp = cy * 0.8;
+        const upper: string[] = [];
+        const lower: string[] = [];
+        for (let i = 0; i < samples; i++) {
+            const x = (i / (samples - 1)) * VB_W;
+            const val = (waveform[Math.floor(i * step)] as number) ?? 0;
+            upper.push(`${x.toFixed(1)},${(cy - val * maxAmp).toFixed(1)}`);
+            lower.push(`${x.toFixed(1)},${(cy + val * maxAmp).toFixed(1)}`);
+        }
+        return `M ${upper.join(' L ')} L ${[...lower].reverse().join(' L ')} Z`;
+    })();
 
     return (
         <footer className="h-[280px] border-t border-editor-border bg-black flex flex-col z-20">
@@ -146,7 +155,7 @@ export default function Timeline() {
                     {/* Stop: halt playback; double-click returns to start */}
                     <button
                         className="p-1 hover:text-white"
-                        onClick={() => { setIsPlaying(false); if (isRecording) { setIsRecording(false); seekTo(recordStartPosition); } }}
+                        onClick={() => { setIsPlaying(false); if (isRecording) setIsRecording(false); }}
                         onDoubleClick={() => { setIsPlaying(false); if (isRecording) setIsRecording(false); seekTo(0); }}
                     >
                         <Square className="w-4 h-4" />
@@ -256,12 +265,12 @@ export default function Timeline() {
                         {recordedEvents.length === 0 ? (
                             <span className="text-[10px] text-gray-500 italic px-2 leading-[40px]">Arm REC to capture...</span>
                         ) : (
-                            <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+                            <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} 100`} preserveAspectRatio="none">
                                 <polyline
                                     fill="none"
                                     stroke="rgb(244,114,182)"
                                     strokeWidth="1.5"
-                                    points={recordedEvents.map((ev) => `${(ev.time * 100)}%,${(1 - ev.x) * 100}%`).join(' ')}
+                                    points={recordedEvents.map((ev) => `${ev.time * VB_W},${(1 - ev.x) * 100}`).join(' ')}
                                 />
                             </svg>
                         )}
@@ -277,12 +286,12 @@ export default function Timeline() {
                         {recordedEvents.length === 0 ? (
                             <span className="text-[10px] text-gray-500 italic px-2 leading-[40px]">Arm REC to capture...</span>
                         ) : (
-                            <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+                            <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} 100`} preserveAspectRatio="none">
                                 <polyline
                                     fill="none"
                                     stroke="rgb(251,191,36)"
                                     strokeWidth="1.5"
-                                    points={recordedEvents.map((ev) => `${(ev.time * 100)}%,${(1 - ev.y) * 100}%`).join(' ')}
+                                    points={recordedEvents.map((ev) => `${ev.time * VB_W},${(1 - ev.y) * 100}`).join(' ')}
                                 />
                             </svg>
                         )}
@@ -290,28 +299,58 @@ export default function Timeline() {
                 </div>
 
                 {/* Lane 4: Scroll Pos — live curve */}
-                <div className="flex h-12 border-b border-white/5">
+                {/* Lane 4: Scroll POS — expandable, with audio waveform ghost guide */}
+                <div className={`flex border-b border-white/5 transition-all duration-200 ${scrollLaneExpanded ? 'h-[120px]' : 'h-12'}`}>
                     <div
                         className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${isRecording ? 'ring-1 ring-inset ring-editor-accent-purple/60 bg-editor-accent-purple/10' : selectedLane === 'scrollPos' ? 'bg-editor-accent-purple/15' : 'bg-black/40 hover:bg-white/5'}`}
                         onClick={() => setSelectedLane('scrollPos')}
                     >
-                        <span className="text-xxs uppercase font-bold text-editor-accent-purple">Scroll POS</span>
+                        <div className="flex items-center justify-between">
+                            <span className="text-xxs uppercase font-bold text-editor-accent-purple">Scroll POS</span>
+                            <div className="flex items-center gap-1">
+                                {scrollKeyframes.length > 0 && (
+                                    <button
+                                        className="text-[9px] text-editor-accent-purple/50 hover:text-red-400 transition-colors"
+                                        title="Clear scroll automation"
+                                        onClick={(e) => { e.stopPropagation(); clearScrollKeyframes(); }}
+                                    >✕</button>
+                                )}
+                                <button
+                                    className="text-[9px] text-editor-accent-purple/50 hover:text-editor-accent-purple transition-colors leading-none"
+                                    title={scrollLaneExpanded ? 'Collapse lane' : 'Expand lane'}
+                                    onClick={(e) => { e.stopPropagation(); setScrollLaneExpanded(v => !v); }}
+                                >{scrollLaneExpanded ? '▴' : '▾'}</button>
+                            </div>
+                        </div>
                         <span className="text-[9px] font-mono text-editor-accent-purple/60">{(scrollProgress * 100).toFixed(1)}%</span>
+                        {scrollLaneExpanded && audioUrl && (
+                            <span className="text-[8px] text-editor-accent-orange/40 font-mono mt-0.5">♫ audio guide</span>
+                        )}
                     </div>
                     <div className="flex-1 relative overflow-hidden bg-editor-accent-purple/[0.03]">
-                        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+                        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${scrollVbH}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
                             <defs><filter id="pglow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-                            <line x1="0" y1={VB_H} x2={VB_W} y2="0" stroke="rgba(168,85,247,0.12)" strokeWidth="1" strokeDasharray="4 4"/>
+                            {/* Diagonal reference line */}
+                            <line x1="0" y1={scrollVbH} x2={VB_W} y2="0" stroke="rgba(168,85,247,0.12)" strokeWidth="1" strokeDasharray="4 4"/>
+                            {/* Audio waveform ghost — visible as guide when lane is expanded and audio loaded */}
+                            {waveformBgPath && (
+                                <path
+                                    d={waveformBgPath}
+                                    fill="rgba(249,115,22,0.07)"
+                                    stroke="rgba(249,115,22,0.15)"
+                                    strokeWidth="0.5"
+                                />
+                            )}
+                            {/* Live recording trail */}
                             {scrollPolyline && <>
                                 <polyline points={scrollPolyline} fill="none" stroke="rgba(168,85,247,0.25)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
                                 <polyline points={scrollPolyline} fill="none" stroke="#a855f7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                             </>}
-                            {/* Recorded keyframes: bezier curve path (TL-01) */}
-                            {keyframeDots.length >= 2 && (() => {
-                                const sorted = [...keyframeDots].sort((a, b) => a.position - b.position);
-                                const pts = sorted.map(kf => ({
-                                    x: (kf.position / SEQUENCE_DURATION) * VB_W,
-                                    y: (1 - kf.value) * VB_H,
+                            {/* Recorded keyframes: bezier curve */}
+                            {scrollKeyframes.length >= 2 && (() => {
+                                const pts = scrollKeyframes.map(kf => ({
+                                    x: (kf.time / SEQUENCE_DURATION) * VB_W,
+                                    y: (1 - kf.value) * scrollVbH,
                                 }));
                                 let d = `M ${pts[0].x} ${pts[0].y}`;
                                 for (let i = 1; i < pts.length; i++) {
@@ -320,73 +359,53 @@ export default function Timeline() {
                                     const dx = curr.x - prev.x;
                                     d += ` C ${prev.x + dx / 3} ${prev.y}, ${curr.x - dx / 3} ${curr.y}, ${curr.x} ${curr.y}`;
                                 }
-                                return (
-                                    <path
-                                        d={d}
-                                        fill="none"
-                                        stroke="#a855f7"
-                                        strokeWidth="1.5"
-                                        strokeOpacity="0.8"
-                                    />
-                                );
+                                return <path d={d} fill="none" stroke="#a855f7" strokeWidth="1.5" strokeOpacity="0.8"/>;
                             })()}
-                            {/* Recorded keyframe dots — draggable left/right to shift timing; click to select */}
-                            {keyframeDots.map((kf, i) => {
-                                const isSelected = selectedKeyframe?.laneId === 'scrollPos' && Math.abs(selectedKeyframe.position - kf.position) < 0.01;
+                            {/* Keyframe dots */}
+                            {scrollKeyframes.map((kf, i) => {
+                                const isSelected = selectedKeyframe?.laneId === 'scrollPos' && Math.abs(selectedKeyframe.position - kf.time) < 0.01;
                                 return (
                                 <circle
-                                    key={kf.id ?? i}
-                                    cx={(kf.position / SEQUENCE_DURATION) * VB_W}
-                                    cy={(1 - kf.value) * VB_H}
-                                    r="6"
-                                    fill={isSelected ? 'white' : '#a855f7'}
-                                    stroke={isSelected ? '#a855f7' : 'white'}
-                                    strokeWidth="1.5"
+                                    key={i}
+                                    cx={(kf.time / SEQUENCE_DURATION) * VB_W}
+                                    cy={(1 - kf.value) * scrollVbH}
+                                    r={isSelected ? '3' : '1.5'}
+                                    fill={isSelected ? 'white' : '#c084fc'}
+                                    stroke={isSelected ? '#a855f7' : 'none'}
+                                    strokeWidth="1"
                                     className="cursor-ew-resize"
                                     style={{ pointerEvents: 'all' }}
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        setSelectedKeyframe({ laneId: 'scrollPos', position: kf.position, value: kf.value });
+                                        setSelectedKeyframe({ laneId: 'scrollPos', position: kf.time, value: kf.value });
                                     }}
                                     onPointerDown={(e) => {
-                                        e.stopPropagation(); // prevent lane playhead drag from triggering
+                                        e.stopPropagation();
                                         (e.target as SVGCircleElement).setPointerCapture(e.pointerId);
-                                        const svgEl = (e.target as SVGCircleElement).ownerSVGElement!;
-                                        draggingKfRef.current = {
-                                            scrub: studio.scrub(),
-                                            value: kf.value,
-                                            svgEl,
-                                        };
+                                        draggingKfRef.current = { origTime: kf.time, value: kf.value };
                                     }}
                                     onPointerMove={(e) => {
                                         if (!draggingKfRef.current || !(e.buttons & 1)) return;
-                                        const { scrub, value, svgEl } = draggingKfRef.current;
-                                        // Convert client X to SVG viewBox X
+                                        const { origTime, value } = draggingKfRef.current;
+                                        const svgEl = (e.target as SVGCircleElement).ownerSVGElement!;
                                         const rect = svgEl.getBoundingClientRect();
                                         const svgX = ((e.clientX - rect.left) / rect.width) * VB_W;
                                         const newTime = Math.max(0, Math.min(SEQUENCE_DURATION, (svgX / VB_W) * SEQUENCE_DURATION));
-                                        scrub.capture(({ set }) => {
-                                            sheet.sequence.position = newTime;
-                                            set(scrollControlsObj.props.position, value);
-                                        });
-                                    }}
-                                    onPointerUp={() => {
-                                        if (!draggingKfRef.current) return;
-                                        draggingKfRef.current.scrub.commit();
-                                        draggingKfRef.current = null;
-                                        // Refresh dots after commit so the circle appears at the new position
-                                        setKeyframeDots(
-                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                            (sheet.sequence as any).__experimental_getKeyframes(
-                                                scrollControlsObj.props.position
-                                            ) as Array<{ position: number; value: number; id?: string }>
+                                        setScrollKeyframes(
+                                            scrollKeyframes
+                                                .filter(k => Math.abs(k.time - origTime) > 0.001)
+                                                .concat({ time: newTime, value })
+                                                .sort((a, b) => a.time - b.time)
                                         );
+                                        draggingKfRef.current = { origTime: newTime, value };
                                     }}
+                                    onPointerUp={() => { draggingKfRef.current = null; }}
                                 />
                                 );
                             })}
-                            <circle cx={seqPos * VB_W} cy={(1 - scrollProgress) * VB_H} r="4" fill="#a855f7" filter="url(#pglow)"/>
-                            <circle cx={seqPos * VB_W} cy={(1 - scrollProgress) * VB_H} r="2.5" fill="white"/>
+                            {/* Current position dot */}
+                            <circle cx={seqPos * VB_W} cy={(1 - scrollProgress) * scrollVbH} r="4" fill="#a855f7" filter="url(#pglow)"/>
+                            <circle cx={seqPos * VB_W} cy={(1 - scrollProgress) * scrollVbH} r="2.5" fill="white"/>
                         </svg>
                     </div>
                 </div>

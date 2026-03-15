@@ -1,7 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import studio from '@theatre/studio';
 import { useStore } from '../store/useStore';
-import { scrollControlsObj } from '../theatre/core';
 import { pushGhostPoint } from './GhostTrailCanvas';
 
 /**
@@ -11,7 +9,6 @@ import { pushGhostPoint } from './GhostTrailCanvas';
  */
 export default function RecordMode() {
     const isRecording = useStore((s) => s.isRecording);
-    const isPlaying = useStore((s) => s.isPlaying);
     const scrollProgress = useStore((s) => s.scrollProgress);
     const pushRecordedEvent = useStore((s) => s.pushRecordedEvent);
     const overlayRef = useRef<HTMLDivElement>(null);
@@ -39,19 +36,9 @@ export default function RecordMode() {
             click: false,
         });
 
-        // Write a Theatre.js keyframe at the current sequence position (REC-02)
-        // Only write when both armed (isRecording) AND transport is running (isPlaying)
-        if (isRecording && isPlaying) {
-            const scrub = studio.scrub();
-            scrub.capture(({ set }) => {
-                set(scrollControlsObj.props.position, scrollProgress);
-            });
-            scrub.commit();
-        }
-
         // Feed raw pixel coords to ghost trail (bypasses React)
         pushGhostPoint(e.clientX - rect.left, e.clientY - rect.top, false);
-    }, [isRecording, isPlaying, scrollProgress, pushRecordedEvent]);
+    }, [isRecording, scrollProgress, pushRecordedEvent]);
 
     const handleClick = useCallback((e: MouseEvent) => {
         if (!isRecording) return;

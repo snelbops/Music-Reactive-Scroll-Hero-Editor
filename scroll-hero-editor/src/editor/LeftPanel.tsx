@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { ChevronDown, ChevronRight, UploadCloud, Video, Film, Layers, SlidersHorizontal, ImageIcon, X } from 'lucide-react';
 
@@ -74,13 +74,13 @@ export default function LeftPanel() {
         setExtractionProgress(0);
     };
 
-    const handleExtract = async () => {
-        const file = mp4InputRef.current?.files?.[0];
-        if (!file) return;
+    const handleExtract = async (sourceOverride?: File | string) => {
+        const source = sourceOverride ?? mp4InputRef.current?.files?.[0];
+        if (!source) return;
         setExtractionStatus('extracting');
         setExtractionProgress(0);
         try {
-            const frames = await extractFrames(file, (p) => setExtractionProgress(p));
+            const frames = await extractFrames(source, (p) => setExtractionProgress(p));
             setExtractedFrames(frames);
             setExtractionStatus('done');
         } catch (err) {
@@ -88,6 +88,14 @@ export default function LeftPanel() {
             setExtractionStatus('error');
         }
     };
+
+    // Auto-extract sample.mp4 on first load
+    useEffect(() => {
+        if (extractionStatus === 'idle' && extractedFrames.length === 0) {
+            handleExtract('/sample.mp4');
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
         <aside className="w-[220px] flex flex-col border-r border-editor-border bg-black/20 p-2 gap-2 overflow-y-auto thin-scrollbar">

@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Maximize2, ImageIcon } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
-import studio from '@theatre/studio';
 import { GithubTestParticleField } from '../presets/ParticleLab';
 import GhostTrailCanvas from './GhostTrailCanvas';
 import RecordMode from './RecordMode';
 import FrameSequenceScene from './FrameSequenceScene';
 import { useStore } from '../store/useStore';
 import { OrbitAdapter, ClassicAdapter, FrameSequenceAdapter } from './SceneAdapter';
-import { sheet, SEQUENCE_DURATION, scrollControlsObj } from '../theatre/core';
+import { sheet, SEQUENCE_DURATION } from '../theatre/core';
 
 const RATIO_VALUES: Record<string, number | null> = {
     '16:9': 16 / 9,
@@ -20,7 +19,6 @@ const RATIO_VALUES: Record<string, number | null> = {
 export default function Viewport() {
     const scrollProgress = useStore(state => state.scrollProgress);
     const isRecording = useStore(state => state.isRecording);
-    const isPlaying = useStore(state => state.isPlaying);
     const activePreset = useStore(state => state.activePreset);
     const aspectRatio = useStore(state => state.aspectRatio);
     const setAspectRatio = useStore(state => state.setAspectRatio);
@@ -28,7 +26,7 @@ export default function Viewport() {
     const setIsFullscreen = useStore(state => state.setIsFullscreen);
     const setActiveAdapter = useStore(state => state.setActiveAdapter);
     const setSceneProgress = useStore(s => s.setSceneProgress);
-    const bumpKeyframeVersion = useStore(s => s.bumpKeyframeVersion);
+    const addScrollKeyframe = useStore(s => s.addScrollKeyframe);
     const rotationSpeed = useStore(s => s.rotationSpeed);
     const particleDepth = useStore(s => s.particleDepth);
     const particleSize = useStore(s => s.particleSize);
@@ -58,6 +56,11 @@ export default function Viewport() {
             const next = Math.max(0, Math.min(1, current + delta));
             sheet.sequence.position = next * SEQUENCE_DURATION;
             useStore.getState().setSceneProgress(next);
+            // Record wheel movement when armed + playing
+            const { isRecording, isPlaying } = useStore.getState();
+            if (isRecording && isPlaying) {
+                useStore.getState().addScrollKeyframe(sheet.sequence.position, next);
+            }
         };
         el.addEventListener('wheel', onWheel, { passive: false });
         return () => el.removeEventListener('wheel', onWheel);
@@ -74,29 +77,18 @@ export default function Viewport() {
         const p = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
         // Scrub handle = scroll position (Playhead 2) — never seeks time
         setSceneProgress(p);
+        // Read directly from store — avoids stale React closure values
+        const { isRecording, isPlaying } = useStore.getState();
         if (isRecording && isPlaying) {
-            // Live recording: time is advancing — write keyframe at each pointer move
-            const scrub = studio.scrub();
-            scrub.capture(({ set }) => {
-                set(scrollControlsObj.props.position, p);
-            });
-            scrub.commit();
-            bumpKeyframeVersion();
+            addScrollKeyframe(sheet.sequence.position, p);
         }
-    }, [setSceneProgress, isRecording, isPlaying]);
+    }, [setSceneProgress, addScrollKeyframe]);
 
     const onPointerUp = useCallback((_e: React.PointerEvent<HTMLDivElement>) => {
-        // Static recording: write one keyframe at current time with final scroll value
-        if (isRecording && !isPlaying) {
-            const p = useStore.getState().scrollProgress;
-            const scrub = studio.scrub();
-            scrub.capture(({ set }) => {
-                set(scrollControlsObj.props.position, p);
-            });
-            scrub.commit();
-            bumpKeyframeVersion();
-        }
-    }, [isRecording, isPlaying, bumpKeyframeVersion]);
+        // Intentionally no keyframe write on pointer up — pointer capture means this fires
+        // whenever the user releases the mouse anywhere (including Stop button), causing
+        // accidental keyframe writes at t=0. Keyframes are written continuously in onPointerMove.
+    }, []);
 
     // Wire the appropriate adapter whenever activePreset changes
     useEffect(() => {
