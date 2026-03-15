@@ -120,23 +120,24 @@ FR27  → Epic 5 — useKickDrumData present in codebase, deferred to post-v1
 
 ## Epic List
 
-### Epic 1: Live Scene Preview
+### ✅ Epic 1: Live Scene Preview — COMPLETE
 Creator can open the editor, load the built-in Orbit or Classic particle preset from the left panel, and see it running live in the viewport with aspect ratio and fullscreen controls.
 **FRs covered:** FR5, FR6, FR9, FR12, FR20
 
-### Epic 2: Playhead Control & Live Motion Recording
-Creator can drive the scene's `progress` value with the timeline playhead and viewport scrub handle, arm record mode to capture live scrub motion as Theatre.js keyframes, and play it back as a reusable automation curve.
+### ✅ Epic 2: Playhead Control & Live Motion Recording — COMPLETE (2026-03-15)
+Creator can drive the scene's `progress` value with the timeline playhead and viewport scrub handle, arm record mode to capture live scrub motion as keyframes, and play it back as a reusable automation curve. Overdub: grabbing the scrub handle mid-playback overwrites the range being touched; releasing hands control back to the recorded curve.
 **FRs covered:** FR1, FR2, FR10, FR11, FR13, FR14, FR15, FR18, FR19
+**Implementation note:** Custom Zustand keyframe system (not Theatre.js) — Theatre.js `scrub()` only writes static overrides, not sequence keyframes.
 
-### Epic 3: Curve Editing & Multi-Lane Parameters
+### 🔲 Epic 3: Curve Editing & Multi-Lane Parameters
 Creator can reshape recorded or hand-drawn automation curves with bezier handles, adjust easing per-keyframe in the right inspector, and animate scene-specific parameters (rotation speed, particle depth/size, CSS opacity) on independent lanes.
 **FRs covered:** FR16, FR17, FR22, FR23
 
-### Epic 4: Frame Sequence Video Hero
+### ✅ Epic 4: Frame Sequence Video Hero — COMPLETE
 Creator can import an MP4, extract PNG frames via ffmpeg WASM (in-browser, Web Worker, non-blocking) for smooth editor scrubbing, and use the full timeline/recording workflow. Export uses ScrollyVideo.js for a compact deployable output.
 **FRs covered:** FR4, FR7, FR8, FR21, FR26
 
-### Epic 5: Export Standalone Scroll Hero
+### 🔲 Epic 5: Export Standalone Scroll Hero
 Creator can export the choreographed scene as a self-contained HTML file where real page scroll — mapped through their saved Theatre.js curves — drives ScrollyVideo.js for the video and GSAP for any CSS effects, reproducing the choreographed motion exactly.
 **FRs covered:** FR3, FR8b, FR24, FR25, FR27
 
