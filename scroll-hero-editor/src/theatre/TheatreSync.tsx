@@ -80,8 +80,11 @@ export default function TheatreSync() {
                     return;
                 }
                 sheet.sequence.position = nextPos;
-                const kfs = useStore.getState().scrollKeyframes;
-                useStore.getState().setSceneProgress(interpolateScrollAt(kfs, nextPos));
+                // Don't override scroll while user is actively dragging the scrub handle
+                if (!useStore.getState().isScrubbing) {
+                    const kfs = useStore.getState().scrollKeyframes;
+                    useStore.getState().setSceneProgress(interpolateScrollAt(kfs, nextPos));
+                }
             }
             lastTime = now;
             rafId = requestAnimationFrame(tick);

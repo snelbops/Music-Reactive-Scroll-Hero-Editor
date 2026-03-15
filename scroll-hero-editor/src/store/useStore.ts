@@ -28,9 +28,9 @@ interface EditorState {
     extractedFrames: Blob[]; setExtractedFrames: (frames: Blob[]) => void;
     extractionProgress: number; setExtractionProgress: (p: number) => void;
     extractionStatus: 'idle' | 'extracting' | 'done' | 'error'; setExtractionStatus: (s: 'idle' | 'extracting' | 'done' | 'error') => void;
+    isScrubbing: boolean; setIsScrubbing: (v: boolean) => void;
     scrollKeyframes: { time: number; value: number }[];
-    // rangeStart: if provided, clears all existing keyframes in [rangeStart, time] before inserting.
-    // Omitting it falls back to ±16ms deduplication only (useful for the future "average overdub" mode).
+    // rangeStart: if provided, clears old keyframes strictly between rangeStart and time (overdub).
     addScrollKeyframe: (time: number, value: number, rangeStart?: number) => void;
     clearScrollKeyframes: () => void;
     setScrollKeyframes: (kfs: { time: number; value: number }[]) => void;
@@ -66,12 +66,14 @@ export const useStore = create<EditorState>((set, get) => ({
     extractedFrames: [], setExtractedFrames: (frames) => set({ extractedFrames: frames }),
     extractionProgress: 0, setExtractionProgress: (p) => set({ extractionProgress: p }),
     extractionStatus: 'idle', setExtractionStatus: (s) => set({ extractionStatus: s }),
+    isScrubbing: false, setIsScrubbing: (v) => set({ isScrubbing: v }),
     scrollKeyframes: [],
     addScrollKeyframe: (time, value, rangeStart?) => set((s) => {
         const filtered = rangeStart !== undefined
-            // Range clear: wipe everything between the previous sample and now for clean overdub
-            ? s.scrollKeyframes.filter(kf => kf.time < rangeStart - 0.001 || kf.time > time + 0.001)
-            // Fallback: ±16ms deduplication only (future "average" overdub mode)
+            // Range clear: keep keyframes up-to-and-including rangeStart, plus anything after time.
+            // +0.001 keeps the previous fresh sample (at exactly rangeStart) while deleting old
+            // keyframes strictly between rangeStart and the current position.
+            ? s.scrollKeyframes.filter(kf => kf.time < rangeStart + 0.001 || kf.time > time + 0.001)
             : s.scrollKeyframes.filter(kf => Math.abs(kf.time - time) > 0.016);
         return { scrollKeyframes: [...filtered, { time, value }].sort((a, b) => a.time - b.time) };
     }),

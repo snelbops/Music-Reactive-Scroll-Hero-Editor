@@ -46,13 +46,7 @@ export default function Viewport() {
     // Ref for the preview area — used for wheel scrub
     const previewRef = useRef<HTMLDivElement>(null);
 
-    // Tracks the sequence time of the last recorded sample — used for range-clear overdub
     const lastRecordedTimeRef = useRef<number | null>(null);
-
-    // Reset lastRecordedTime whenever recording stops
-    useEffect(() => {
-        if (!isRecording) lastRecordedTimeRef.current = null;
-    }, [isRecording]);
 
     // Mouse wheel → scrub progress (passive:false required for preventDefault)
     useEffect(() => {
@@ -79,6 +73,8 @@ export default function Viewport() {
     // Pointer capture handlers for the scrub handle
     const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
         e.currentTarget.setPointerCapture(e.pointerId);
+        useStore.getState().setIsScrubbing(true);
+        lastRecordedTimeRef.current = null;
     }, []);
 
     const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -95,9 +91,8 @@ export default function Viewport() {
     }, [setSceneProgress, addScrollKeyframe]);
 
     const onPointerUp = useCallback((_e: React.PointerEvent<HTMLDivElement>) => {
-        // Intentionally no keyframe write on pointer up — pointer capture means this fires
-        // whenever the user releases the mouse anywhere (including Stop button), causing
-        // accidental keyframe writes at t=0. Keyframes are written continuously in onPointerMove.
+        useStore.getState().setIsScrubbing(false);
+        lastRecordedTimeRef.current = null;
     }, []);
 
     // Wire the appropriate adapter whenever activePreset changes

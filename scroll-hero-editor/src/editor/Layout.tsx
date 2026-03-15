@@ -72,6 +72,10 @@ export default function Layout() {
     useEffect(() => {
         const handleKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape' && isFullscreen) setIsFullscreen(false);
+            if (e.key === ' ' && (e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                useStore.getState().setIsPlaying(!useStore.getState().isPlaying);
+            }
         };
         document.addEventListener('keydown', handleKey);
         return () => document.removeEventListener('keydown', handleKey);
