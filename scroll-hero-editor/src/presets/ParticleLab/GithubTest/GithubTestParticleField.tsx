@@ -21,6 +21,8 @@ uniform float uAspect;
 uniform sampler2D uTexture;
 uniform sampler2D uTouch;
 uniform float uAssemble;
+uniform float uRandom;
+uniform float uInvert;
 
 varying vec2 vPUv;
 varying vec2 vUv;
@@ -64,7 +66,7 @@ void main() {
 
   float ease = smoothstep(0.0, 1.0, uAssemble);
   float currentDepth = mix(40.0, uDepth, ease);
-  float currentRandom = mix(5.0, 0.0, ease);
+  float currentRandom = mix(5.0, uRandom, ease);
   float sizeIntroMult = mix(0.1, 1.0, ease);
 
   displaced.xy += vec2(rnd(pindex) - 0.5, rnd(offset.x + pindex) - 0.5) * currentRandom;
@@ -77,7 +79,9 @@ void main() {
   displaced.y += sin(angle) * t * 20.0 * rndz * ease;
 
   float psize = (snoise(vec2(uTime * 0.5, pindex * 0.5)) + 2.0);
-  psize *= max(grey, 0.2);
+  // Light mode: no minimum size — dark areas vanish against white bg
+  float greyMin = uInvert > 0.5 ? 0.0 : 0.2;
+  psize *= max(grey, greyMin);
   psize *= uSize * sizeIntroMult;
 
   vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
@@ -101,8 +105,8 @@ void main() {
   
   vec3 finalColor;
   if (uInvert > 0.5) {
-    // Light mode: dark particles on white
-    finalColor = vec3(1.0 - grey) * 0.75;
+    // Light mode: uniform dark particles — image reads through size variation, not colour
+    finalColor = vec3(0.08);
   } else {
     // Dark mode: white/grey particles
     finalColor = vec3(grey);
@@ -167,11 +171,14 @@ interface GithubTestParticleFieldProps {
     depth?: number;
     size?: number;
     touchRadius?: number;
+    randomScatter?: number;
+    /** Freeze time after assembly completes — particles go static, only mouse-reactive */
+    staticAfterAssembly?: boolean;
     /** Optional external progress (0–1). When provided, drives uAssemble instead of the internal timer. */
     progress?: number;
 }
 
-export const GithubTestParticleField = ({ imageUrl, theme, rotationSpeed = 0.1, depth = 2.0, size = 1.4, touchRadius = 0.15, progress }: GithubTestParticleFieldProps) => {
+export const GithubTestParticleField = ({ imageUrl, theme, rotationSpeed = 0.1, depth = 2.0, size = 1.4, touchRadius = 0.15, randomScatter = 0, staticAfterAssembly = false, progress }: GithubTestParticleFieldProps) => {
     const meshRef = useRef<THREE.Mesh>(null);
     const matRef = useRef<THREE.RawShaderMaterial>(null);
     const touchRef = useRef<TouchTexture | null>(null);
@@ -277,19 +284,23 @@ export const GithubTestParticleField = ({ imageUrl, theme, rotationSpeed = 0.1, 
     useFrame((_, delta) => {
         if (!matRef.current) return;
         const u = matRef.current.uniforms;
-        timeRef.current += delta;
+        const assemblyDone = timeRef.current >= 2.0;
+        if (!assemblyDone || !staticAfterAssembly) {
+            timeRef.current += delta;
+        }
         u.uTime.value = timeRef.current;
         // Always use the internal timer for assembly — particles animate in on mount.
         // Scroll progress drives scene params (rotationSpeed, depth, size) via Theatre.js lanes.
         u.uAssemble.value = Math.min(1.0, timeRef.current / 2.0);
         u.uInvert.value = isDark ? 0.0 : 1.0;
         u.uDepth.value = depth;
+        u.uRandom.value = randomScatter;
         u.uSize.value = size;
         touchRef.current?.update();
 
         if (meshRef.current) {
             meshRef.current.rotation.y = timeRef.current * rotationSpeed;
-            meshRef.current.rotation.x = Math.sin(timeRef.current * 0.2) * 0.05;
+            meshRef.current.rotation.x = rotationSpeed !== 0 ? Math.sin(timeRef.current * 0.2) * 0.05 : 0;
         }
     });
 
@@ -302,6 +313,7 @@ export const GithubTestParticleField = ({ imageUrl, theme, rotationSpeed = 0.1, 
         uTouch: { value: new THREE.Texture() },
         uAssemble: { value: 0 },
         uInvert: { value: 0 },
+        uRandom: { value: 0 },
     }), []);
 
     return (

@@ -9,4 +9,11 @@ export default defineConfig({
     // @ffmpeg/ffmpeg uses a worker internally — exclude from Vite pre-bundling
     exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'],
   },
+  server: {
+    // Required for SharedArrayBuffer used by ffmpeg WASM
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+  },
 })

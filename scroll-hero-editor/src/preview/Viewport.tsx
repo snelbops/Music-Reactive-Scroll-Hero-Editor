@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { Maximize2 } from 'lucide-react';
+import { Maximize2, ImageIcon } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
+import studio from '@theatre/studio';
 import { GithubTestParticleField } from '../presets/ParticleLab';
 import GhostTrailCanvas from './GhostTrailCanvas';
 import RecordMode from './RecordMode';
 import FrameSequenceScene from './FrameSequenceScene';
 import { useStore } from '../store/useStore';
 import { OrbitAdapter, ClassicAdapter, FrameSequenceAdapter } from './SceneAdapter';
-import { sheet, SEQUENCE_DURATION } from '../theatre/core';
+import { sheet, SEQUENCE_DURATION, scrollControlsObj } from '../theatre/core';
 
 const RATIO_VALUES: Record<string, number | null> = {
     '16:9': 16 / 9,
@@ -19,6 +20,7 @@ const RATIO_VALUES: Record<string, number | null> = {
 export default function Viewport() {
     const scrollProgress = useStore(state => state.scrollProgress);
     const isRecording = useStore(state => state.isRecording);
+    const isPlaying = useStore(state => state.isPlaying);
     const activePreset = useStore(state => state.activePreset);
     const aspectRatio = useStore(state => state.aspectRatio);
     const setAspectRatio = useStore(state => state.setAspectRatio);
@@ -26,11 +28,15 @@ export default function Viewport() {
     const setIsFullscreen = useStore(state => state.setIsFullscreen);
     const setActiveAdapter = useStore(state => state.setActiveAdapter);
     const setSceneProgress = useStore(s => s.setSceneProgress);
+    const bumpKeyframeVersion = useStore(s => s.bumpKeyframeVersion);
     const rotationSpeed = useStore(s => s.rotationSpeed);
     const particleDepth = useStore(s => s.particleDepth);
     const particleSize = useStore(s => s.particleSize);
     const cssOpacity = useStore(s => s.cssOpacity);
     const extractedFrames = useStore(s => s.extractedFrames);
+    const classicDarkControls = useStore(s => s.classicDarkControls);
+    const lightImages = useStore(s => s.lightImages);
+    const activeLightImageIdx = useStore(s => s.activeLightImageIdx);
 
     // Ref for the classic iframe element
     const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -66,13 +72,31 @@ export default function Viewport() {
         if (!(e.buttons & 1)) return;
         const rect = trackRef.current!.getBoundingClientRect();
         const p = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-        sheet.sequence.position = p * SEQUENCE_DURATION;
+        // Scrub handle = scroll position (Playhead 2) — never seeks time
         setSceneProgress(p);
-    }, [setSceneProgress]);
+        if (isRecording && isPlaying) {
+            // Live recording: time is advancing — write keyframe at each pointer move
+            const scrub = studio.scrub();
+            scrub.capture(({ set }) => {
+                set(scrollControlsObj.props.position, p);
+            });
+            scrub.commit();
+            bumpKeyframeVersion();
+        }
+    }, [setSceneProgress, isRecording, isPlaying]);
 
     const onPointerUp = useCallback((_e: React.PointerEvent<HTMLDivElement>) => {
-        // Position already snapped to Theatre.js during last onPointerMove — no action needed
-    }, []);
+        // Static recording: write one keyframe at current time with final scroll value
+        if (isRecording && !isPlaying) {
+            const p = useStore.getState().scrollProgress;
+            const scrub = studio.scrub();
+            scrub.capture(({ set }) => {
+                set(scrollControlsObj.props.position, p);
+            });
+            scrub.commit();
+            bumpKeyframeVersion();
+        }
+    }, [isRecording, isPlaying, bumpKeyframeVersion]);
 
     // Wire the appropriate adapter whenever activePreset changes
     useEffect(() => {
@@ -85,8 +109,10 @@ export default function Viewport() {
                 // on GithubTestParticleField reads scrollProgress directly.
                 void v;
             }));
-        } else if (activePreset === 'classic-dark' || activePreset === 'classic-inverted') {
+        } else if (activePreset === 'classic-dark' || activePreset === 'classic-dark-copy') {
             setActiveAdapter(new ClassicAdapter(iframeRef));
+        } else if (activePreset === 'classic-light' || activePreset === 'classic-inverted' || activePreset === 'light-images') {
+            setActiveAdapter(new OrbitAdapter((v) => { void v; }));
         } else {
             setActiveAdapter(new FrameSequenceAdapter());
         }
@@ -94,6 +120,7 @@ export default function Viewport() {
             setActiveAdapter(null);
         };
     }, [activePreset, setActiveAdapter]);
+
 
     return (
         <main className="flex-1 flex flex-col relative bg-[#050508]">
@@ -187,7 +214,7 @@ export default function Viewport() {
                         </Canvas>
                     )}
 
-                    {/* Classic Dark: original iframe, dark bg */}
+                    {/* Classic Dark: original iframe */}
                     {activePreset === 'classic-dark' && (
                         <iframe
                             ref={iframeRef}
@@ -197,14 +224,88 @@ export default function Viewport() {
                         />
                     )}
 
-                    {/* Classic Inverted: CSS negative of the iframe */}
+                    {/* Classic Light (Three.js, white bg, dark particles, standard images) */}
+                    {activePreset === 'classic-dark-copy' && (
+                        <Canvas
+                            camera={{ position: [0, 0, 5], fov: 50 }}
+                            style={{ width: '100%', height: '100%', background: 'white', display: 'block' }}
+                        >
+                            <GithubTestParticleField
+                                imageUrl="/github-test-app/images/sample-01.png"
+                                theme="light"
+                                progress={scrollProgress}
+                                rotationSpeed={0}
+                                staticAfterAssembly
+                                depth={classicDarkControls.depth}
+                                size={classicDarkControls.size}
+                                touchRadius={classicDarkControls.touchRadius}
+                                randomScatter={classicDarkControls.random}
+                            />
+                        </Canvas>
+                    )}
+
+                    {/* Light Images: Three.js, white bg, uses uploaded light-optimised images */}
+                    {activePreset === 'light-images' && (
+                        lightImages.length > 0 ? (
+                            <Canvas
+                                camera={{ position: [0, 0, 5], fov: 50 }}
+                                style={{ width: '100%', height: '100%', background: 'white', display: 'block' }}
+                            >
+                                <GithubTestParticleField
+                                    imageUrl={lightImages[activeLightImageIdx]?.url ?? lightImages[0].url}
+                                    theme="light"
+                                    progress={scrollProgress}
+                                    rotationSpeed={0}
+                                    staticAfterAssembly
+                                    depth={classicDarkControls.depth}
+                                    size={classicDarkControls.size}
+                                    touchRadius={classicDarkControls.touchRadius}
+                                    randomScatter={classicDarkControls.random}
+                                />
+                            </Canvas>
+                        ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-white text-gray-400">
+                                <ImageIcon className="w-10 h-10 text-gray-300" />
+                                <p className="text-sm">No images in this folder</p>
+                                <p className="text-xs text-gray-400">Upload images from the left panel</p>
+                            </div>
+                        )
+                    )}
+
+                    {/* Classic Light: Three.js duplicate of Classic Dark — to be tweaked */}
+                    {activePreset === 'classic-light' && (
+                        <Canvas
+                            camera={{ position: [0, 0, 5], fov: 50 }}
+                            style={{ width: '100%', height: '100%', background: '#0a0a0a', display: 'block' }}
+                        >
+                            <GithubTestParticleField
+                                imageUrl="/github-test-app/images/sample-01.png"
+                                theme="dark"
+                                progress={scrollProgress}
+                                rotationSpeed={0}
+                                depth={classicDarkControls.depth}
+                                size={classicDarkControls.size}
+                                touchRadius={classicDarkControls.touchRadius}
+                                randomScatter={classicDarkControls.random}
+                            />
+                        </Canvas>
+                    )}
+
+                    {/* Classic Light: R3F Canvas — white bg, dark particles, no rotation */}
                     {activePreset === 'classic-inverted' && (
-                        <iframe
-                            ref={iframeRef}
-                            src="/github-test-app/index.html"
-                            style={{ width: '100%', height: '100%', border: 'none', display: 'block', filter: 'invert(1)' }}
-                            title="Classic Particles Inverted"
-                        />
+                        <Canvas
+                            camera={{ position: [0, 0, 5], fov: 50 }}
+                            style={{ width: '100%', height: '100%', background: 'white', display: 'block' }}
+                        >
+                            <GithubTestParticleField
+                                imageUrl="/github-test-app/images/sample-01.png"
+                                theme="light"
+                                progress={scrollProgress}
+                                rotationSpeed={0}
+                                depth={particleDepth}
+                                size={particleSize}
+                            />
+                        </Canvas>
                     )}
 
                     {/* Progress Overlay — replaces old DEBUG label */}

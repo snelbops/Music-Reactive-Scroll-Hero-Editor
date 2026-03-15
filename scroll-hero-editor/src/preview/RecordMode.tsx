@@ -42,9 +42,11 @@ export default function RecordMode() {
         // Write a Theatre.js keyframe at the current sequence position (REC-02)
         // Only write when both armed (isRecording) AND transport is running (isPlaying)
         if (isRecording && isPlaying) {
-            studio.transaction(({ set }) => {
+            const scrub = studio.scrub();
+            scrub.capture(({ set }) => {
                 set(scrollControlsObj.props.position, scrollProgress);
             });
+            scrub.commit();
         }
 
         // Feed raw pixel coords to ghost trail (bypasses React)

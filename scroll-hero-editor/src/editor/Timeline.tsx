@@ -25,6 +25,8 @@ export default function Timeline() {
     const setSceneProgress = useStore(state => state.setSceneProgress);
     const recordStartPosition = useStore(state => state.recordStartPosition);
     const setRecordStartPosition = useStore(state => state.setRecordStartPosition);
+    const activePreset = useStore(s => s.activePreset);
+    const extractedFrames = useStore(s => s.extractedFrames);
     const rotationSpeed = useStore(s => s.rotationSpeed);
     const particleDepth = useStore(s => s.particleDepth);
     const particleSize = useStore(s => s.particleSize);
@@ -33,6 +35,7 @@ export default function Timeline() {
     const setSelectedKeyframe = useStore(s => s.setSelectedKeyframe);
     const selectedLane = useStore(s => s.selectedLane);
     const selectedKeyframe = useStore(s => s.selectedKeyframe);
+    const keyframeVersion = useStore(s => s.keyframeVersion);
 
     const [timelineZoom, setTimelineZoom] = useState(1);
     const [lanesWidth, setLanesWidth] = useState(0);
@@ -76,15 +79,14 @@ export default function Timeline() {
         return () => clearInterval(id);
     }, [isPlaying]);
 
-    // Refresh keyframe dots from Theatre.js when playback or recording ends
-    // __experimental_getKeyframes returns keyframes for the sequenced prop
+    // Refresh keyframe dots whenever a keyframe is written or play/record state changes
     useEffect(() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const kfs = (sheet.sequence as any).__experimental_getKeyframes(
             scrollControlsObj.props.position
         ) as Array<{ position: number; value: number; id?: string }>;
         setKeyframeDots(kfs ?? []);
-    }, [isPlaying, isRecording]);
+    }, [isPlaying, isRecording, keyframeVersion]);
 
     // seekTo — canonical scrub: syncs Theatre.js + scene adapter + Zustand + clears history
     const seekTo = useCallback((progress: number) => {
@@ -127,8 +129,8 @@ export default function Timeline() {
     };
 
     const trackW = lanesWidth ? lanesWidth * timelineZoom - LABEL_W : 0;
-    const playheadLeft = lanesWidth ? LABEL_W + scrollProgress * trackW : LABEL_W;
     const seqPos = sheet.sequence.position / SEQUENCE_DURATION;
+    const playheadLeft = lanesWidth ? LABEL_W + seqPos * trackW : LABEL_W;
     const scrollPolyline = scrollHistory.current.length > 1
         ? scrollHistory.current.map(p => `${p.pos * VB_W},${(1 - p.val) * VB_H}`).join(' ')
         : '';
@@ -141,8 +143,12 @@ export default function Timeline() {
                     <button className="p-1 hover:text-white" onClick={() => setIsPlaying(!isPlaying)}>
                         {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
                     </button>
-                    {/* Stop: halt playback; if recording, end recording and restore pre-record position */}
-                    <button className="p-1 hover:text-white" onClick={() => { setIsPlaying(false); if (isRecording) { setIsRecording(false); seekTo(recordStartPosition); } }}>
+                    {/* Stop: halt playback; double-click returns to start */}
+                    <button
+                        className="p-1 hover:text-white"
+                        onClick={() => { setIsPlaying(false); if (isRecording) { setIsRecording(false); seekTo(recordStartPosition); } }}
+                        onDoubleClick={() => { setIsPlaying(false); if (isRecording) setIsRecording(false); seekTo(0); }}
+                    >
                         <Square className="w-4 h-4" />
                     </button>
                     <button
@@ -222,7 +228,26 @@ export default function Timeline() {
                     </div>
                 </div>
 
-                {/* Lane 2: Mouse X */}
+                {/* Lane 2: Video Frames — only shown when frames are extracted */}
+                {extractedFrames.length > 0 && (
+                <div className="flex h-10 border-b border-white/5 group">
+                    <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${activePreset === 'frames' ? 'bg-editor-accent-blue/15 ring-1 ring-inset ring-editor-accent-blue/40' : 'bg-black/40 hover:bg-white/5'}`}>
+                        <span className="text-xxs uppercase font-bold text-editor-accent-blue">Video Frames</span>
+                        <span className="text-[9px] font-mono text-editor-accent-blue/60">{extractedFrames.length} frames</span>
+                    </div>
+                    <div className="flex-1 relative overflow-hidden flex items-center bg-editor-accent-blue/[0.03]">
+                        {/* Frame count bar fills proportionally */}
+                        <div className="absolute inset-y-2 left-0 bg-editor-accent-blue/20 rounded-r" style={{ width: '100%' }} />
+                        <div className="absolute inset-y-0 left-0 right-0 flex items-center px-3">
+                            <span className="text-[9px] text-editor-accent-blue/60 font-mono z-10">
+                                {activePreset === 'frames' ? '▶ Active in viewport' : 'Click "Load as Scene" to preview'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                )}
+
+                {/* Lane 3: Mouse X */}
                 <div className="flex h-10 border-b border-white/5 group">
                     <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
                         <span className="text-[10px] uppercase font-bold text-pink-400 truncate">Mouse X</span>

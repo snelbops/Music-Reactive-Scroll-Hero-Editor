@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-08)
 ## Current Position
 
 Phase: 2 of 5 (Playhead, Transport, and Motion Recording)
-Plan: 5 of 5 in current phase — PHASE COMPLETE
-Status: Phase 2 complete
-Last activity: 2026-03-09 — Plan 02-05 (draggable keyframe dots on Scroll POS lane with pointer capture and studio.scrub) complete
+Plan: 5+6 of 6 — Phase 2 BLOCKED on recording architecture
+Status: In Progress — recording broken at architectural level, fix designed
+Last activity: 2026-03-15 — Extensive debugging of recording; root cause found
 
-Progress: [█████████░] 89%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
@@ -88,7 +88,26 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+1. **BLOCKER — Custom scroll keyframe system** (replaces Theatre.js automation for scroll):
+   - `studio.scrub()` / `studio.transaction` both write to `staticOverrides`, NOT sequence keyframes
+   - `stateByProjectId` is empty — Theatre.js has no state.json, so programmatic keyframe writing is broken
+   - Fix: replace Theatre.js scroll automation with custom Zustand keyframe store
+   - Add `scrollKeyframes: { time: number; value: number }[]` to Zustand
+   - TheatreSync RAF interpolates from `scrollKeyframes` → drives `setSceneProgress`
+   - Default: no keyframes = linear (time/duration) — matches Cavalry "forward play = diagonal line"
+   - Scrub handle writes to `scrollKeyframes` on pointerUp (static) / pointerMove (live)
+   - Timeline Scroll POS lane reads from `scrollKeyframes` directly
+
+2. **Video upload working** ✅ — ffmpeg WASM loads via `toBlobURL`, COOP/COEP headers added
+3. **Video frame preset working** ✅ — `viewport.width/height` plane geometry fix
+4. **Video Frames timeline lane** ✅ — appears when frames extracted
+5. **Playhead decoupled from scrub handle** ✅ — `playheadLeft` now uses `seqPos` (time)
+6. **Double-click stop → go to start** ✅
+
+### Blockers/Concerns
+
+Theatre.js `studio.scrub()` does not write sequence keyframes when `stateByProjectId` is empty.
+All programmatic mutations go to `staticOverrides` instead. Scroll automation must be custom-built.
 
 ### Blockers/Concerns
 
@@ -96,6 +115,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-09
-Stopped at: Completed 02-05-PLAN.md (draggable keyframe dots on Scroll POS lane with pointer capture and studio.scrub)
+Last session: 2026-03-15
+Stopped at: Discovered Theatre.js cannot write sequence keyframes programmatically — scroll automation must be rebuilt as custom Zustand keyframe system. All other Phase 2 features (video upload, frame extraction, playhead decoupling, transport controls) confirmed working.
 Resume file: None
+Next action: Implement custom `scrollKeyframes` store + TheatreSync interpolation (see Pending Todos #1 above)

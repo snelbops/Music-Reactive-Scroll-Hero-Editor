@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { SceneAdapter } from '../preview/SceneAdapter';
 
-type PresetId = 'orbit' | 'light' | 'classic-dark' | 'classic-inverted' | 'frames';
+type PresetId = 'orbit' | 'light' | 'classic-dark' | 'classic-dark-copy' | 'classic-light' | 'classic-inverted' | 'light-images' | 'frames';
 type AspectRatio = '16:9' | '9:16' | '1:1' | 'free';
 
 export interface RecordedEvent {
@@ -73,9 +73,24 @@ interface EditorState {
     cssOpacity: number;
     setCssOpacity: (v: number) => void;
 
+    // Classic Dark iframe controls
+    classicDarkControls: { random: number; depth: number; size: number; touchRadius: number };
+    setClassicDarkControls: (c: { random: number; depth: number; size: number; touchRadius: number }) => void;
+
+    // Light Images preset
+    lightImages: { name: string; url: string }[];
+    addLightImage: (img: { name: string; url: string }) => void;
+    removeLightImage: (name: string) => void;
+    activeLightImageIdx: number;
+    setActiveLightImageIdx: (i: number) => void;
+
     // Scene adapter (Phase 2) — the active preset's progress driver
     activeAdapter: SceneAdapter | null;
     setActiveAdapter: (adapter: SceneAdapter | null) => void;
+
+    // Incremented after each keyframe write so Timeline refreshes dots immediately
+    keyframeVersion: number;
+    bumpKeyframeVersion: () => void;
 
     /**
      * setSceneProgress — unified progress path used by scrub handle, transport, and recording.
@@ -142,9 +157,23 @@ export const useStore = create<EditorState>((set, get) => ({
     cssOpacity: 1,
     setCssOpacity: (v) => set({ cssOpacity: v }),
 
+    // Classic Dark iframe controls
+    classicDarkControls: { random: 2.0, depth: 4.0, size: 1.5, touchRadius: 0.15 },
+    setClassicDarkControls: (c) => set({ classicDarkControls: c }),
+
+    // Light Images preset
+    lightImages: [],
+    addLightImage: (img) => set((s) => ({ lightImages: [...s.lightImages, img] })),
+    removeLightImage: (name) => set((s) => ({ lightImages: s.lightImages.filter(i => i.name !== name) })),
+    activeLightImageIdx: 0,
+    setActiveLightImageIdx: (i) => set({ activeLightImageIdx: i }),
+
     // Scene adapter
     activeAdapter: null,
     setActiveAdapter: (adapter) => set({ activeAdapter: adapter }),
+
+    keyframeVersion: 0,
+    bumpKeyframeVersion: () => set((s) => ({ keyframeVersion: s.keyframeVersion + 1 })),
 
     // Unified progress path — drives adapter + Zustand bridge
     setSceneProgress: (p) => {

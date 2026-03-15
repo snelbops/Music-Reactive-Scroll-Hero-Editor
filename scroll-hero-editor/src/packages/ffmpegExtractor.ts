@@ -1,5 +1,5 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile } from '@ffmpeg/util';
+import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
 /**
  * extractFrames — converts an MP4 File to PNG Blob[] using ffmpeg WASM.
@@ -17,8 +17,8 @@ export async function extractFrames(
     });
 
     await ffmpeg.load({
-        coreURL: '/ffmpeg-core.js',
-        wasmURL: '/ffmpeg-core.wasm',
+        coreURL: await toBlobURL('/ffmpeg-core.js', 'text/javascript'),
+        wasmURL: await toBlobURL('/ffmpeg-core.wasm', 'application/wasm'),
     });
 
     await ffmpeg.writeFile('input.mp4', await fetchFile(file));

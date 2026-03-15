@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { frameLoader } from '../packages/frameLoader';
 
@@ -14,6 +14,7 @@ interface FrameSequenceSceneProps {
  * on each frame based on progress (0–1 → frame index).
  */
 export default function FrameSequenceScene({ frames, progress }: FrameSequenceSceneProps) {
+    const { viewport } = useThree();
     const matRef = useRef<THREE.MeshBasicMaterial>(null);
     const [textures, setTextures] = useState<THREE.Texture[]>([]);
 
@@ -42,7 +43,7 @@ export default function FrameSequenceScene({ frames, progress }: FrameSequenceSc
 
     return (
         <mesh>
-            <planeGeometry args={[2, 1.125]} />
+            <planeGeometry args={[viewport.width, viewport.height]} />
             <meshBasicMaterial ref={matRef} map={textures[0]} toneMapped={false} />
         </mesh>
     );
