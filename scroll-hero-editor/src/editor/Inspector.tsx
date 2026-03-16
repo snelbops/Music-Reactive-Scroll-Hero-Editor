@@ -1,4 +1,5 @@
 import { useStore } from '../store/useStore';
+import { SEQUENCE_DURATION } from '../theatre/core';
 
 // Lane configuration — maps laneId to display info
 const LANE_CONFIG = {
@@ -26,6 +27,97 @@ function applyEasingPreset(laneId: string, position: number, presetId: string) {
     } else {
         useStore.getState().updateParamKeyframeEasing(laneId, position, presetId);
     }
+}
+
+// Scroll POS pattern presets — generate keyframes for the scroll lane
+// ViewBox for thumbnails: 60×30, bottom-left=(0,30)=value 0, top-right=(60,0)=value 1
+const SCROLL_PATTERNS = [
+    {
+        id: 'linear',
+        label: 'Linear',
+        thumb: 'M 0 30 L 60 0',
+        generate: (d: number) => [
+            { time: 0, value: 0, easing: 'linear' },
+            { time: d, value: 1, easing: 'linear' },
+        ],
+    },
+    {
+        id: 'easeIn',
+        label: 'Ease In',
+        thumb: 'M 0 30 C 50 30 60 0 60 0',
+        generate: (d: number) => [
+            { time: 0, value: 0, easing: 'easeIn' },
+            { time: d, value: 1, easing: 'linear' },
+        ],
+    },
+    {
+        id: 'easeOut',
+        label: 'Ease Out',
+        thumb: 'M 0 30 C 0 30 10 0 60 0',
+        generate: (d: number) => [
+            { time: 0, value: 0, easing: 'easeOut' },
+            { time: d, value: 1, easing: 'linear' },
+        ],
+    },
+    {
+        id: 'sCurve',
+        label: 'S-Curve',
+        thumb: 'M 0 30 C 15 30 45 0 60 0',
+        generate: (d: number) => [
+            { time: 0, value: 0, easing: 'easeInOut' },
+            { time: d, value: 1, easing: 'linear' },
+        ],
+    },
+    {
+        id: 'twoPhase',
+        label: 'Two Phase',
+        thumb: 'M 0 30 C 8 30 16 15 22 15 H 38 C 44 15 52 0 60 0',
+        generate: (d: number) => [
+            { time: 0,      value: 0,   easing: 'easeInOut' },
+            { time: d * .4, value: 0.5, easing: 'linear'    },
+            { time: d * .6, value: 0.5, easing: 'easeInOut' },
+            { time: d,      value: 1,   easing: 'linear'    },
+        ],
+    },
+    {
+        id: 'staircase',
+        label: 'Staircase',
+        thumb: 'M 0 30 H 15 V 22.5 H 30 V 15 H 45 V 7.5 H 60 V 0',
+        generate: (d: number) => [
+            { time: 0,        value: 0,    easing: 'step' },
+            { time: d * 0.25, value: 0.25, easing: 'step' },
+            { time: d * 0.5,  value: 0.5,  easing: 'step' },
+            { time: d * 0.75, value: 0.75, easing: 'step' },
+            { time: d,        value: 1,    easing: 'linear' },
+        ],
+    },
+    {
+        id: 'yoyo',
+        label: 'Yo-yo',
+        thumb: 'M 0 30 C 10 30 20 0 30 0 C 40 0 50 30 60 30',
+        generate: (d: number) => [
+            { time: 0,      value: 0, easing: 'easeInOut' },
+            { time: d * .5, value: 1, easing: 'easeInOut' },
+            { time: d,      value: 0, easing: 'linear'    },
+        ],
+    },
+    {
+        id: 'bounce',
+        label: 'Bounce',
+        thumb: 'M 0 30 C 5 30 40 0 42 0 C 44 0 44 5 46 5 C 50 5 58 0 60 0',
+        generate: (d: number) => [
+            { time: 0,       value: 0,    easing: 'easeOut'   },
+            { time: d * 0.7, value: 1,    easing: 'easeInOut' },
+            { time: d * 0.85,value: 0.88, easing: 'easeInOut' },
+            { time: d,       value: 1,    easing: 'linear'    },
+        ],
+    },
+] as const;
+
+function applyEasingToAllSelected(presetId: string) {
+    useStore.getState().selectedKeyframes.forEach(({ laneId, position }) => {
+        applyEasingPreset(laneId, position, presetId);
+    });
 }
 
 // ── No Selection ─────────────────────────────────────────────────────────────
@@ -91,11 +183,35 @@ function LaneInspector({ laneId }: { laneId: string }) {
                 </div>
             </div>
 
+            {/* Scroll pattern presets */}
+            {laneId === 'scrollPos' && (
+                <div>
+                    <label className="text-xxs font-bold text-gray-500 uppercase tracking-widest block mb-2">Pattern Presets</label>
+                    <p className="text-[9px] text-gray-600 mb-2 leading-relaxed">Replaces current scroll automation.</p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                        {SCROLL_PATTERNS.map(preset => (
+                            <button
+                                key={preset.id}
+                                onClick={() => useStore.getState().setScrollKeyframes(preset.generate(SEQUENCE_DURATION))}
+                                className="group flex flex-col items-center gap-1 p-2 glass-panel hover:bg-white/10 rounded transition-colors"
+                            >
+                                <svg viewBox="0 0 60 30" className="w-full h-7" preserveAspectRatio="none">
+                                    <path d={preset.thumb} fill="none" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.7" className="group-hover:opacity-100 transition-opacity" />
+                                </svg>
+                                <span className="text-[9px] text-gray-500 group-hover:text-white transition-colors">{preset.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Interpolation mode hint */}
-            <div>
-                <label className="text-xxs font-bold text-gray-500 uppercase tracking-widest block mb-2">Interpolation</label>
-                <p className="text-[10px] text-gray-500 leading-relaxed">Click a keyframe dot on this lane to edit its easing.</p>
-            </div>
+            {laneId !== 'scrollPos' && (
+                <div>
+                    <label className="text-xxs font-bold text-gray-500 uppercase tracking-widest block mb-2">Interpolation</label>
+                    <p className="text-[10px] text-gray-500 leading-relaxed">Click a keyframe dot on this lane to edit its easing.</p>
+                </div>
+            )}
         </div>
     );
 }
@@ -106,6 +222,8 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
     if (!lane) return null;
 
     const setSelectedKeyframe = useStore(s => s.setSelectedKeyframe);
+    const selectedCount = useStore(s => s.selectedKeyframes.length);
+    const isMulti = selectedCount > 1;
 
     const timeLabel = new Date(kf.position * 1000).toISOString().slice(15, 22);
 
@@ -114,9 +232,16 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
             {/* Keyframe header */}
             <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full shrink-0" style={{ background: lane.color, boxShadow: `0 0 8px ${lane.color}80` }} />
-                <div>
-                    <span className="text-xs font-bold text-white">{lane.name}</span>
-                    <p className="text-[9px] text-gray-500 font-mono">Keyframe @ {timeLabel}s</p>
+                <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-white">{lane.name}</span>
+                        {isMulti && (
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full" style={{ background: lane.color + '30', color: lane.color }}>
+                                {selectedCount} selected
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-[9px] text-gray-500 font-mono">{isMulti ? 'Shift+click to toggle' : `Keyframe @ ${timeLabel}s`}</p>
                 </div>
             </div>
 
@@ -130,10 +255,11 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
                     <span className="text-xxs text-gray-500">Position</span>
                     <span className="font-mono text-xs text-gray-400">{kf.position.toFixed(3)}s</span>
                 </div>
-                {kf.laneId !== 'scrollPos' && (
+                {kf.laneId !== 'scrollPos' && !isMulti && (
                     <div className="mt-2">
                         <label className="text-xxs text-gray-500 block mb-1">Edit Value</label>
                         <input
+                            key={`${kf.laneId}-${kf.position}`}
                             type="number"
                             className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs font-mono text-white focus:outline-none focus:border-white/30"
                             defaultValue={kf.value.toFixed(4)}
@@ -142,7 +268,11 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
                             max={lane.range[1]}
                             onBlur={(e) => {
                                 const v = parseFloat(e.target.value);
-                                if (!isNaN(v)) useStore.getState().updateParamKeyframeValue(kf.laneId, kf.position, Math.max(lane.range[0], Math.min(lane.range[1], v)));
+                                if (!isNaN(v)) {
+                                    const clamped = Math.max(lane.range[0], Math.min(lane.range[1], v));
+                                    useStore.getState().updateParamKeyframeValue(kf.laneId, kf.position, clamped);
+                                    useStore.getState().setSelectedKeyframe({ laneId: kf.laneId, position: kf.position, value: clamped });
+                                }
                             }}
                         />
                     </div>
@@ -151,13 +281,18 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
 
             {/* Easing presets */}
             <div>
-                <label className="text-xxs font-bold text-gray-500 uppercase tracking-widest block mb-2">Easing to Next</label>
+                <div className="flex justify-between items-center mb-2">
+                    <label className="text-xxs font-bold text-gray-500 uppercase tracking-widest">
+                        Easing to Next{isMulti ? ` (${selectedCount})` : ''}
+                    </label>
+                    <span className="text-[9px] text-gray-600">right-click / Delete to remove</span>
+                </div>
                 <div className="grid grid-cols-3 gap-1.5">
                     {EASING_PRESETS.map((preset) => (
                         <button
                             key={preset.id}
                             onClick={() => {
-                                applyEasingPreset(kf.laneId, kf.position, preset.id);
+                                applyEasingToAllSelected(preset.id);
                                 setSelectedKeyframe({ ...kf });
                             }}
                             className="group flex flex-col items-center gap-1 p-2 glass-panel hover:bg-white/10 rounded transition-colors"
@@ -169,20 +304,7 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
                             <span className="text-[9px] text-gray-500 group-hover:text-white transition-colors">{preset.label}</span>
                         </button>
                     ))}
-                    <button
-                        className="flex flex-col items-center gap-1 p-2 glass-panel hover:bg-white/10 rounded transition-colors"
-                        title="Open Theatre Studio for custom bezier editing"
-                        onClick={() => {/* Theatre Studio overlay provides custom bezier handles */}}
-                    >
-                        <svg viewBox="0 0 40 40" className="w-8 h-8 text-gray-400">
-                            <path d="M 0 40 C 8 40 14 0 20 20 S 32 0 40 0" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-                            <circle cx="8" cy="40" r="3" fill="currentColor" opacity="0.4" />
-                            <circle cx="32" cy="0" r="3" fill="currentColor" opacity="0.4" />
-                        </svg>
-                        <span className="text-[9px] text-gray-500">Custom</span>
-                    </button>
                 </div>
-                <p className="text-[9px] text-gray-600 mt-2 leading-relaxed">Custom bezier: drag ◆ handles in the Theatre Studio panel.</p>
             </div>
         </div>
     );
@@ -191,7 +313,8 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
 // ── Root Inspector ────────────────────────────────────────────────────────────
 export default function Inspector({ width = 240 }: { width?: number }) {
     const selectedLane = useStore(s => s.selectedLane);
-    const selectedKeyframe = useStore(s => s.selectedKeyframe);
+    const selectedKeyframes = useStore(s => s.selectedKeyframes);
+    const primaryKeyframe = selectedKeyframes.at(-1) ?? null;
 
     return (
         <aside className="border-l border-editor-border bg-black/20 flex flex-col overflow-y-auto thin-scrollbar" style={{ width }}>
@@ -199,8 +322,8 @@ export default function Inspector({ width = 240 }: { width?: number }) {
                 <span className="text-xxs font-bold text-gray-500 uppercase tracking-widest">Inspector</span>
             </div>
             <div className="p-4 flex-1">
-                {selectedKeyframe ? (
-                    <KeyframeInspector kf={selectedKeyframe} />
+                {primaryKeyframe ? (
+                    <KeyframeInspector kf={primaryKeyframe} />
                 ) : selectedLane ? (
                     <LaneInspector laneId={selectedLane} />
                 ) : (

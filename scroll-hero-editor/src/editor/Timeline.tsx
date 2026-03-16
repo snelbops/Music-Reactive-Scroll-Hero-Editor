@@ -1,6 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import type React from 'react';
-import { Play, Pause, Square, Repeat, Circle, ZoomIn, ZoomOut } from 'lucide-react';
+import { Play, Pause, Square, Repeat, Circle, ZoomIn, ZoomOut, MousePointer2, Pen, Eraser, UploadCloud } from 'lucide-react';
 import { onChange } from '@theatre/core';
 import { useStore } from '../store/useStore';
 import { useKickDrumData } from '../packages/useKickDrumData';
@@ -38,6 +38,14 @@ function buildParamPath(kfs: ParamKf[], min: number, max: number): string | null
     return d;
 }
 
+function buildParamFillPath(kfs: ParamKf[], min: number, max: number): string | null {
+    const open = buildParamPath(kfs, min, max);
+    if (!open) return null;
+    const firstX = (kfs[0].time / SEQUENCE_DURATION) * VB_W;
+    const lastX = (kfs[kfs.length - 1].time / SEQUENCE_DURATION) * VB_W;
+    return `${open} L ${lastX} ${VB_H} L ${firstX} ${VB_H} Z`;
+}
+
 export default function Timeline({ height = 280 }: { height?: number }) {
     const isPlaying = useStore(state => state.isPlaying);
     const setIsPlaying = useStore(state => state.setIsPlaying);
@@ -60,8 +68,10 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const cssOpacity = useStore(s => s.cssOpacity);
     const setSelectedLane = useStore(s => s.setSelectedLane);
     const setSelectedKeyframe = useStore(s => s.setSelectedKeyframe);
+    const setSelectedKeyframes = useStore(s => s.setSelectedKeyframes);
+    const toggleSelectedKeyframe = useStore(s => s.toggleSelectedKeyframe);
     const selectedLane = useStore(s => s.selectedLane);
-    const selectedKeyframe = useStore(s => s.selectedKeyframe);
+    const selectedKeyframes = useStore(s => s.selectedKeyframes);
     const scrollKeyframes = useStore(s => s.scrollKeyframes);
     const setScrollKeyframes = useStore(s => s.setScrollKeyframes);
     const clearScrollKeyframes = useStore(s => s.clearScrollKeyframes);
@@ -71,17 +81,22 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const recordCountdown = useStore(s => s.recordCountdown);
     const setRecordCountdown = useStore(s => s.setRecordCountdown);
 
+    const updateScrollKeyframeHandle = useStore(s => s.updateScrollKeyframeHandle);
+
     const [timelineZoom, setTimelineZoom] = useState(1);
+    const [verticalZoom, setVerticalZoom] = useState(1);
     const [lanesWidth, setLanesWidth] = useState(0);
+    const [activeTool, setActiveTool] = useState<'select' | 'pen' | 'eraser'>('select');
+    const draggingHandleRef = useRef<{ kfTime: number; side: 'in' | 'out' } | null>(null);
     // Reactive time display — updated by onChange so it refreshes each frame during playback
     const [seqTime, setSeqTime] = useState(() => sheet.sequence.position);
     const [laneHeights, setLaneHeights] = useState<Record<string, number>>({});
-    const laneH = (id: string, def = 40) => laneHeights[id] ?? def;
+    const laneH = (id: string, def = 40) => laneHeights[id] ?? Math.round(def * verticalZoom);
     const makeLaneDrag = (id: string, def = 40) => (e: React.PointerEvent<HTMLDivElement>) => {
         e.stopPropagation();
         e.currentTarget.setPointerCapture(e.pointerId);
         const startY = e.clientY;
-        const startH = laneHeights[id] ?? def;
+        const startH = laneH(id, def);
         const onMove = (ev: PointerEvent) => setLaneHeights(prev => ({ ...prev, [id]: Math.max(def, startH + (ev.clientY - startY)) }));
         const onUp = () => { document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp); };
         document.addEventListener('pointermove', onMove);
@@ -91,7 +106,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const scrollHistory = useRef<{ pos: number; val: number }[]>([]);
     // Tracks an in-progress keyframe drag: origTime of the dragged keyframe
     const draggingKfRef = useRef<{ origTime: number; value: number } | null>(null);
-    const draggingParamKfRef = useRef<{ laneId: string; origTime: number; value: number } | null>(null);
+    const draggingParamKfRef = useRef<{ laneId: string; startTime: number; origTime: number; value: number } | null>(null);
 
     const { beats, waveform, isReady } = useKickDrumData(audioUrl);
 
@@ -105,12 +120,58 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         return () => observer.disconnect();
     }, []);
 
+    // Ctrl+scroll = horizontal zoom, Alt+scroll = vertical zoom (non-passive so preventDefault works)
+    useEffect(() => {
+        const el = lanesRef.current;
+        if (!el) return;
+        const onWheel = (e: WheelEvent) => {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -1 : 1;
+                setTimelineZoom(prev => {
+                    const i = ZOOM_LEVELS.indexOf(prev);
+                    return ZOOM_LEVELS[Math.max(0, Math.min(ZOOM_LEVELS.length - 1, i + delta))];
+                });
+            } else if (e.altKey) {
+                e.preventDefault();
+                setVerticalZoom(prev => Math.max(0.4, Math.min(4, +(prev + (e.deltaY > 0 ? -0.1 : 0.1)).toFixed(2))));
+            }
+        };
+        el.addEventListener('wheel', onWheel, { passive: false });
+        return () => el.removeEventListener('wheel', onWheel);
+    }, []);
+
     // Reactive TIME display — onChange fires whenever Theatre.js position changes (play, scrub, loop)
     useEffect(() => {
         const unsub = onChange(sheet.sequence.pointer.position, (pos) => {
             setSeqTime(pos);
         });
         return unsub;
+    }, []);
+
+    // Delete key removes all selected keyframes; V/P/E switches tools
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if ((e.target as HTMLElement).tagName === 'INPUT') return;
+            if (e.key === 'v' || e.key === 'V') { setActiveTool('select'); return; }
+            if (e.key === 'p' || e.key === 'P') { setActiveTool('pen'); return; }
+            if (e.key === 'e' || e.key === 'E') { setActiveTool('eraser'); return; }
+            if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+            const kfs = useStore.getState().selectedKeyframes;
+            if (kfs.length === 0) return;
+            kfs.forEach(({ laneId, position }) => {
+                if (laneId === 'scrollPos') {
+                    useStore.getState().setScrollKeyframes(
+                        useStore.getState().scrollKeyframes.filter(k => Math.abs(k.time - position) > 0.001)
+                    );
+                } else {
+                    useStore.getState().removeParamKeyframe(laneId, position);
+                }
+            });
+            useStore.getState().setSelectedKeyframes([]);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
     }, []);
 
     // Record scroll history during playback for the live Scroll POS lane
@@ -247,9 +308,30 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     </button>
                     {isRecording && <span className="text-[9px] text-red-400 font-mono ml-2 animate-pulse">● REC — {recordedEvents.length} pts</span>}
                     <div className="h-4 w-[1px] bg-editor-border mx-2" />
-                    <button className="p-1 text-gray-500 hover:text-white disabled:opacity-30" onClick={() => { const i = ZOOM_LEVELS.indexOf(timelineZoom); if (i > 0) setTimelineZoom(ZOOM_LEVELS[i-1]); }} disabled={timelineZoom === ZOOM_LEVELS[0]}><ZoomOut className="w-4 h-4" /></button>
+                    <span className="text-[9px] text-gray-600 font-mono">H</span>
+                    <button className="p-1 text-gray-500 hover:text-white disabled:opacity-30" title="Zoom out (Ctrl+scroll)" onClick={() => { const i = ZOOM_LEVELS.indexOf(timelineZoom); if (i > 0) setTimelineZoom(ZOOM_LEVELS[i-1]); }} disabled={timelineZoom === ZOOM_LEVELS[0]}><ZoomOut className="w-4 h-4" /></button>
                     <span className="text-xxs text-gray-500 w-6 text-center font-mono">{timelineZoom}x</span>
-                    <button className="p-1 text-gray-500 hover:text-white disabled:opacity-30" onClick={() => { const i = ZOOM_LEVELS.indexOf(timelineZoom); if (i < ZOOM_LEVELS.length-1) setTimelineZoom(ZOOM_LEVELS[i+1]); }} disabled={timelineZoom === ZOOM_LEVELS[ZOOM_LEVELS.length-1]}><ZoomIn className="w-4 h-4" /></button>
+                    <button className="p-1 text-gray-500 hover:text-white disabled:opacity-30" title="Zoom in (Ctrl+scroll)" onClick={() => { const i = ZOOM_LEVELS.indexOf(timelineZoom); if (i < ZOOM_LEVELS.length-1) setTimelineZoom(ZOOM_LEVELS[i+1]); }} disabled={timelineZoom === ZOOM_LEVELS[ZOOM_LEVELS.length-1]}><ZoomIn className="w-4 h-4" /></button>
+                    <div className="h-4 w-[1px] bg-editor-border mx-1" />
+                    <span className="text-[9px] text-gray-600 font-mono">V</span>
+                    <button className="p-1 text-gray-500 hover:text-white disabled:opacity-30" title="Shrink lanes (Alt+scroll)" onClick={() => setVerticalZoom(v => Math.max(0.4, +(v - 0.2).toFixed(2)))} disabled={verticalZoom <= 0.4}><ZoomOut className="w-4 h-4" /></button>
+                    <span className="text-xxs text-gray-500 w-8 text-center font-mono">{verticalZoom.toFixed(1)}x</span>
+                    <button className="p-1 text-gray-500 hover:text-white disabled:opacity-30" title="Expand lanes (Alt+scroll)" onClick={() => setVerticalZoom(v => Math.min(4, +(v + 0.2).toFixed(2)))} disabled={verticalZoom >= 4}><ZoomIn className="w-4 h-4" /></button>
+                    <div className="h-4 w-[1px] bg-editor-border mx-1" />
+                    {([
+                        { id: 'select' as const, Icon: MousePointer2, title: 'Select (V)' },
+                        { id: 'pen'    as const, Icon: Pen,           title: 'Pen (P)'    },
+                        { id: 'eraser' as const, Icon: Eraser,        title: 'Eraser (E)' },
+                    ]).map(({ id, Icon, title }) => (
+                        <button
+                            key={id}
+                            title={title}
+                            onClick={() => setActiveTool(id)}
+                            className={`p-1 rounded transition-colors ${activeTool === id ? 'text-white bg-white/15' : 'text-gray-500 hover:text-white'}`}
+                        >
+                            <Icon className="w-4 h-4" />
+                        </button>
+                    ))}
                 </div>
                 <div className="flex items-center gap-6 font-mono text-xs">
                     <div className="flex flex-col items-center">
@@ -280,8 +362,15 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         <span className="text-[10px] uppercase font-bold text-editor-accent-orange truncate">Audio Wave</span>
                     </div>
                     <div className="flex-1 relative overflow-hidden flex items-center">
+                        <input type="file" accept="audio/*" className="hidden" id="timeline-audio-upload"
+                            onChange={(e) => { const f = e.target.files?.[0]; if (f) useStore.getState().setAudioUrl(URL.createObjectURL(f)); }} />
                         {!audioUrl ? (
-                            <span className="text-[10px] text-gray-500 italic px-2">Import Audio to parse wave...</span>
+                            <button
+                                className="flex items-center gap-1.5 px-2 text-[10px] text-gray-500 hover:text-editor-accent-orange transition-colors italic"
+                                onClick={(e) => { e.stopPropagation(); document.getElementById('timeline-audio-upload')?.click(); }}
+                            >
+                                <UploadCloud className="w-3 h-3 shrink-0" /> Import audio...
+                            </button>
                         ) : !isReady ? (
                             <span className="text-[10px] text-editor-accent-orange animate-pulse px-2">Analyzing audio...</span>
                         ) : (
@@ -381,24 +470,36 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     >
                         <div className="flex items-center justify-between">
                             <span className="text-xxs uppercase font-bold text-editor-accent-purple">Scroll POS</span>
-                            <div className="flex items-center gap-1">
-                                {scrollKeyframes.length > 0 && (
-                                    <button
-                                        className="text-[9px] text-editor-accent-purple/50 hover:text-red-400 transition-colors"
-                                        title="Clear scroll automation"
-                                        onClick={(e) => { e.stopPropagation(); clearScrollKeyframes(); }}
-                                    >✕</button>
-                                )}
-                            </div>
+                            {scrollKeyframes.length > 0 && (
+                                <button
+                                    className="text-[9px] text-editor-accent-purple/50 hover:text-red-400 transition-colors"
+                                    title="Clear scroll automation"
+                                    onClick={(e) => { e.stopPropagation(); clearScrollKeyframes(); }}
+                                >✕</button>
+                            )}
                         </div>
                         <span className="text-[9px] font-mono text-editor-accent-purple/60">{(scrollProgress * 100).toFixed(1)}%</span>
-                        {audioUrl && scrollVbH > 60 && (
-                            <span className="text-[8px] text-editor-accent-orange/40 font-mono mt-0.5">♫ audio guide</span>
-                        )}
                     </div>
-                    <div className="flex-1 relative overflow-hidden bg-editor-accent-purple/[0.03]">
+                    <div
+                        className="flex-1 relative overflow-hidden bg-editor-accent-purple/[0.03]"
+                        style={{ cursor: activeTool === 'pen' ? 'crosshair' : activeTool === 'eraser' ? 'cell' : undefined }}
+                        onMouseDown={(e) => {
+                            if (activeTool !== 'pen') return;
+                            e.stopPropagation();
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const time = Math.max(0, Math.min(SEQUENCE_DURATION, ((e.clientX - rect.left) / rect.width) * SEQUENCE_DURATION));
+                            const value = Math.max(0, Math.min(1, 1 - (e.clientY - rect.top) / rect.height));
+                            useStore.getState().addScrollKeyframe(time, value);
+                        }}
+                    >
                         <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${scrollVbH}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
-                            <defs><filter id="pglow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+                            <defs>
+                                <filter id="pglow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                                <linearGradient id="scrollFill" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#a855f7" stopOpacity="0.35"/>
+                                    <stop offset="100%" stopColor="#a855f7" stopOpacity="0.04"/>
+                                </linearGradient>
+                            </defs>
                             {/* Diagonal reference line */}
                             <line x1="0" y1={scrollVbH} x2={VB_W} y2="0" stroke="rgba(168,85,247,0.12)" strokeWidth="1" strokeDasharray="4 4"/>
                             {/* Audio waveform ghost — visible as guide when lane is expanded and audio loaded */}
@@ -414,24 +515,92 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             {scrollPolyline && (
                                 <polyline points={scrollPolyline} fill="none" stroke="rgba(168,85,247,0.2)" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
                             )}
-                            {/* Keyframe curve — prominent performed-back line */}
+                            {/* Keyframe curve — uses stored bezier handles when present */}
                             {scrollKeyframes.length >= 2 && (() => {
+                                const scaleX = VB_W / SEQUENCE_DURATION;
                                 const pts = scrollKeyframes.map(kf => ({
-                                    x: (kf.time / SEQUENCE_DURATION) * VB_W,
+                                    x: kf.time * scaleX,
                                     y: (1 - kf.value) * scrollVbH,
                                 }));
                                 let d = `M ${pts[0].x} ${pts[0].y}`;
                                 for (let i = 1; i < pts.length; i++) {
-                                    const prev = pts[i - 1];
-                                    const curr = pts[i];
-                                    const dx = curr.x - prev.x;
-                                    d += ` C ${prev.x + dx / 3} ${prev.y}, ${curr.x - dx / 3} ${curr.y}, ${curr.x} ${curr.y}`;
+                                    const prev = pts[i - 1], curr = pts[i];
+                                    const dt = scrollKeyframes[i].time - scrollKeyframes[i - 1].time;
+                                    const outDt = scrollKeyframes[i - 1].handleOut?.dt ?? dt / 3;
+                                    const outDv = scrollKeyframes[i - 1].handleOut?.dv ?? 0;
+                                    const inDt  = scrollKeyframes[i].handleIn?.dt  ?? -dt / 3;
+                                    const inDv  = scrollKeyframes[i].handleIn?.dv  ?? 0;
+                                    const hox = prev.x + outDt * scaleX;
+                                    const hoy = prev.y - outDv * scrollVbH;
+                                    const hix = curr.x + inDt * scaleX;
+                                    const hiy = curr.y - inDv * scrollVbH;
+                                    d += ` C ${hox} ${hoy}, ${hix} ${hiy}, ${curr.x} ${curr.y}`;
                                 }
-                                return <path d={d} fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2" strokeLinecap="round"/>;
+                                const fillD = `${d} L ${pts[pts.length - 1].x} ${scrollVbH} L ${pts[0].x} ${scrollVbH} Z`;
+                                return (
+                                    <>
+                                        <path d={fillD} fill="url(#scrollFill)" stroke="none"/>
+                                        <path d={d} fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2" strokeLinecap="round"/>
+                                    </>
+                                );
+                            })()}
+                            {/* Bezier handles for selected keyframes (select tool only) */}
+                            {activeTool === 'select' && (() => {
+                                const scaleX = VB_W / SEQUENCE_DURATION;
+                                return scrollKeyframes.map((kf, idx) => {
+                                    const isKfSelected = selectedKeyframes.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.01);
+                                    if (!isKfSelected) return null;
+                                    const kx = kf.time * scaleX;
+                                    const ky = (1 - kf.value) * scrollVbH;
+                                    const hasNext = idx < scrollKeyframes.length - 1;
+                                    const hasPrev = idx > 0;
+                                    const handleCircle = (hx: number, hy: number, side: 'in' | 'out', kfTime: number) => (
+                                        <circle
+                                            cx={hx} cy={hy} r="4"
+                                            fill="rgba(168,85,247,0.8)" stroke="white" strokeWidth="1"
+                                            className="cursor-move" style={{ pointerEvents: 'all' }}
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                            onPointerDown={(e) => {
+                                                e.stopPropagation();
+                                                (e.target as SVGCircleElement).setPointerCapture(e.pointerId);
+                                                draggingHandleRef.current = { kfTime, side };
+                                            }}
+                                            onPointerMove={(e) => {
+                                                if (!draggingHandleRef.current || !(e.buttons & 1)) return;
+                                                const { kfTime: t, side: s } = draggingHandleRef.current;
+                                                const ref = scrollKeyframes.find(k => Math.abs(k.time - t) < 0.001);
+                                                if (!ref) return;
+                                                const svgEl = (e.target as SVGCircleElement).ownerSVGElement!;
+                                                const rect = svgEl.getBoundingClientRect();
+                                                const svgX = ((e.clientX - rect.left) / rect.width) * VB_W;
+                                                const svgY = ((e.clientY - rect.top) / rect.height) * scrollVbH;
+                                                const newDt = (svgX - ref.time * scaleX) / scaleX;
+                                                const newDv = -((svgY - (1 - ref.value) * scrollVbH) / scrollVbH);
+                                                updateScrollKeyframeHandle(t, s, {
+                                                    dt: s === 'out' ? Math.max(0, newDt) : Math.min(0, newDt),
+                                                    dv: newDv,
+                                                });
+                                            }}
+                                            onPointerUp={() => { draggingHandleRef.current = null; }}
+                                        />
+                                    );
+                                    const outDt = hasNext ? (kf.handleOut?.dt ?? (scrollKeyframes[idx + 1].time - kf.time) / 3) : 0;
+                                    const outDv = hasNext ? (kf.handleOut?.dv ?? 0) : 0;
+                                    const inDt  = hasPrev ? (kf.handleIn?.dt  ?? -(kf.time - scrollKeyframes[idx - 1].time) / 3) : 0;
+                                    const inDv  = hasPrev ? (kf.handleIn?.dv  ?? 0) : 0;
+                                    const hox = kx + outDt * scaleX, hoy = ky - outDv * scrollVbH;
+                                    const hix = kx + inDt  * scaleX, hiy = ky - inDv  * scrollVbH;
+                                    return (
+                                        <g key={idx}>
+                                            {hasNext && <><line x1={kx} y1={ky} x2={hox} y2={hoy} stroke="rgba(168,85,247,0.4)" strokeWidth="1" strokeDasharray="3 2"/>{handleCircle(hox, hoy, 'out', kf.time)}</>}
+                                            {hasPrev && <><line x1={kx} y1={ky} x2={hix} y2={hiy} stroke="rgba(168,85,247,0.4)" strokeWidth="1" strokeDasharray="3 2"/>{handleCircle(hix, hiy, 'in', kf.time)}</>}
+                                        </g>
+                                    );
+                                });
                             })()}
                             {/* Keyframe dots */}
                             {scrollKeyframes.map((kf, i) => {
-                                const isSelected = selectedKeyframe?.laneId === 'scrollPos' && Math.abs(selectedKeyframe.position - kf.time) < 0.01;
+                                const isSelected = selectedKeyframes.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.01);
                                 return (
                                 <circle
                                     key={i}
@@ -441,31 +610,40 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     fill={isSelected ? 'white' : '#c084fc'}
                                     stroke={isSelected ? '#a855f7' : 'none'}
                                     strokeWidth="1"
-                                    className="cursor-ew-resize"
+                                    className={activeTool === 'eraser' ? 'cursor-cell' : 'cursor-move'}
                                     style={{ pointerEvents: 'all' }}
+                                    onMouseDown={(e) => e.stopPropagation()}
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        setSelectedKeyframe({ laneId: 'scrollPos', position: kf.time, value: kf.value });
+                                        if (activeTool === 'eraser') {
+                                            useStore.getState().setScrollKeyframes(scrollKeyframes.filter(k => Math.abs(k.time - kf.time) > 0.001));
+                                            return;
+                                        }
+                                        if (e.shiftKey) toggleSelectedKeyframe({ laneId: 'scrollPos', position: kf.time, value: kf.value });
+                                        else setSelectedKeyframe({ laneId: 'scrollPos', position: kf.time, value: kf.value });
                                     }}
                                     onPointerDown={(e) => {
+                                        if (activeTool === 'eraser') return;
                                         e.stopPropagation();
                                         (e.target as SVGCircleElement).setPointerCapture(e.pointerId);
                                         draggingKfRef.current = { origTime: kf.time, value: kf.value };
                                     }}
                                     onPointerMove={(e) => {
                                         if (!draggingKfRef.current || !(e.buttons & 1)) return;
-                                        const { origTime, value } = draggingKfRef.current;
+                                        const { origTime } = draggingKfRef.current;
                                         const svgEl = (e.target as SVGCircleElement).ownerSVGElement!;
                                         const rect = svgEl.getBoundingClientRect();
                                         const svgX = ((e.clientX - rect.left) / rect.width) * VB_W;
+                                        const svgY = ((e.clientY - rect.top) / rect.height) * scrollVbH;
                                         const newTime = Math.max(0, Math.min(SEQUENCE_DURATION, (svgX / VB_W) * SEQUENCE_DURATION));
+                                        const newValue = Math.max(0, Math.min(1, 1 - svgY / scrollVbH));
                                         setScrollKeyframes(
                                             scrollKeyframes
                                                 .filter(k => Math.abs(k.time - origTime) > 0.001)
-                                                .concat({ time: newTime, value })
+                                                .concat({ time: newTime, value: newValue })
                                                 .sort((a, b) => a.time - b.time)
                                         );
-                                        draggingKfRef.current = { origTime: newTime, value };
+                                        draggingKfRef.current = { origTime: newTime, value: newValue };
                                     }}
                                     onPointerUp={() => { draggingKfRef.current = null; }}
                                 />
@@ -485,6 +663,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     const currentVal = paramCurrentValues[lane.id];
                     const normalY = (v: number) => (1 - (v - lane.min) / (lane.max - lane.min)) * VB_H;
                     const curvePath = buildParamPath(kfs, lane.min, lane.max);
+                    const fillPath = buildParamFillPath(kfs, lane.min, lane.max);
                     const isSelected = selectedLane === lane.id;
                     return (
                         <div key={lane.id} className="flex border-b border-white/5 group relative" style={{ height: laneH(lane.id) }}>
@@ -521,9 +700,19 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 }}
                             >
                                 <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+                                    <defs>
+                                        <linearGradient id={`fill-${lane.id}`} x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor={lane.color} stopOpacity="0.3"/>
+                                            <stop offset="100%" stopColor={lane.color} stopOpacity="0.04"/>
+                                        </linearGradient>
+                                    </defs>
                                     {/* No-keyframe fallback: horizontal reference line */}
                                     {kfs.length === 0 && (
                                         <line x1="0" y1={normalY(currentVal)} x2={VB_W} y2={normalY(currentVal)} stroke={lane.color + '33'} strokeWidth="1" strokeDasharray="4 4"/>
+                                    )}
+                                    {/* Fill below curve */}
+                                    {fillPath && (
+                                        <path d={fillPath} fill={`url(#fill-${lane.id})`} stroke="none"/>
                                     )}
                                     {/* Curve */}
                                     {curvePath && (
@@ -531,7 +720,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     )}
                                     {/* Keyframe dots */}
                                     {kfs.map((kf, i) => {
-                                        const kfSelected = selectedKeyframe?.laneId === lane.id && Math.abs(selectedKeyframe.position - kf.time) < 0.01;
+                                        const kfSelected = selectedKeyframes.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.01);
                                         return (
                                             <circle
                                                 key={i}
@@ -541,31 +730,57 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 fill={kfSelected ? 'white' : lane.color}
                                                 stroke={kfSelected ? lane.color : 'none'}
                                                 strokeWidth="1"
-                                                className="cursor-ew-resize"
+                                                className="cursor-move"
                                                 style={{ pointerEvents: 'all' }}
+                                                onMouseDown={(e) => e.stopPropagation()}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    setSelectedKeyframe({ laneId: lane.id, position: kf.time, value: kf.value });
+                                                    if (e.shiftKey) toggleSelectedKeyframe({ laneId: lane.id, position: kf.time, value: kf.value });
+                                                    else setSelectedKeyframe({ laneId: lane.id, position: kf.time, value: kf.value });
                                                 }}
                                                 onPointerDown={(e) => {
                                                     e.stopPropagation();
                                                     (e.target as SVGCircleElement).setPointerCapture(e.pointerId);
-                                                    draggingParamKfRef.current = { laneId: lane.id, origTime: kf.time, value: kf.value };
+                                                    draggingParamKfRef.current = { laneId: lane.id, startTime: kf.time, origTime: kf.time, value: kf.value };
                                                 }}
                                                 onPointerMove={(e) => {
                                                     if (!draggingParamKfRef.current || !(e.buttons & 1)) return;
-                                                    const { laneId, origTime, value } = draggingParamKfRef.current;
+                                                    const { laneId, origTime } = draggingParamKfRef.current;
                                                     const svgEl = (e.target as SVGCircleElement).ownerSVGElement!;
                                                     const rect = svgEl.getBoundingClientRect();
                                                     const svgX = ((e.clientX - rect.left) / rect.width) * VB_W;
+                                                    const svgY = ((e.clientY - rect.top) / rect.height) * VB_H;
                                                     const newTime = Math.max(0, Math.min(SEQUENCE_DURATION, (svgX / VB_W) * SEQUENCE_DURATION));
+                                                    const newValue = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - svgY / VB_H) * (lane.max - lane.min)));
+                                                    const existingEasing = (paramKeyframes[laneId] ?? []).find(k => Math.abs(k.time - origTime) < 0.001)?.easing ?? 'linear';
                                                     setParamKeyframes(laneId, (paramKeyframes[laneId] ?? [])
                                                         .filter(k => Math.abs(k.time - origTime) > 0.001)
-                                                        .concat({ time: newTime, value, easing: kfs.find(k => Math.abs(k.time - origTime) < 0.001)?.easing ?? 'linear' })
+                                                        .concat({ time: newTime, value: newValue, easing: existingEasing })
                                                         .sort((a, b) => a.time - b.time) as ParamKf[]);
-                                                    draggingParamKfRef.current = { laneId, origTime: newTime, value };
+                                                    draggingParamKfRef.current = { laneId, origTime: newTime, value: newValue };
                                                 }}
-                                                onPointerUp={() => { draggingParamKfRef.current = null; }}
+                                                onPointerUp={() => {
+                                                    if (draggingParamKfRef.current) {
+                                                        const { laneId, startTime, origTime, value } = draggingParamKfRef.current;
+                                                        const updated = { laneId, position: origTime, value };
+                                                        const prev = useStore.getState().selectedKeyframes;
+                                                        const hadIt = prev.some(s => s.laneId === laneId && Math.abs(s.position - startTime) < 0.001);
+                                                        if (hadIt) {
+                                                            setSelectedKeyframes(prev
+                                                                .filter(s => !(s.laneId === laneId && Math.abs(s.position - startTime) < 0.001))
+                                                                .concat(updated));
+                                                        } else {
+                                                            setSelectedKeyframe(updated);
+                                                        }
+                                                    }
+                                                    draggingParamKfRef.current = null;
+                                                }}
+                                                onContextMenu={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    useStore.getState().removeParamKeyframe(lane.id, kf.time);
+                                                    setSelectedKeyframe(null);
+                                                }}
                                             />
                                         );
                                     })}

@@ -9,9 +9,17 @@ function applyEasing(alpha: number, easing: string): number {
     }
 }
 
+/** Cubic bezier value — t is the bezier parameter [0,1], p0–p3 are value control points. */
+function cubicBezierValue(t: number, p0: number, p1: number, p2: number, p3: number): number {
+    const mt = 1 - t;
+    return mt * mt * mt * p0 + 3 * mt * mt * t * p1 + 3 * mt * t * t * p2 + t * t * t * p3;
+}
+
+type ScrollKf = { time: number; value: number; easing?: string; handleOut?: { dt: number; dv: number }; handleIn?: { dt: number; dv: number } };
+
 /** Interpolate scroll keyframes. No keyframes = linear (t/duration). */
 export function interpolateScrollAt(
-    keyframes: { time: number; value: number; easing?: string }[],
+    keyframes: ScrollKf[],
     t: number,
     duration: number,
 ): number {
@@ -23,6 +31,12 @@ export function interpolateScrollAt(
         if (t >= a.time && t <= b.time) {
             if (a.easing === 'step') return a.value;
             const alpha = (t - a.time) / (b.time - a.time);
+            if (a.handleOut || b.handleIn) {
+                // Cubic bezier: use handle dv offsets as value control points
+                const p1v = a.value + (a.handleOut?.dv ?? 0);
+                const p2v = b.value + (b.handleIn?.dv ?? 0);
+                return cubicBezierValue(alpha, a.value, p1v, p2v, b.value);
+            }
             return a.value + applyEasing(alpha, a.easing ?? 'linear') * (b.value - a.value);
         }
     }

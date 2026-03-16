@@ -1,5 +1,4 @@
 import { getProject, types } from '@theatre/core';
-import studio from '@theatre/studio';
 
 /** Total sequence length in seconds. scrollProgress 0→1 maps across this duration. */
 export const SEQUENCE_DURATION = 10;
@@ -7,11 +6,6 @@ export const SEQUENCE_DURATION = 10;
 // Initialize Theatre.js project — studio persists state in localStorage automatically
 export const project = getProject('Scroll Hero Editor');
 export const sheet = project.sheet('Main Sequence');
-
-// Initialize Studio in dev so studio.transaction is available for recording
-if (import.meta.env.DEV) {
-    studio.initialize();
-}
 
 // Define our core scroll control parameters as a Theatre object.
 // These are the lanes that will be visible in the @theatre/studio overlay.

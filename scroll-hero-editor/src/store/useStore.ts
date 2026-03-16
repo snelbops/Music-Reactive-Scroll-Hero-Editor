@@ -30,12 +30,13 @@ interface EditorState {
     extractionProgress: number; setExtractionProgress: (p: number) => void;
     extractionStatus: 'idle' | 'extracting' | 'done' | 'error'; setExtractionStatus: (s: 'idle' | 'extracting' | 'done' | 'error') => void;
     isScrubbing: boolean; setIsScrubbing: (v: boolean) => void;
-    scrollKeyframes: { time: number; value: number; easing?: string }[];
+    scrollKeyframes: { time: number; value: number; easing?: string; handleOut?: { dt: number; dv: number }; handleIn?: { dt: number; dv: number } }[];
     // rangeStart: if provided, clears old keyframes strictly between rangeStart and time (overdub).
     addScrollKeyframe: (time: number, value: number, rangeStart?: number) => void;
     clearScrollKeyframes: () => void;
-    setScrollKeyframes: (kfs: { time: number; value: number; easing?: string }[]) => void;
+    setScrollKeyframes: (kfs: { time: number; value: number; easing?: string; handleOut?: { dt: number; dv: number }; handleIn?: { dt: number; dv: number } }[]) => void;
     updateScrollKeyframeEasing: (time: number, easing: string) => void;
+    updateScrollKeyframeHandle: (time: number, side: 'in' | 'out', handle: { dt: number; dv: number }) => void;
     paramKeyframes: Record<string, ParamKf[]>;
     addParamKeyframe: (laneId: string, time: number, value: number) => void;
     removeParamKeyframe: (laneId: string, time: number) => void;
@@ -45,8 +46,10 @@ interface EditorState {
     clearParamKeyframes: (laneId: string) => void;
     applyParamKeyframesAt: (time: number) => void;
     selectedLane: string | null; setSelectedLane: (id: string | null) => void;
-    selectedKeyframe: { laneId: string; position: number; value: number } | null;
+    selectedKeyframes: { laneId: string; position: number; value: number }[];
     setSelectedKeyframe: (kf: { laneId: string; position: number; value: number } | null) => void;
+    setSelectedKeyframes: (kfs: { laneId: string; position: number; value: number }[]) => void;
+    toggleSelectedKeyframe: (kf: { laneId: string; position: number; value: number }) => void;
     rotationSpeed: number; setRotationSpeed: (v: number) => void;
     particleDepth: number; setParticleDepth: (v: number) => void;
     particleSize: number; setParticleSize: (v: number) => void;
@@ -92,6 +95,13 @@ export const useStore = create<EditorState>((set, get) => ({
     updateScrollKeyframeEasing: (time, easing) => set((s) => ({
         scrollKeyframes: s.scrollKeyframes.map(kf => Math.abs(kf.time - time) < 0.001 ? { ...kf, easing } : kf),
     })),
+    updateScrollKeyframeHandle: (time, side, handle) => set((s) => ({
+        scrollKeyframes: s.scrollKeyframes.map(kf =>
+            Math.abs(kf.time - time) < 0.001
+                ? { ...kf, [side === 'in' ? 'handleIn' : 'handleOut']: handle }
+                : kf
+        ),
+    })),
     paramKeyframes: {},
     addParamKeyframe: (laneId, time, value) => set((s) => {
         const existing = s.paramKeyframes[laneId] ?? [];
@@ -122,8 +132,17 @@ export const useStore = create<EditorState>((set, get) => ({
         if (opacity !== null) updates.cssOpacity = opacity;
         if (Object.keys(updates).length > 0) set(updates);
     },
-    selectedLane: null, setSelectedLane: (id) => set({ selectedLane: id, selectedKeyframe: null }),
-    selectedKeyframe: null, setSelectedKeyframe: (kf) => set({ selectedKeyframe: kf, selectedLane: kf?.laneId ?? null }),
+    selectedLane: null, setSelectedLane: (id) => set({ selectedLane: id, selectedKeyframes: [] }),
+    selectedKeyframes: [],
+    setSelectedKeyframe: (kf) => set({ selectedKeyframes: kf ? [kf] : [], selectedLane: kf?.laneId ?? null }),
+    setSelectedKeyframes: (kfs) => set({ selectedKeyframes: kfs, selectedLane: kfs.at(-1)?.laneId ?? null }),
+    toggleSelectedKeyframe: (kf) => set((s) => {
+        const exists = s.selectedKeyframes.some(k => k.laneId === kf.laneId && Math.abs(k.position - kf.position) < 0.001);
+        const next = exists
+            ? s.selectedKeyframes.filter(k => !(k.laneId === kf.laneId && Math.abs(k.position - kf.position) < 0.001))
+            : [...s.selectedKeyframes, kf];
+        return { selectedKeyframes: next, selectedLane: next.at(-1)?.laneId ?? s.selectedLane };
+    }),
     rotationSpeed: 0.1, setRotationSpeed: (v) => set({ rotationSpeed: v }),
     particleDepth: 2.0, setParticleDepth: (v) => set({ particleDepth: v }),
     particleSize: 1.4, setParticleSize: (v) => set({ particleSize: v }),
