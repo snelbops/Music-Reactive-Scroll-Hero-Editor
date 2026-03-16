@@ -1,14 +1,12 @@
-import studio from '@theatre/studio';
 import { useStore } from '../store/useStore';
-import { sheet, scrollControlsObj, sceneParamsObj, cssOpacityObj, SEQUENCE_DURATION } from '../theatre/core';
 
-// Lane configuration — maps laneId to display info and Theatre.js prop
+// Lane configuration — maps laneId to display info
 const LANE_CONFIG = {
-    scrollPos:     { name: 'Scroll POS',      color: '#a855f7', unit: '',  range: [0, 1]   as [number, number], getProp: () => scrollControlsObj.props.position },
-    rotationSpeed: { name: 'Rotation Speed',  color: '#14b8a6', unit: 'x', range: [0, 2]   as [number, number], getProp: () => sceneParamsObj.props.rotationSpeed },
-    depth:         { name: 'Particle Depth',  color: '#22c55e', unit: '',  range: [0, 10]  as [number, number], getProp: () => sceneParamsObj.props.depth },
-    size:          { name: 'Particle Size',   color: '#22c55e', unit: '',  range: [0.1, 5] as [number, number], getProp: () => sceneParamsObj.props.size },
-    cssOpacity:    { name: 'CSS Opacity',     color: '#3b82f6', unit: '',  range: [0, 1]   as [number, number], getProp: () => cssOpacityObj.props.opacity },
+    scrollPos:     { name: 'Scroll POS',      color: '#a855f7', unit: '',  range: [0, 1]   as [number, number] },
+    rotationSpeed: { name: 'Rotation Speed',  color: '#14b8a6', unit: 'x', range: [0, 2]   as [number, number] },
+    depth:         { name: 'Particle Depth',  color: '#22c55e', unit: '',  range: [0, 10]  as [number, number] },
+    size:          { name: 'Particle Size',   color: '#22c55e', unit: '',  range: [0.1, 5] as [number, number] },
+    cssOpacity:    { name: 'CSS Opacity',     color: '#3b82f6', unit: '',  range: [0, 1]   as [number, number] },
 } as const;
 
 type LaneId = keyof typeof LANE_CONFIG;
@@ -22,28 +20,12 @@ const EASING_PRESETS = [
     { id: 'step',      label: 'Step',     d: 'M 0 40 H 40 V 0' },
 ] as const;
 
-function applyEasingPreset(laneId: string, position: number, value: number, presetId: string) {
-    const lane = LANE_CONFIG[laneId as LaneId];
-    if (!lane) return;
-    const prop = lane.getProp();
-    const savedPos = sheet.sequence.position;
-
-    if (presetId === 'step') {
-        // Simulate step/hold: write two keyframes — one holding the value, one snapping forward
-        studio.transaction(({ set }) => {
-            sheet.sequence.position = Math.max(0, position - 0.001);
-            set(prop, value);
-            sheet.sequence.position = position;
-            set(prop, value);
-        });
+function applyEasingPreset(laneId: string, position: number, presetId: string) {
+    if (laneId === 'scrollPos') {
+        useStore.getState().updateScrollKeyframeEasing(position, presetId);
     } else {
-        // Re-write keyframe at same position/value — Theatre.js default handles are smooth bezier
-        studio.transaction(({ set }) => {
-            sheet.sequence.position = position;
-            set(prop, value);
-        });
+        useStore.getState().updateParamKeyframeEasing(laneId, position, presetId);
     }
-    sheet.sequence.position = savedPos;
 }
 
 // ── No Selection ─────────────────────────────────────────────────────────────
@@ -148,6 +130,23 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
                     <span className="text-xxs text-gray-500">Position</span>
                     <span className="font-mono text-xs text-gray-400">{kf.position.toFixed(3)}s</span>
                 </div>
+                {kf.laneId !== 'scrollPos' && (
+                    <div className="mt-2">
+                        <label className="text-xxs text-gray-500 block mb-1">Edit Value</label>
+                        <input
+                            type="number"
+                            className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs font-mono text-white focus:outline-none focus:border-white/30"
+                            defaultValue={kf.value.toFixed(4)}
+                            step={(lane.range[1] - lane.range[0]) / 100}
+                            min={lane.range[0]}
+                            max={lane.range[1]}
+                            onBlur={(e) => {
+                                const v = parseFloat(e.target.value);
+                                if (!isNaN(v)) useStore.getState().updateParamKeyframeValue(kf.laneId, kf.position, Math.max(lane.range[0], Math.min(lane.range[1], v)));
+                            }}
+                        />
+                    </div>
+                )}
             </div>
 
             {/* Easing presets */}
@@ -158,8 +157,7 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
                         <button
                             key={preset.id}
                             onClick={() => {
-                                applyEasingPreset(kf.laneId, kf.position, kf.value, preset.id);
-                                // Refresh selection state so keyframe dot re-reads position
+                                applyEasingPreset(kf.laneId, kf.position, preset.id);
                                 setSelectedKeyframe({ ...kf });
                             }}
                             className="group flex flex-col items-center gap-1 p-2 glass-panel hover:bg-white/10 rounded transition-colors"

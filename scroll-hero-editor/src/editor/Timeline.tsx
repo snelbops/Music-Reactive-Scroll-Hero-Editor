@@ -5,11 +5,38 @@ import { onChange } from '@theatre/core';
 import { useStore } from '../store/useStore';
 import { useKickDrumData } from '../packages/useKickDrumData';
 import { sheet, SEQUENCE_DURATION } from '../theatre/core';
+import { interpolateParamAt, type ParamKf } from '../utils/interpolate';
 
 const LABEL_W = 120;
 const ZOOM_LEVELS = [1, 2, 4, 8];
 const VB_W = 1000;
 const VB_H = 40;
+
+const PARAM_LANES = [
+    { id: 'rotationSpeed', label: 'Rotation Speed', color: '#14b8a6', selBg: 'bg-teal-500/10',  min: 0,   max: 2   },
+    { id: 'depth',         label: 'Particle Depth', color: '#22c55e', selBg: 'bg-green-500/10', min: 0,   max: 10  },
+    { id: 'size',          label: 'Particle Size',  color: '#22c55e', selBg: 'bg-green-500/10', min: 0.1, max: 5   },
+    { id: 'cssOpacity',    label: 'CSS Opacity',    color: '#3b82f6', selBg: 'bg-blue-500/10',  min: 0,   max: 1   },
+] as const;
+
+function buildParamPath(kfs: ParamKf[], min: number, max: number): string | null {
+    if (kfs.length < 2) return null;
+    const pts = kfs.map(kf => ({
+        x: (kf.time / SEQUENCE_DURATION) * VB_W,
+        y: (1 - (kf.value - min) / (max - min)) * VB_H,
+    }));
+    let d = `M ${pts[0].x} ${pts[0].y}`;
+    for (let i = 1; i < pts.length; i++) {
+        const prev = pts[i - 1], curr = pts[i];
+        if (kfs[i - 1].easing === 'step') {
+            d += ` H ${curr.x} V ${curr.y}`;
+        } else {
+            const dx = curr.x - prev.x;
+            d += ` C ${prev.x + dx / 3} ${prev.y}, ${curr.x - dx / 3} ${curr.y}, ${curr.x} ${curr.y}`;
+        }
+    }
+    return d;
+}
 
 export default function Timeline({ height = 280 }: { height?: number }) {
     const isPlaying = useStore(state => state.isPlaying);
@@ -38,6 +65,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const scrollKeyframes = useStore(s => s.scrollKeyframes);
     const setScrollKeyframes = useStore(s => s.setScrollKeyframes);
     const clearScrollKeyframes = useStore(s => s.clearScrollKeyframes);
+    const paramKeyframes = useStore(s => s.paramKeyframes);
+    const addParamKeyframe = useStore(s => s.addParamKeyframe);
+    const setParamKeyframes = useStore(s => s.setParamKeyframes);
     const recordCountdown = useStore(s => s.recordCountdown);
     const setRecordCountdown = useStore(s => s.setRecordCountdown);
 
@@ -61,6 +91,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const scrollHistory = useRef<{ pos: number; val: number }[]>([]);
     // Tracks an in-progress keyframe drag: origTime of the dragged keyframe
     const draggingKfRef = useRef<{ origTime: number; value: number } | null>(null);
+    const draggingParamKfRef = useRef<{ laneId: string; origTime: number; value: number } | null>(null);
 
     const { beats, waveform, isReady } = useKickDrumData(audioUrl);
 
@@ -98,6 +129,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         sheet.sequence.position = progress * SEQUENCE_DURATION;
         setSceneProgress(progress);
         scrollHistory.current = [];
+        useStore.getState().applyParamKeyframesAt(progress * SEQUENCE_DURATION);
     }, [setSceneProgress]);
 
     const progressFromClientX = useCallback((clientX: number) => {
@@ -148,6 +180,13 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         } else {
             setRecordCountdown(3);
         }
+    };
+
+    const paramCurrentValues: Record<string, number> = {
+        rotationSpeed,
+        depth: particleDepth,
+        size: particleSize,
+        cssOpacity,
     };
 
     const trackW = lanesWidth ? lanesWidth * timelineZoom - LABEL_W : 0;
@@ -440,97 +479,110 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-purple/40 z-40" onPointerDown={makeLaneDrag('scrollPos', 48)} />
                 </div>
 
-                {/* Lane 5: Rotation Speed */}
-                <div className="flex border-b border-white/5 group relative" style={{ height: laneH('rotationSpeed') }}>
-                    <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${selectedLane === 'rotationSpeed' ? 'bg-teal-500/10' : 'bg-black/40 hover:bg-white/5'}`} onClick={() => setSelectedLane('rotationSpeed')}>
-                        <span className="text-xxs uppercase font-bold text-editor-accent-teal">Rotation Speed</span>
-                        <span className="text-[9px] font-mono text-editor-accent-teal/60">{rotationSpeed.toFixed(3)}</span>
-                    </div>
-                    <div className="flex-1 relative overflow-hidden">
-                        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none">
-                            {/* reference: current value as horizontal line; range [0, 2] */}
-                            {(() => {
-                                const y = (1 - rotationSpeed / 2) * VB_H;
-                                return (
-                                    <>
-                                        <line x1="0" y1={y} x2={VB_W} y2={y} stroke="rgba(20,184,166,0.2)" strokeWidth="1" strokeDasharray="4 4"/>
-                                        <circle cx={(sheet.sequence.position / SEQUENCE_DURATION) * VB_W} cy={y} r="3" fill="#14b8a6" opacity="0.8"/>
-                                    </>
-                                );
-                            })()}
-                        </svg>
-                    </div>
-                    <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-purple/40 z-40" onPointerDown={makeLaneDrag('rotationSpeed')} />
-                </div>
-
-                {/* Lane 6: Particle Depth */}
-                <div className="flex border-b border-white/5 group relative" style={{ height: laneH('depth') }}>
-                    <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${selectedLane === 'depth' ? 'bg-green-500/10' : 'bg-black/40 hover:bg-white/5'}`} onClick={() => setSelectedLane('depth')}>
-                        <span className="text-xxs uppercase font-bold text-editor-accent-green">Particle Depth</span>
-                        <span className="text-[9px] font-mono text-editor-accent-green/60">{particleDepth.toFixed(2)}</span>
-                    </div>
-                    <div className="flex-1 relative overflow-hidden">
-                        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none">
-                            {/* range [0, 10] */}
-                            {(() => {
-                                const y = (1 - particleDepth / 10) * VB_H;
-                                return (
-                                    <>
-                                        <line x1="0" y1={y} x2={VB_W} y2={y} stroke="rgba(34,197,94,0.2)" strokeWidth="1" strokeDasharray="4 4"/>
-                                        <circle cx={(sheet.sequence.position / SEQUENCE_DURATION) * VB_W} cy={y} r="3" fill="#22c55e" opacity="0.8"/>
-                                    </>
-                                );
-                            })()}
-                        </svg>
-                    </div>
-                    <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-purple/40 z-40" onPointerDown={makeLaneDrag('depth')} />
-                </div>
-
-                {/* Lane 7: Particle Size */}
-                <div className="flex border-b border-white/5 group relative" style={{ height: laneH('size') }}>
-                    <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${selectedLane === 'size' ? 'bg-green-500/10' : 'bg-black/40 hover:bg-white/5'}`} onClick={() => setSelectedLane('size')}>
-                        <span className="text-xxs uppercase font-bold text-editor-accent-green">Particle Size</span>
-                        <span className="text-[9px] font-mono text-editor-accent-green/60">{particleSize.toFixed(2)}</span>
-                    </div>
-                    <div className="flex-1 relative overflow-hidden">
-                        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none">
-                            {/* range [0.1, 5] */}
-                            {(() => {
-                                const y = (1 - (particleSize - 0.1) / 4.9) * VB_H;
-                                return (
-                                    <>
-                                        <line x1="0" y1={y} x2={VB_W} y2={y} stroke="rgba(34,197,94,0.2)" strokeWidth="1" strokeDasharray="4 4"/>
-                                        <circle cx={(sheet.sequence.position / SEQUENCE_DURATION) * VB_W} cy={y} r="3" fill="#22c55e" opacity="0.8"/>
-                                    </>
-                                );
-                            })()}
-                        </svg>
-                    </div>
-                    <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-purple/40 z-40" onPointerDown={makeLaneDrag('size')} />
-                </div>
-
-                {/* Lane 8: CSS Opacity */}
-                <div className="flex border-b border-white/5 group relative" style={{ height: laneH('cssOpacity') }}>
-                    <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${selectedLane === 'cssOpacity' ? 'bg-blue-500/10' : 'bg-black/40 hover:bg-white/5'}`} onClick={() => setSelectedLane('cssOpacity')}>
-                        <span className="text-xxs uppercase font-bold text-editor-accent-blue">CSS Opacity</span>
-                        <span className="text-[9px] font-mono text-editor-accent-blue/60">{cssOpacity.toFixed(2)}</span>
-                    </div>
-                    <div className="flex-1 relative overflow-hidden">
-                        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none">
-                            {/* range [0, 1] */}
-                            {(() => {
-                                const y = (1 - cssOpacity) * VB_H;
-                                return (
-                                    <>
-                                        <line x1="0" y1={y} x2={VB_W} y2={y} stroke="rgba(59,130,246,0.2)" strokeWidth="1" strokeDasharray="4 4"/>
-                                        <circle cx={(sheet.sequence.position / SEQUENCE_DURATION) * VB_W} cy={y} r="3" fill="#3b82f6" opacity="0.8"/>
-                                    </>
-                                );
-                            })()}
-                        </svg>
-                    </div>
-                    <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-purple/40 z-40" onPointerDown={makeLaneDrag('cssOpacity')} />
-                </div>
+                {/* Lanes 5–8: Param lanes (Rotation Speed, Particle Depth, Particle Size, CSS Opacity) */}
+                {PARAM_LANES.map(lane => {
+                    const kfs = (paramKeyframes[lane.id] ?? []) as ParamKf[];
+                    const currentVal = paramCurrentValues[lane.id];
+                    const normalY = (v: number) => (1 - (v - lane.min) / (lane.max - lane.min)) * VB_H;
+                    const curvePath = buildParamPath(kfs, lane.min, lane.max);
+                    const isSelected = selectedLane === lane.id;
+                    return (
+                        <div key={lane.id} className="flex border-b border-white/5 group relative" style={{ height: laneH(lane.id) }}>
+                            {/* Label */}
+                            <div
+                                className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${isSelected ? lane.selBg : 'bg-black/40 hover:bg-white/5'}`}
+                                onClick={() => setSelectedLane(lane.id)}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xxs uppercase font-bold truncate" style={{ color: lane.color }}>{lane.label}</span>
+                                    {kfs.length > 0 && (
+                                        <button
+                                            className="text-[9px] text-white/20 hover:text-red-400 transition-colors ml-1"
+                                            title="Clear keyframes"
+                                            onClick={(e) => { e.stopPropagation(); useStore.getState().clearParamKeyframes(lane.id); }}
+                                        >✕</button>
+                                    )}
+                                </div>
+                                <span className="text-[9px] font-mono" style={{ color: lane.color + '99' }}>{currentVal.toFixed(lane.id === 'rotationSpeed' ? 3 : 2)}</span>
+                            </div>
+                            {/* Track */}
+                            <div
+                                className="flex-1 relative overflow-hidden"
+                                onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    const el = lanesRef.current;
+                                    if (!el) return;
+                                    const rect = el.getBoundingClientRect();
+                                    const x = e.clientX - rect.left + el.scrollLeft - LABEL_W;
+                                    const laneTrackW = lanesWidth * timelineZoom - LABEL_W;
+                                    const t = Math.max(0, Math.min(1, x / laneTrackW)) * SEQUENCE_DURATION;
+                                    const existing = interpolateParamAt(kfs, t);
+                                    addParamKeyframe(lane.id, t, existing ?? currentVal);
+                                }}
+                            >
+                                <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+                                    {/* No-keyframe fallback: horizontal reference line */}
+                                    {kfs.length === 0 && (
+                                        <line x1="0" y1={normalY(currentVal)} x2={VB_W} y2={normalY(currentVal)} stroke={lane.color + '33'} strokeWidth="1" strokeDasharray="4 4"/>
+                                    )}
+                                    {/* Curve */}
+                                    {curvePath && (
+                                        <path d={curvePath} fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5" strokeLinecap="round"/>
+                                    )}
+                                    {/* Keyframe dots */}
+                                    {kfs.map((kf, i) => {
+                                        const kfSelected = selectedKeyframe?.laneId === lane.id && Math.abs(selectedKeyframe.position - kf.time) < 0.01;
+                                        return (
+                                            <circle
+                                                key={i}
+                                                cx={(kf.time / SEQUENCE_DURATION) * VB_W}
+                                                cy={normalY(kf.value)}
+                                                r={kfSelected ? '3.5' : '2'}
+                                                fill={kfSelected ? 'white' : lane.color}
+                                                stroke={kfSelected ? lane.color : 'none'}
+                                                strokeWidth="1"
+                                                className="cursor-ew-resize"
+                                                style={{ pointerEvents: 'all' }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedKeyframe({ laneId: lane.id, position: kf.time, value: kf.value });
+                                                }}
+                                                onPointerDown={(e) => {
+                                                    e.stopPropagation();
+                                                    (e.target as SVGCircleElement).setPointerCapture(e.pointerId);
+                                                    draggingParamKfRef.current = { laneId: lane.id, origTime: kf.time, value: kf.value };
+                                                }}
+                                                onPointerMove={(e) => {
+                                                    if (!draggingParamKfRef.current || !(e.buttons & 1)) return;
+                                                    const { laneId, origTime, value } = draggingParamKfRef.current;
+                                                    const svgEl = (e.target as SVGCircleElement).ownerSVGElement!;
+                                                    const rect = svgEl.getBoundingClientRect();
+                                                    const svgX = ((e.clientX - rect.left) / rect.width) * VB_W;
+                                                    const newTime = Math.max(0, Math.min(SEQUENCE_DURATION, (svgX / VB_W) * SEQUENCE_DURATION));
+                                                    setParamKeyframes(laneId, (paramKeyframes[laneId] ?? [])
+                                                        .filter(k => Math.abs(k.time - origTime) > 0.001)
+                                                        .concat({ time: newTime, value, easing: kfs.find(k => Math.abs(k.time - origTime) < 0.001)?.easing ?? 'linear' })
+                                                        .sort((a, b) => a.time - b.time) as ParamKf[]);
+                                                    draggingParamKfRef.current = { laneId, origTime: newTime, value };
+                                                }}
+                                                onPointerUp={() => { draggingParamKfRef.current = null; }}
+                                            />
+                                        );
+                                    })}
+                                    {/* Live playhead dot */}
+                                    <circle
+                                        cx={(sheet.sequence.position / SEQUENCE_DURATION) * VB_W}
+                                        cy={normalY(currentVal)}
+                                        r="3"
+                                        fill={lane.color}
+                                        opacity="0.8"
+                                    />
+                                </svg>
+                            </div>
+                            <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-purple/40 z-40" onPointerDown={makeLaneDrag(lane.id)} />
+                        </div>
+                    );
+                })}
 
                 {/* Lane 9: Scroll Speed (mock) */}
                 <div className="flex border-b border-white/5 group relative" style={{ height: laneH('scrollSpeed') }}>

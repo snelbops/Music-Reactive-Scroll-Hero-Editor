@@ -1,26 +1,7 @@
 import { useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { sceneParamsObj, cssOpacityObj, sheet, SEQUENCE_DURATION } from './core';
-
-/**
- * Linearly interpolate scrollKeyframes at time t (seconds).
- * With no keyframes: returns t/duration (linear default = Cavalry diagonal).
- */
-function interpolateScrollAt(keyframes: { time: number; value: number }[], t: number): number {
-    if (keyframes.length === 0) return t / SEQUENCE_DURATION;
-    if (keyframes.length === 1) return keyframes[0].value;
-    if (t <= keyframes[0].time) return keyframes[0].value;
-    if (t >= keyframes[keyframes.length - 1].time) return keyframes[keyframes.length - 1].value;
-    for (let i = 0; i < keyframes.length - 1; i++) {
-        const a = keyframes[i];
-        const b = keyframes[i + 1];
-        if (t >= a.time && t <= b.time) {
-            const alpha = (t - a.time) / (b.time - a.time);
-            return a.value + alpha * (b.value - a.value);
-        }
-    }
-    return t / SEQUENCE_DURATION;
-}
+import { interpolateScrollAt, interpolateParamAt, type ParamKf } from '../utils/interpolate';
 
 /**
  * TheatreSync — logic-only component mounted at the app root.
@@ -67,13 +48,23 @@ export default function TheatreSync() {
                     if (isLoop) {
                         sheet.sequence.position = 0;
                         const kfs = useStore.getState().scrollKeyframes;
-                        useStore.getState().setSceneProgress(interpolateScrollAt(kfs, 0));
+                        useStore.getState().setSceneProgress(interpolateScrollAt(kfs, 0, SEQUENCE_DURATION));
+                        // Param lane interpolation at loop restart
+                        const pkfs0 = useStore.getState().paramKeyframes;
+                        const rSpeed0 = interpolateParamAt((pkfs0['rotationSpeed'] ?? []) as ParamKf[], 0);
+                        if (rSpeed0 !== null) useStore.getState().setRotationSpeed(rSpeed0);
+                        const depth0 = interpolateParamAt((pkfs0['depth'] ?? []) as ParamKf[], 0);
+                        if (depth0 !== null) useStore.getState().setParticleDepth(depth0);
+                        const size0 = interpolateParamAt((pkfs0['size'] ?? []) as ParamKf[], 0);
+                        if (size0 !== null) useStore.getState().setParticleSize(size0);
+                        const opacity0 = interpolateParamAt((pkfs0['cssOpacity'] ?? []) as ParamKf[], 0);
+                        if (opacity0 !== null) useStore.getState().setCssOpacity(opacity0);
                         lastTime = now;
                         rafId = requestAnimationFrame(tick);
                     } else {
                         sheet.sequence.position = SEQUENCE_DURATION;
                         const kfs = useStore.getState().scrollKeyframes;
-                        useStore.getState().setSceneProgress(interpolateScrollAt(kfs, SEQUENCE_DURATION));
+                        useStore.getState().setSceneProgress(interpolateScrollAt(kfs, SEQUENCE_DURATION, SEQUENCE_DURATION));
                         useStore.getState().setIsPlaying(false);
                         useStore.getState().setIsRecording(false);
                     }
@@ -83,8 +74,18 @@ export default function TheatreSync() {
                 // Don't override scroll while user is actively dragging the scrub handle
                 if (!useStore.getState().isScrubbing) {
                     const kfs = useStore.getState().scrollKeyframes;
-                    useStore.getState().setSceneProgress(interpolateScrollAt(kfs, nextPos));
+                    useStore.getState().setSceneProgress(interpolateScrollAt(kfs, nextPos, SEQUENCE_DURATION));
                 }
+                // Param lane interpolation
+                const pkfs = useStore.getState().paramKeyframes;
+                const rSpeed = interpolateParamAt((pkfs['rotationSpeed'] ?? []) as ParamKf[], nextPos);
+                if (rSpeed !== null) useStore.getState().setRotationSpeed(rSpeed);
+                const depth = interpolateParamAt((pkfs['depth'] ?? []) as ParamKf[], nextPos);
+                if (depth !== null) useStore.getState().setParticleDepth(depth);
+                const size = interpolateParamAt((pkfs['size'] ?? []) as ParamKf[], nextPos);
+                if (size !== null) useStore.getState().setParticleSize(size);
+                const opacity = interpolateParamAt((pkfs['cssOpacity'] ?? []) as ParamKf[], nextPos);
+                if (opacity !== null) useStore.getState().setCssOpacity(opacity);
             }
             lastTime = now;
             rafId = requestAnimationFrame(tick);

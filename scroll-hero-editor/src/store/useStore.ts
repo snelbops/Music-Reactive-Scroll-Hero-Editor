@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { SceneAdapter } from '../preview/SceneAdapter';
+import { interpolateParamAt, type ParamKf } from '../utils/interpolate';
 
 type PresetId = 'orbit' | 'light' | 'classic-dark' | 'classic-dark-copy' | 'classic-light' | 'classic-inverted' | 'light-images' | 'frames';
 type AspectRatio = '16:9' | '9:16' | '1:1' | 'free';
@@ -29,11 +30,20 @@ interface EditorState {
     extractionProgress: number; setExtractionProgress: (p: number) => void;
     extractionStatus: 'idle' | 'extracting' | 'done' | 'error'; setExtractionStatus: (s: 'idle' | 'extracting' | 'done' | 'error') => void;
     isScrubbing: boolean; setIsScrubbing: (v: boolean) => void;
-    scrollKeyframes: { time: number; value: number }[];
+    scrollKeyframes: { time: number; value: number; easing?: string }[];
     // rangeStart: if provided, clears old keyframes strictly between rangeStart and time (overdub).
     addScrollKeyframe: (time: number, value: number, rangeStart?: number) => void;
     clearScrollKeyframes: () => void;
-    setScrollKeyframes: (kfs: { time: number; value: number }[]) => void;
+    setScrollKeyframes: (kfs: { time: number; value: number; easing?: string }[]) => void;
+    updateScrollKeyframeEasing: (time: number, easing: string) => void;
+    paramKeyframes: Record<string, ParamKf[]>;
+    addParamKeyframe: (laneId: string, time: number, value: number) => void;
+    removeParamKeyframe: (laneId: string, time: number) => void;
+    updateParamKeyframeEasing: (laneId: string, time: number, easing: string) => void;
+    updateParamKeyframeValue: (laneId: string, time: number, value: number) => void;
+    setParamKeyframes: (laneId: string, kfs: ParamKf[]) => void;
+    clearParamKeyframes: (laneId: string) => void;
+    applyParamKeyframesAt: (time: number) => void;
     selectedLane: string | null; setSelectedLane: (id: string | null) => void;
     selectedKeyframe: { laneId: string; position: number; value: number } | null;
     setSelectedKeyframe: (kf: { laneId: string; position: number; value: number } | null) => void;
@@ -79,6 +89,39 @@ export const useStore = create<EditorState>((set, get) => ({
     }),
     clearScrollKeyframes: () => set({ scrollKeyframes: [] }),
     setScrollKeyframes: (kfs) => set({ scrollKeyframes: kfs }),
+    updateScrollKeyframeEasing: (time, easing) => set((s) => ({
+        scrollKeyframes: s.scrollKeyframes.map(kf => Math.abs(kf.time - time) < 0.001 ? { ...kf, easing } : kf),
+    })),
+    paramKeyframes: {},
+    addParamKeyframe: (laneId, time, value) => set((s) => {
+        const existing = s.paramKeyframes[laneId] ?? [];
+        const filtered = existing.filter(kf => Math.abs(kf.time - time) > 0.016);
+        return { paramKeyframes: { ...s.paramKeyframes, [laneId]: [...filtered, { time, value, easing: 'linear' }].sort((a, b) => a.time - b.time) } };
+    }),
+    removeParamKeyframe: (laneId, time) => set((s) => ({
+        paramKeyframes: { ...s.paramKeyframes, [laneId]: (s.paramKeyframes[laneId] ?? []).filter(kf => Math.abs(kf.time - time) > 0.001) },
+    })),
+    updateParamKeyframeEasing: (laneId, time, easing) => set((s) => ({
+        paramKeyframes: { ...s.paramKeyframes, [laneId]: (s.paramKeyframes[laneId] ?? []).map(kf => Math.abs(kf.time - time) < 0.001 ? { ...kf, easing } : kf) },
+    })),
+    updateParamKeyframeValue: (laneId, time, value) => set((s) => ({
+        paramKeyframes: { ...s.paramKeyframes, [laneId]: (s.paramKeyframes[laneId] ?? []).map(kf => Math.abs(kf.time - time) < 0.001 ? { ...kf, value } : kf) },
+    })),
+    setParamKeyframes: (laneId, kfs) => set((s) => ({ paramKeyframes: { ...s.paramKeyframes, [laneId]: kfs } })),
+    clearParamKeyframes: (laneId) => set((s) => { const next = { ...s.paramKeyframes }; delete next[laneId]; return { paramKeyframes: next }; }),
+    applyParamKeyframesAt: (time) => {
+        const kfs = get().paramKeyframes;
+        const updates: Partial<{ rotationSpeed: number; particleDepth: number; particleSize: number; cssOpacity: number }> = {};
+        const rSpeed = interpolateParamAt((kfs['rotationSpeed'] ?? []) as ParamKf[], time);
+        if (rSpeed !== null) updates.rotationSpeed = rSpeed;
+        const depth = interpolateParamAt((kfs['depth'] ?? []) as ParamKf[], time);
+        if (depth !== null) updates.particleDepth = depth;
+        const size = interpolateParamAt((kfs['size'] ?? []) as ParamKf[], time);
+        if (size !== null) updates.particleSize = size;
+        const opacity = interpolateParamAt((kfs['cssOpacity'] ?? []) as ParamKf[], time);
+        if (opacity !== null) updates.cssOpacity = opacity;
+        if (Object.keys(updates).length > 0) set(updates);
+    },
     selectedLane: null, setSelectedLane: (id) => set({ selectedLane: id, selectedKeyframe: null }),
     selectedKeyframe: null, setSelectedKeyframe: (kf) => set({ selectedKeyframe: kf, selectedLane: kf?.laneId ?? null }),
     rotationSpeed: 0.1, setRotationSpeed: (v) => set({ rotationSpeed: v }),
