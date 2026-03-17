@@ -7,7 +7,7 @@ import Inspector from './Inspector';
 import Timeline from './Timeline';
 import Viewport from '../preview/Viewport';
 import { useStore } from '../store/useStore';
-import { exportParticleHeroHtml, exportFrameSequenceHeroHtml } from '../export/exportHtml';
+import { exportParticleHeroHtml, exportFrameSequenceHeroHtml, exportCurvesJson } from '../export/exportHtml';
 
 export default function Layout() {
     const isFullscreen = useStore(state => state.isFullscreen);
@@ -108,6 +108,7 @@ export default function Layout() {
                 </div>
                 <div className="flex items-center gap-3">
                     <button onClick={handleExportJson} className="bg-editor-accent-purple/20 hover:bg-editor-accent-purple/40 text-editor-accent-purple px-3 py-1 rounded text-xs transition-colors border border-editor-accent-purple/30">EXPORT JSON</button>
+                    <button onClick={exportCurvesJson} className="bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white px-3 py-1 rounded text-xs transition-colors border border-white/10" title="Export scroll keyframes as curves.json">CURVES JSON</button>
                     <button
                         onClick={handleExportHtml}
                         disabled={isExportingHtml}

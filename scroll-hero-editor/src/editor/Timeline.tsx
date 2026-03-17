@@ -21,18 +21,38 @@ const PARAM_LANES = [
 
 function buildParamPath(kfs: ParamKf[], min: number, max: number): string | null {
     if (kfs.length < 2) return null;
+    const scaleX = VB_W / SEQUENCE_DURATION;
+    const valueRange = max - min;
     const pts = kfs.map(kf => ({
-        x: (kf.time / SEQUENCE_DURATION) * VB_W,
-        y: (1 - (kf.value - min) / (max - min)) * VB_H,
+        x: kf.time * scaleX,
+        y: (1 - (kf.value - min) / valueRange) * VB_H,
     }));
     let d = `M ${pts[0].x} ${pts[0].y}`;
     for (let i = 1; i < pts.length; i++) {
         const prev = pts[i - 1], curr = pts[i];
-        if (kfs[i - 1].easing === 'step') {
-            d += ` H ${curr.x} V ${curr.y}`;
-        } else {
-            const dx = curr.x - prev.x;
-            d += ` C ${prev.x + dx / 3} ${prev.y}, ${curr.x - dx / 3} ${curr.y}, ${curr.x} ${curr.y}`;
+        const kfPrev = kfs[i - 1], kfCurr = kfs[i];
+        if (kfPrev.easing === 'step') { d += ` H ${curr.x} V ${curr.y}`; continue; }
+        // Bezier handles override easing
+        if (kfPrev.handleOut || kfCurr.handleIn) {
+            const dt = kfCurr.time - kfPrev.time;
+            const outDt = kfPrev.handleOut?.dt ?? dt / 3;
+            const outDv = kfPrev.handleOut?.dv ?? 0;
+            const inDt  = kfCurr.handleIn?.dt  ?? -dt / 3;
+            const inDv  = kfCurr.handleIn?.dv  ?? 0;
+            const hox = prev.x + outDt * scaleX;
+            const hoy = prev.y - (outDv / valueRange) * VB_H;
+            const hix = curr.x + inDt * scaleX;
+            const hiy = curr.y - (inDv / valueRange) * VB_H;
+            d += ` C ${hox} ${hoy}, ${hix} ${hiy}, ${curr.x} ${curr.y}`;
+            continue;
+        }
+        // Easing-specific control points — match the inspector thumbnail shapes exactly
+        const dx = curr.x - prev.x;
+        switch (kfPrev.easing) {
+            case 'linear':    d += ` L ${curr.x} ${curr.y}`; break;
+            case 'easeIn':    d += ` C ${prev.x + dx*0.42} ${prev.y}, ${curr.x} ${curr.y}, ${curr.x} ${curr.y}`; break;
+            case 'easeOut':   d += ` C ${prev.x} ${prev.y}, ${curr.x - dx*0.42} ${curr.y}, ${curr.x} ${curr.y}`; break;
+            default:          d += ` C ${prev.x + dx*0.42} ${prev.y}, ${curr.x - dx*0.42} ${curr.y}, ${curr.x} ${curr.y}`; // easeInOut
         }
     }
     return d;
@@ -82,12 +102,14 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const setRecordCountdown = useStore(s => s.setRecordCountdown);
 
     const updateScrollKeyframeHandle = useStore(s => s.updateScrollKeyframeHandle);
+    const updateParamKeyframeHandle = useStore(s => s.updateParamKeyframeHandle);
 
     const [timelineZoom, setTimelineZoom] = useState(1);
     const [verticalZoom, setVerticalZoom] = useState(1);
     const [lanesWidth, setLanesWidth] = useState(0);
     const [activeTool, setActiveTool] = useState<'select' | 'pen' | 'eraser'>('select');
     const draggingHandleRef = useRef<{ kfTime: number; side: 'in' | 'out' } | null>(null);
+    const draggingParamHandleRef = useRef<{ laneId: string; kfTime: number; side: 'in' | 'out' } | null>(null);
     // Reactive time display — updated by onChange so it refreshes each frame during playback
     const [seqTime, setSeqTime] = useState(() => sheet.sequence.position);
     const [laneHeights, setLaneHeights] = useState<Record<string, number>>({});
@@ -718,6 +740,60 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     {curvePath && (
                                         <path d={curvePath} fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5" strokeLinecap="round"/>
                                     )}
+                                    {/* Bezier handles for selected keyframes (select tool only) */}
+                                    {activeTool === 'select' && kfs.map((kf, idx) => {
+                                        const isKfSelected = selectedKeyframes.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.01);
+                                        if (!isKfSelected) return null;
+                                        const scaleX = VB_W / SEQUENCE_DURATION;
+                                        const valueRange = lane.max - lane.min;
+                                        const kx = kf.time * scaleX;
+                                        const ky = normalY(kf.value);
+                                        const hasNext = idx < kfs.length - 1;
+                                        const hasPrev = idx > 0;
+                                        const outDt = hasNext ? (kf.handleOut?.dt ?? (kfs[idx+1].time - kf.time) / 3) : 0;
+                                        const outDv = hasNext ? (kf.handleOut?.dv ?? 0) : 0;
+                                        const inDt  = hasPrev ? (kf.handleIn?.dt  ?? -(kf.time - kfs[idx-1].time) / 3) : 0;
+                                        const inDv  = hasPrev ? (kf.handleIn?.dv  ?? 0) : 0;
+                                        const hox = kx + outDt * scaleX, hoy = ky - (outDv / valueRange) * VB_H;
+                                        const hix = kx + inDt  * scaleX, hiy = ky - (inDv  / valueRange) * VB_H;
+                                        const handleCircle = (hx: number, hy: number, side: 'in' | 'out') => (
+                                            <circle
+                                                cx={hx} cy={hy} r="4"
+                                                fill={lane.color + 'cc'} stroke="white" strokeWidth="1"
+                                                className="cursor-move" style={{ pointerEvents: 'all' }}
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                                onPointerDown={(e) => {
+                                                    e.stopPropagation();
+                                                    (e.target as SVGCircleElement).setPointerCapture(e.pointerId);
+                                                    draggingParamHandleRef.current = { laneId: lane.id, kfTime: kf.time, side };
+                                                }}
+                                                onPointerMove={(e) => {
+                                                    if (!draggingParamHandleRef.current || !(e.buttons & 1)) return;
+                                                    const { laneId, kfTime, side: s } = draggingParamHandleRef.current;
+                                                    const refKf = (paramKeyframes[laneId] ?? []).find(k => Math.abs(k.time - kfTime) < 0.001);
+                                                    if (!refKf) return;
+                                                    const svgEl = (e.target as SVGCircleElement).ownerSVGElement!;
+                                                    const rect = svgEl.getBoundingClientRect();
+                                                    const svgX = ((e.clientX - rect.left) / rect.width) * VB_W;
+                                                    const svgY = ((e.clientY - rect.top) / rect.height) * VB_H;
+                                                    const laneScaleX = VB_W / SEQUENCE_DURATION;
+                                                    const newDt = (svgX - refKf.time * laneScaleX) / laneScaleX;
+                                                    const newDv = -((svgY - normalY(refKf.value)) / VB_H) * valueRange;
+                                                    updateParamKeyframeHandle(laneId, kfTime, s, {
+                                                        dt: s === 'out' ? Math.max(0, newDt) : Math.min(0, newDt),
+                                                        dv: newDv,
+                                                    });
+                                                }}
+                                                onPointerUp={() => { draggingParamHandleRef.current = null; }}
+                                            />
+                                        );
+                                        return (
+                                            <g key={`h-${idx}`}>
+                                                {hasNext && <><line x1={kx} y1={ky} x2={hox} y2={hoy} stroke={lane.color + '66'} strokeWidth="1" strokeDasharray="3 2"/>{handleCircle(hox, hoy, 'out')}</>}
+                                                {hasPrev && <><line x1={kx} y1={ky} x2={hix} y2={hiy} stroke={lane.color + '66'} strokeWidth="1" strokeDasharray="3 2"/>{handleCircle(hix, hiy, 'in')}</>}
+                                            </g>
+                                        );
+                                    })}
                                     {/* Keyframe dots */}
                                     {kfs.map((kf, i) => {
                                         const kfSelected = selectedKeyframes.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.01);
@@ -752,10 +828,11 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                     const svgY = ((e.clientY - rect.top) / rect.height) * VB_H;
                                                     const newTime = Math.max(0, Math.min(SEQUENCE_DURATION, (svgX / VB_W) * SEQUENCE_DURATION));
                                                     const newValue = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - svgY / VB_H) * (lane.max - lane.min)));
-                                                    const existingEasing = (paramKeyframes[laneId] ?? []).find(k => Math.abs(k.time - origTime) < 0.001)?.easing ?? 'linear';
+                                                    const existingKf = (paramKeyframes[laneId] ?? []).find(k => Math.abs(k.time - origTime) < 0.001);
+                                                    const { easing: existingEasing = 'linear', handleOut, handleIn } = existingKf ?? {};
                                                     setParamKeyframes(laneId, (paramKeyframes[laneId] ?? [])
                                                         .filter(k => Math.abs(k.time - origTime) > 0.001)
-                                                        .concat({ time: newTime, value: newValue, easing: existingEasing })
+                                                        .concat({ time: newTime, value: newValue, easing: existingEasing, ...(handleOut ? { handleOut } : {}), ...(handleIn ? { handleIn } : {}) })
                                                         .sort((a, b) => a.time - b.time) as ParamKf[]);
                                                     draggingParamKfRef.current = { laneId, origTime: newTime, value: newValue };
                                                 }}

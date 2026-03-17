@@ -1,4 +1,10 @@
-export type ParamKf = { time: number; value: number; easing: string };
+export type ParamKf = {
+    time: number;
+    value: number;
+    easing: string;
+    handleOut?: { dt: number; dv: number };
+    handleIn?:  { dt: number; dv: number };
+};
 
 function applyEasing(alpha: number, easing: string): number {
     switch (easing) {
@@ -53,6 +59,11 @@ export function interpolateParamAt(keyframes: ParamKf[], t: number): number | nu
         if (t >= a.time && t <= b.time) {
             if (a.easing === 'step') return a.value;
             const alpha = (t - a.time) / (b.time - a.time);
+            if (a.handleOut || b.handleIn) {
+                const p1v = a.value + (a.handleOut?.dv ?? 0);
+                const p2v = b.value + (b.handleIn?.dv ?? 0);
+                return cubicBezierValue(alpha, a.value, p1v, p2v, b.value);
+            }
             return a.value + applyEasing(alpha, a.easing) * (b.value - a.value);
         }
     }

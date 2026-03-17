@@ -42,6 +42,7 @@ interface EditorState {
     removeParamKeyframe: (laneId: string, time: number) => void;
     updateParamKeyframeEasing: (laneId: string, time: number, easing: string) => void;
     updateParamKeyframeValue: (laneId: string, time: number, value: number) => void;
+    updateParamKeyframeHandle: (laneId: string, time: number, side: 'in' | 'out', handle: { dt: number; dv: number }) => void;
     setParamKeyframes: (laneId: string, kfs: ParamKf[]) => void;
     clearParamKeyframes: (laneId: string) => void;
     applyParamKeyframesAt: (time: number) => void;
@@ -116,6 +117,11 @@ export const useStore = create<EditorState>((set, get) => ({
     })),
     updateParamKeyframeValue: (laneId, time, value) => set((s) => ({
         paramKeyframes: { ...s.paramKeyframes, [laneId]: (s.paramKeyframes[laneId] ?? []).map(kf => Math.abs(kf.time - time) < 0.001 ? { ...kf, value } : kf) },
+    })),
+    updateParamKeyframeHandle: (laneId, time, side, handle) => set((s) => ({
+        paramKeyframes: { ...s.paramKeyframes, [laneId]: (s.paramKeyframes[laneId] ?? []).map(kf =>
+            Math.abs(kf.time - time) < 0.001 ? { ...kf, [side === 'in' ? 'handleIn' : 'handleOut']: handle } : kf
+        )},
     })),
     setParamKeyframes: (laneId, kfs) => set((s) => ({ paramKeyframes: { ...s.paramKeyframes, [laneId]: kfs } })),
     clearParamKeyframes: (laneId) => set((s) => { const next = { ...s.paramKeyframes }; delete next[laneId]; return { paramKeyframes: next }; }),

@@ -1,43 +1,44 @@
-import studio from '@theatre/studio';
+import { useStore } from '../store/useStore';
 import { SEQUENCE_DURATION } from '../theatre/core';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface Keyframe {
-    position: number; // seconds 0..SEQUENCE_DURATION
-    value: number;    // 0..1
-}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Extract position keyframes from a Theatre.js save-file blob. */
-function extractScrollKeyframes(saveFile: unknown): Keyframe[] {
-    try {
-        const sf = saveFile as Record<string, unknown>;
-        const sheet = (sf.sheetsById as Record<string, unknown>)?.['Main Sequence'] as Record<string, unknown>;
-        const byObj = (sheet?.sequence as Record<string, unknown>)?.tracksByObject as Record<string, unknown>;
-        const scrollControls = byObj?.['Scroll Controls'] as Record<string, unknown>;
-        const trackData = scrollControls?.trackData as Record<string, { keyframes: Keyframe[] }>;
-        if (!trackData) return [];
-        // find the position track (first track with numeric values)
-        const track = Object.values(trackData)[0];
-        return (track?.keyframes ?? []).map((kf) => ({ position: kf.position, value: kf.value }));
-    } catch {
-        return [];
-    }
+/** Read scroll keyframes directly from Zustand — authoritative source. */
+function getScrollKeyframes() {
+    return useStore.getState().scrollKeyframes;
 }
 
-/** Inline JS snippet: evalCurve(keyframes, t) → 0..1 */
+/**
+ * Inline JS snippet embedded in exported HTML.
+ * evalCurve(keyframes, t, sequenceDuration) → 0..1
+ * Supports linear / easeIn / easeOut / easeInOut / step and bezier handles.
+ */
 const EVAL_CURVE_JS = `
+function _applyEasing(alpha, easing) {
+  if (easing === 'easeIn')    return alpha * alpha * alpha;
+  if (easing === 'easeOut')   { var t = 1 - alpha; return 1 - t * t * t; }
+  if (easing === 'easeInOut') return alpha < 0.5 ? 4 * Math.pow(alpha, 3) : 1 - Math.pow(-2 * alpha + 2, 3) / 2;
+  return alpha;
+}
+function _cubicBez(t, p0, p1, p2, p3) {
+  var mt = 1 - t;
+  return mt*mt*mt*p0 + 3*mt*mt*t*p1 + 3*mt*t*t*p2 + t*t*t*p3;
+}
 function evalCurve(keyframes, t, sequenceDuration) {
   if (!keyframes.length) return t / sequenceDuration;
-  if (t <= keyframes[0].position) return keyframes[0].value;
-  if (t >= keyframes[keyframes.length - 1].position) return keyframes[keyframes.length - 1].value;
-  for (let i = 0; i < keyframes.length - 1; i++) {
-    const a = keyframes[i], b = keyframes[i + 1];
-    if (t >= a.position && t <= b.position) {
-      const u = (t - a.position) / (b.position - a.position);
-      return a.value + (b.value - a.value) * u;
+  if (t <= keyframes[0].time) return keyframes[0].value;
+  if (t >= keyframes[keyframes.length - 1].time) return keyframes[keyframes.length - 1].value;
+  for (var i = 0; i < keyframes.length - 1; i++) {
+    var a = keyframes[i], b = keyframes[i + 1];
+    if (t >= a.time && t <= b.time) {
+      if (a.easing === 'step') return a.value;
+      var alpha = (t - a.time) / (b.time - a.time);
+      if (a.handleOut || b.handleIn) {
+        var p1v = a.value + (a.handleOut ? a.handleOut.dv : 0);
+        var p2v = b.value + (b.handleIn  ? b.handleIn.dv  : 0);
+        return _cubicBez(alpha, a.value, p1v, p2v, b.value);
+      }
+      return a.value + _applyEasing(alpha, a.easing || 'linear') * (b.value - a.value);
     }
   }
   return 0;
@@ -57,8 +58,7 @@ function downloadFile(filename: string, content: string, mime = 'text/html') {
 // ─── Story 5.2 — Particle Hero HTML ──────────────────────────────────────────
 
 export function exportParticleHeroHtml() {
-    const saveFile = studio.createContentOfSaveFile('Scroll Hero Editor');
-    const keyframes = extractScrollKeyframes(saveFile);
+    const keyframes = getScrollKeyframes();
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -115,7 +115,7 @@ export function exportParticleHeroHtml() {
     │  1. Replace <canvas id="hero-canvas"> with your Three.js / R3F scene.   │
     │  2. Your scene should expose a setProgress(p: 0..1) function.           │
     │  3. The onUpdate callback already calls setProgress with the curve value.│
-    │  4. The KEYFRAMES array below bakes your exact Theatre.js curves.        │
+    │  4. The KEYFRAMES array below bakes your scroll automation curves.        │
     └──────────────────────────────────────────────────────────────────────────┘
   -->
 
@@ -210,8 +210,7 @@ export function exportParticleHeroHtml() {
 // ─── Story 5.3 — Frame Sequence Hero HTML ────────────────────────────────────
 
 export async function exportFrameSequenceHeroHtml(mp4BlobUrl: string, mp4Name: string) {
-    const saveFile = studio.createContentOfSaveFile('Scroll Hero Editor');
-    const keyframes = extractScrollKeyframes(saveFile);
+    const keyframes = getScrollKeyframes();
 
     // Convert the blob URL to base64
     const response = await fetch(mp4BlobUrl);
@@ -260,45 +259,52 @@ export async function exportFrameSequenceHeroHtml(mp4BlobUrl: string, mp4Name: s
     │  Source: ${mp4Name} (${sizeMB} MB embedded as base64)${''.padEnd(Math.max(0, 43 - mp4Name.length - sizeMB.length))} │
     │  Generated by Scroll Hero Editor                                         │
     │                                                                          │
-    │  The video is driven by your baked Theatre.js curve.                    │
+    │  The video is driven by your baked scroll automation curve.             │
     │  Scroll the page to play the animation.                                  │
     └──────────────────────────────────────────────────────────────────────────┘
   -->
 
-  <div class="hero">
+  <!-- ScrollyVideo container — drives video via setVideoPercentage() -->
+  <div class="hero" id="scrolly-container">
     <video id="hero-video" muted playsinline preload="auto"
       src="${dataUri}">
     </video>
   </div>
 
+  <!-- ScrollyVideo.js — smooth scroll-driven video seeking (FR8b) -->
+  <script src="https://cdn.jsdelivr.net/npm/scrollyvideo@2/dist/scrollyvideo.js"></script>
   <!-- GSAP + ScrollTrigger -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 
   <script>
-    // ── Baked curve data from Theatre.js ──────────────────────────────────
+    // ── Baked scroll automation curve ─────────────────────────────────────
     const SEQUENCE_DURATION = ${SEQUENCE_DURATION};
     const KEYFRAMES = ${JSON.stringify(keyframes, null, 4)};
 
-    // ── Curve interpolation (linear) ──────────────────────────────────────
+    // ── Curve interpolation (easing + bezier handle support) ──────────────
     ${EVAL_CURVE_JS}
 
-    // ── ScrollTrigger → curve → video scrub ──────────────────────────────
+    // ── ScrollyVideo instance (full:false = manual control via setVideoPercentage) ──
+    var scrollyVideo = new ScrollyVideo({
+      scrollyVideoContainer: document.getElementById('scrolly-container'),
+      src: document.getElementById('hero-video').src,
+      full: false,
+      sticky: false,
+      cover: true,
+    });
+
+    // ── GSAP ScrollTrigger → baked curve → ScrollyVideo ──────────────────
     gsap.registerPlugin(ScrollTrigger);
 
-    const video = document.getElementById('hero-video');
-
-    // Wait for metadata so video.duration is available
-    video.addEventListener('loadedmetadata', () => {
-      ScrollTrigger.create({
-        start: 'top top',
-        end: 'bottom bottom',
-        onUpdate(self) {
-          const t = self.progress * SEQUENCE_DURATION;
-          const p = evalCurve(KEYFRAMES, t, SEQUENCE_DURATION);
-          video.currentTime = p * video.duration;
-        },
-      });
+    ScrollTrigger.create({
+      start: 'top top',
+      end: 'bottom bottom',
+      onUpdate: function(self) {
+        var t = self.progress * SEQUENCE_DURATION;
+        var p = evalCurve(KEYFRAMES, t, SEQUENCE_DURATION);
+        scrollyVideo.setVideoPercentage(p, { ms: 80 });
+      },
     });
   </script>
 
@@ -306,4 +312,13 @@ export async function exportFrameSequenceHeroHtml(mp4BlobUrl: string, mp4Name: s
 </html>`;
 
     downloadFile(`scroll-hero-${mp4Name.replace(/\.mp4$/i, '')}.html`, html);
+}
+
+// ─── Story 5.4 — Export Curves JSON (FR25) ───────────────────────────────────
+
+/** Export the scroll automation curve as a standalone curves.json file. */
+export function exportCurvesJson() {
+    const keyframes = getScrollKeyframes();
+    const data = JSON.stringify({ sequenceDuration: SEQUENCE_DURATION, keyframes }, null, 2);
+    downloadFile('scroll-curves.json', data, 'application/json');
 }

@@ -222,8 +222,19 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
     if (!lane) return null;
 
     const setSelectedKeyframe = useStore(s => s.setSelectedKeyframe);
-    const selectedCount = useStore(s => s.selectedKeyframes.length);
+    const selectedKeyframes = useStore(s => s.selectedKeyframes);
+    const selectedCount = selectedKeyframes.length;
     const isMulti = selectedCount > 1;
+    const scrollKfs = useStore(s => s.scrollKeyframes);
+    const paramKfs = useStore(s => s.paramKeyframes);
+
+    // Determine the active easing — highlight picker button only when all selected kfs share the same easing
+    const getEasing = (laneId: string, position: number): string => {
+        if (laneId === 'scrollPos') return scrollKfs.find(k => Math.abs(k.time - position) < 0.001)?.easing ?? 'linear';
+        return (paramKfs[laneId] ?? []).find(k => Math.abs(k.time - position) < 0.001)?.easing ?? 'linear';
+    };
+    const allEasings = (isMulti ? selectedKeyframes : [kf]).map(s => getEasing(s.laneId, s.position));
+    const activeEasing = allEasings.every(e => e === allEasings[0]) ? allEasings[0] : null;
 
     const timeLabel = new Date(kf.position * 1000).toISOString().slice(15, 22);
 
@@ -288,7 +299,9 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
                     <span className="text-[9px] text-gray-600">right-click / Delete to remove</span>
                 </div>
                 <div className="grid grid-cols-3 gap-1.5">
-                    {EASING_PRESETS.map((preset) => (
+                    {EASING_PRESETS.map((preset) => {
+                        const isActive = preset.id === activeEasing;
+                        return (
                         <button
                             key={preset.id}
                             onClick={() => {
@@ -296,14 +309,16 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
                                 setSelectedKeyframe({ ...kf });
                             }}
                             className="group flex flex-col items-center gap-1 p-2 glass-panel hover:bg-white/10 rounded transition-colors"
+                            style={isActive ? { outline: `1px solid ${lane.color}60`, background: `${lane.color}18` } : undefined}
                             title={preset.label}
                         >
-                            <svg viewBox="0 0 40 40" className="w-8 h-8" style={{ color: lane.color }}>
-                                <path d={preset.d} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                            <svg viewBox="0 0 40 40" className="w-8 h-8" style={{ color: isActive ? lane.color : undefined }}>
+                                <path d={preset.d} fill="none" stroke={isActive ? lane.color : 'rgba(255,255,255,0.5)'} strokeWidth="2.5" strokeLinecap="round" />
                             </svg>
-                            <span className="text-[9px] text-gray-500 group-hover:text-white transition-colors">{preset.label}</span>
+                            <span className={`text-[9px] transition-colors ${isActive ? 'text-white' : 'text-gray-500 group-hover:text-white'}`}>{preset.label}</span>
                         </button>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
         </div>

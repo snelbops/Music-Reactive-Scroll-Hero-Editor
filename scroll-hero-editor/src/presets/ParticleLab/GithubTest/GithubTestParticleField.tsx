@@ -79,9 +79,11 @@ void main() {
   displaced.y += sin(angle) * t * 20.0 * rndz * ease;
 
   float psize = (snoise(vec2(uTime * 0.5, pindex * 0.5)) + 2.0);
-  // Light mode: no minimum size — dark areas vanish against white bg
+  // Light mode: invert luminance so dark areas of the image produce large particles.
+  // Dark mode: use grey directly so bright areas produce large bright particles.
+  float luminance = uInvert > 0.5 ? (1.0 - grey) * (1.0 - grey) : grey;
   float greyMin = uInvert > 0.5 ? 0.0 : 0.2;
-  psize *= max(grey, greyMin);
+  psize *= max(luminance, greyMin);
   psize *= uSize * sizeIntroMult;
 
   vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
@@ -105,8 +107,8 @@ void main() {
   
   vec3 finalColor;
   if (uInvert > 0.5) {
-    // Light mode: uniform dark particles — image reads through size variation, not colour
-    finalColor = vec3(0.08);
+    // Light mode: dark particles on white bg — image reads through size/density variation
+    finalColor = vec3(0.05);
   } else {
     // Dark mode: white/grey particles
     finalColor = vec3(grey);
