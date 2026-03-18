@@ -11,6 +11,11 @@ function applyEasing(alpha: number, easing: string): number {
         case 'easeIn': return alpha * alpha * alpha;
         case 'easeOut': { const t = 1 - alpha; return 1 - t * t * t; }
         case 'easeInOut': return alpha < 0.5 ? 4 * alpha ** 3 : 1 - Math.pow(-2 * alpha + 2, 3) / 2;
+        case 'spring': {
+            // Critically-damped spring: overshoot ~8% then settle
+            const w = 3;
+            return 1 - (1 + w * alpha) * Math.exp(-w * alpha);
+        }
         default: return alpha; // linear
     }
 }

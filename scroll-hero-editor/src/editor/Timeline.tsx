@@ -48,10 +48,12 @@ function buildParamPath(kfs: ParamKf[], min: number, max: number): string | null
         }
         // Easing-specific control points — match the inspector thumbnail shapes exactly
         const dx = curr.x - prev.x;
+        const dy = curr.y - prev.y;
         switch (kfPrev.easing) {
             case 'linear':    d += ` L ${curr.x} ${curr.y}`; break;
             case 'easeIn':    d += ` C ${prev.x + dx*0.42} ${prev.y}, ${curr.x} ${curr.y}, ${curr.x} ${curr.y}`; break;
             case 'easeOut':   d += ` C ${prev.x} ${prev.y}, ${curr.x - dx*0.42} ${curr.y}, ${curr.x} ${curr.y}`; break;
+            case 'spring':    d += ` C ${prev.x + dx*0.3} ${curr.y - dy*0.3}, ${prev.x + dx*0.6} ${curr.y + dy*0.15}, ${curr.x} ${curr.y}`; break;
             default:          d += ` C ${prev.x + dx*0.42} ${prev.y}, ${curr.x - dx*0.42} ${curr.y}, ${curr.x} ${curr.y}`; // easeInOut
         }
     }
@@ -709,6 +711,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             {/* Track */}
                             <div
                                 className="flex-1 relative overflow-hidden"
+                                style={{ cursor: activeTool === 'pen' ? 'crosshair' : activeTool === 'eraser' ? 'cell' : undefined }}
                                 onDoubleClick={(e) => {
                                     e.stopPropagation();
                                     const el = lanesRef.current;
@@ -719,6 +722,14 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     const t = Math.max(0, Math.min(1, x / laneTrackW)) * SEQUENCE_DURATION;
                                     const existing = interpolateParamAt(kfs, t);
                                     addParamKeyframe(lane.id, t, existing ?? currentVal);
+                                }}
+                                onMouseDown={(e) => {
+                                    if (activeTool !== 'pen') return;
+                                    e.stopPropagation();
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const time = Math.max(0, Math.min(SEQUENCE_DURATION, ((e.clientX - rect.left) / rect.width) * SEQUENCE_DURATION));
+                                    const value = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - (e.clientY - rect.top) / rect.height) * (lane.max - lane.min)));
+                                    addParamKeyframe(lane.id, time, value);
                                 }}
                             >
                                 <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
@@ -806,11 +817,16 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 fill={kfSelected ? 'white' : lane.color}
                                                 stroke={kfSelected ? lane.color : 'none'}
                                                 strokeWidth="1"
-                                                className="cursor-move"
+                                                className={activeTool === 'eraser' ? 'cursor-cell' : 'cursor-move'}
                                                 style={{ pointerEvents: 'all' }}
                                                 onMouseDown={(e) => e.stopPropagation()}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
+                                                    if (activeTool === 'eraser') {
+                                                        useStore.getState().removeParamKeyframe(lane.id, kf.time);
+                                                        setSelectedKeyframe(null);
+                                                        return;
+                                                    }
                                                     if (e.shiftKey) toggleSelectedKeyframe({ laneId: lane.id, position: kf.time, value: kf.value });
                                                     else setSelectedKeyframe({ laneId: lane.id, position: kf.time, value: kf.value });
                                                 }}
@@ -821,7 +837,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 }}
                                                 onPointerMove={(e) => {
                                                     if (!draggingParamKfRef.current || !(e.buttons & 1)) return;
-                                                    const { laneId, origTime } = draggingParamKfRef.current;
+                                                    const { laneId, startTime: st, origTime } = draggingParamKfRef.current;
                                                     const svgEl = (e.target as SVGCircleElement).ownerSVGElement!;
                                                     const rect = svgEl.getBoundingClientRect();
                                                     const svgX = ((e.clientX - rect.left) / rect.width) * VB_W;
@@ -834,7 +850,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                         .filter(k => Math.abs(k.time - origTime) > 0.001)
                                                         .concat({ time: newTime, value: newValue, easing: existingEasing, ...(handleOut ? { handleOut } : {}), ...(handleIn ? { handleIn } : {}) })
                                                         .sort((a, b) => a.time - b.time) as ParamKf[]);
-                                                    draggingParamKfRef.current = { laneId, origTime: newTime, value: newValue };
+                                                    draggingParamKfRef.current = { laneId, startTime: st, origTime: newTime, value: newValue };
                                                 }}
                                                 onPointerUp={() => {
                                                     if (draggingParamKfRef.current) {

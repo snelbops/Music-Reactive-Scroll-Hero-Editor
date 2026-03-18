@@ -1,3 +1,4 @@
+import { useState, useCallback } from 'react';
 import { useStore } from '../store/useStore';
 import { SEQUENCE_DURATION } from '../theatre/core';
 
@@ -18,6 +19,7 @@ const EASING_PRESETS = [
     { id: 'easeIn',    label: 'Ease In',  d: 'M 0 40 C 16.8 40 40 0 40 0' },
     { id: 'easeOut',   label: 'Ease Out', d: 'M 0 40 C 0 40 23.2 0 40 0' },
     { id: 'easeInOut', label: 'In-Out',   d: 'M 0 40 C 16.8 40 23.2 0 40 0' },
+    { id: 'spring',    label: 'Spring',   d: 'M 0 40 C 12 40 24 -6 30 -2 S 38 0 40 0' },
     { id: 'step',      label: 'Step',     d: 'M 0 40 H 40 V 0' },
 ] as const;
 
@@ -118,6 +120,134 @@ function applyEasingToAllSelected(presetId: string) {
     useStore.getState().selectedKeyframes.forEach(({ laneId, position }) => {
         applyEasingPreset(laneId, position, presetId);
     });
+}
+
+// ── Custom Bezier Editor ─────────────────────────────────────────────────────
+function CustomBezierEditor({ laneId, position, laneColor }: { laneId: string; position: number; laneColor: string }) {
+    // Control points in normalized [0,1] space
+    const scrollKfs = useStore(s => s.scrollKeyframes);
+    const paramKfs = useStore(s => s.paramKeyframes);
+
+    const kf = laneId === 'scrollPos'
+        ? scrollKfs.find(k => Math.abs(k.time - position) < 0.001)
+        : (paramKfs[laneId] ?? []).find(k => Math.abs(k.time - position) < 0.001);
+
+    // Default cp positions: ease-in-out style
+    const [cp1, setCp1] = useState({ x: 0.42, y: 0 });
+    const [cp2, setCp2] = useState({ x: 0.58, y: 1 });
+    const [dragging, setDragging] = useState<'cp1' | 'cp2' | null>(null);
+
+    // Sync from existing handles on mount / selection change
+    const initFromKf = useCallback(() => {
+        if (!kf) return;
+        const ho = kf.handleOut;
+        const hi = kf.handleIn;
+        if (ho) setCp1({ x: Math.max(0, Math.min(1, ho.dt / (SEQUENCE_DURATION * 0.1))), y: ho.dv });
+        if (hi) setCp2({ x: Math.max(0, Math.min(1, 1 + hi.dt / (SEQUENCE_DURATION * 0.1))), y: 1 + hi.dv });
+    }, [kf]);
+
+    // Initialize on first render
+    useState(() => { initFromKf(); });
+
+    const SIZE = 120;
+    const PAD = 12;
+    const inner = SIZE - PAD * 2;
+
+    const toSvg = (nx: number, ny: number) => ({
+        x: PAD + nx * inner,
+        y: PAD + (1 - ny) * inner,
+    });
+
+    const fromSvg = (sx: number, sy: number) => ({
+        x: Math.max(0, Math.min(1, (sx - PAD) / inner)),
+        y: Math.max(-0.5, Math.min(1.5, 1 - (sy - PAD) / inner)),
+    });
+
+    const p0 = toSvg(0, 0);
+    const p3 = toSvg(1, 1);
+    const c1 = toSvg(cp1.x, cp1.y);
+    const c2 = toSvg(cp2.x, cp2.y);
+
+    const curvePath = `M ${p0.x} ${p0.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p3.x} ${p3.y}`;
+
+    const writeHandles = (newCp1: typeof cp1, newCp2: typeof cp2) => {
+        // Convert normalized cp to handle deltas (dt in seconds, dv in value units)
+        const dtScale = SEQUENCE_DURATION * 0.1; // 10% of duration as handle reach
+        if (laneId === 'scrollPos') {
+            useStore.getState().updateScrollKeyframeHandle(position, 'out', { dt: newCp1.x * dtScale, dv: newCp1.y });
+            useStore.getState().updateScrollKeyframeHandle(position, 'in', { dt: (newCp2.x - 1) * dtScale, dv: newCp2.y - 1 });
+        } else {
+            useStore.getState().updateParamKeyframeHandle(laneId, position, 'out', { dt: newCp1.x * dtScale, dv: newCp1.y });
+            useStore.getState().updateParamKeyframeHandle(laneId, position, 'in', { dt: (newCp2.x - 1) * dtScale, dv: newCp2.y - 1 });
+        }
+    };
+
+    const handlePointerMove = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+        if (!dragging) return;
+        const svg = e.currentTarget;
+        const rect = svg.getBoundingClientRect();
+        const sx = ((e.clientX - rect.left) / rect.width) * SIZE;
+        const sy = ((e.clientY - rect.top) / rect.height) * SIZE;
+        const np = fromSvg(sx, sy);
+        if (dragging === 'cp1') {
+            setCp1(np);
+            writeHandles(np, cp2);
+        } else {
+            setCp2(np);
+            writeHandles(cp1, np);
+        }
+    }, [dragging, cp1, cp2]);
+
+    return (
+        <div>
+            <label className="text-xxs font-bold text-gray-500 uppercase tracking-widest block mb-2">Custom Bezier</label>
+            <div className="glass-panel rounded p-2 flex flex-col items-center gap-2">
+                <svg
+                    viewBox={`0 0 ${SIZE} ${SIZE}`}
+                    className="w-full aspect-square"
+                    style={{ maxWidth: SIZE }}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={() => setDragging(null)}
+                    onPointerLeave={() => setDragging(null)}
+                >
+                    {/* Grid */}
+                    <rect x={PAD} y={PAD} width={inner} height={inner} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+                    <line x1={PAD} y1={PAD + inner / 2} x2={PAD + inner} y2={PAD + inner / 2} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+                    <line x1={PAD + inner / 2} y1={PAD} x2={PAD + inner / 2} y2={PAD + inner} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+                    {/* Linear reference */}
+                    <line x1={p0.x} y1={p0.y} x2={p3.x} y2={p3.y} stroke="rgba(255,255,255,0.08)" strokeWidth="1" strokeDasharray="3 3" />
+                    {/* Handle lines */}
+                    <line x1={p0.x} y1={p0.y} x2={c1.x} y2={c1.y} stroke={laneColor + '66'} strokeWidth="1" />
+                    <line x1={p3.x} y1={p3.y} x2={c2.x} y2={c2.y} stroke={laneColor + '66'} strokeWidth="1" />
+                    {/* Curve */}
+                    <path d={curvePath} fill="none" stroke={laneColor} strokeWidth="2" strokeLinecap="round" />
+                    {/* CP1 */}
+                    <circle
+                        cx={c1.x} cy={c1.y} r="5"
+                        fill={dragging === 'cp1' ? laneColor : laneColor + 'cc'}
+                        stroke="white" strokeWidth="1.5"
+                        className="cursor-move"
+                        onPointerDown={(e) => { e.stopPropagation(); setDragging('cp1'); }}
+                    />
+                    {/* CP2 */}
+                    <circle
+                        cx={c2.x} cy={c2.y} r="5"
+                        fill={dragging === 'cp2' ? laneColor : laneColor + 'cc'}
+                        stroke="white" strokeWidth="1.5"
+                        className="cursor-move"
+                        onPointerDown={(e) => { e.stopPropagation(); setDragging('cp2'); }}
+                    />
+                    {/* Endpoints */}
+                    <circle cx={p0.x} cy={p0.y} r="3" fill="white" opacity="0.5" />
+                    <circle cx={p3.x} cy={p3.y} r="3" fill="white" opacity="0.5" />
+                </svg>
+                <div className="flex justify-between w-full text-[9px] text-gray-500 font-mono px-1">
+                    <span>CP1: ({cp1.x.toFixed(2)}, {cp1.y.toFixed(2)})</span>
+                    <span>CP2: ({cp2.x.toFixed(2)}, {cp2.y.toFixed(2)})</span>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 // ── No Selection ─────────────────────────────────────────────────────────────
@@ -321,6 +451,11 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
                     })}
                 </div>
             </div>
+
+            {/* Custom bezier editor */}
+            {!isMulti && (
+                <CustomBezierEditor laneId={kf.laneId} position={kf.position} laneColor={lane.color} />
+            )}
         </div>
     );
 }
