@@ -1,9 +1,37 @@
 @import "tailwindcss";
 
+:root {
+  --theme-bg: #f9fafb;
+  --theme-panel: #ffffff;
+  --theme-border: #e5e7eb;
+  --theme-text: #111827;
+  --theme-muted: #6b7280;
+  --theme-surface: #f0f0f0;
+  --theme-surface-hover: #e5e7eb;
+  --theme-fill: #000000;
+}
+
+.dark {
+  --theme-bg: #0a0a0f;
+  --theme-panel: rgba(255, 255, 255, 0.03);
+  --theme-border: rgba(255, 255, 255, 0.1);
+  --theme-text: #ffffff;
+  --theme-muted: #9ca3af;
+  --theme-surface: rgba(255, 255, 255, 0.05);
+  --theme-surface-hover: rgba(255, 255, 255, 0.1);
+  --theme-fill: #ffffff;
+}
+
 @theme {
-  --color-editor-bg: #0a0a0f;
-  --color-editor-panel: rgba(255, 255, 255, 0.03);
-  --color-editor-border: rgba(255, 255, 255, 0.1);
+  --color-editor-bg: var(--theme-bg);
+  --color-editor-panel: var(--theme-panel);
+  --color-editor-border: var(--theme-border);
+  --color-editor-fg: var(--theme-text);
+  --color-editor-muted: var(--theme-muted);
+  --color-editor-surface: var(--theme-surface);
+  --color-editor-surface-hover: var(--theme-surface-hover);
+  --color-editor-fill: var(--theme-fill);
+
   --color-editor-accent-purple: #a855f7;
   --color-editor-accent-teal: #14b8a6;
   --color-editor-accent-orange: #f97316;
@@ -24,9 +52,9 @@
 
 @layer utilities {
   .glass-panel {
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--theme-panel);
     backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--theme-border);
     border-radius: 8px;
   }
   .thin-scrollbar::-webkit-scrollbar {
@@ -37,8 +65,11 @@
     background: transparent;
   }
   .thin-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--theme-border);
     border-radius: 10px;
+  }
+  .dark .thin-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
   }
   .waveform-bg {
     background-image: linear-gradient(to right, rgba(249, 115, 22, 0.3) 1px, transparent 1px);
