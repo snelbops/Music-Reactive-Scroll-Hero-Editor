@@ -1,6 +1,6 @@
 
 import { useEffect, useState, useCallback } from 'react';
-import { Minimize2, Moon, Sun } from 'lucide-react';
+import { Minimize2 } from 'lucide-react';
 import studio from '@theatre/studio';
 import LeftPanel from './LeftPanel';
 import Inspector from './Inspector';
@@ -125,13 +125,20 @@ export default function Layout() {
                         {isExportingHtml ? 'EXPORTING…' : 'EXPORT HTML'}
                     </button>
                     <div className="w-px h-6 bg-editor-border"></div>
-                    <button
-                        onClick={() => setIsDarkMode(!isDarkMode)}
-                        className="p-1.5 rounded transition-colors text-editor-muted hover:text-editor-fg hover:bg-editor-surface"
-                        title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-                    >
-                        {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                    </button>
+                    <div className="flex bg-editor-surface border border-editor-border rounded-full p-0.5 gap-0.5">
+                        <button
+                            onClick={() => setIsDarkMode(false)}
+                            className={`px-2.5 py-0.5 rounded-full text-xs transition-colors ${!isDarkMode ? 'bg-editor-panel text-editor-fg shadow-sm' : 'text-editor-muted hover:text-editor-fg'}`}
+                        >
+                            Light
+                        </button>
+                        <button
+                            onClick={() => setIsDarkMode(true)}
+                            className={`px-2.5 py-0.5 rounded-full text-xs transition-colors ${isDarkMode ? 'bg-editor-panel text-editor-fg shadow-sm' : 'text-editor-muted hover:text-editor-fg'}`}
+                        >
+                            Dark
+                        </button>
+                    </div>
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-teal-500 border border-editor-border"></div>
                 </div>
             </header>
