@@ -13,6 +13,7 @@ export interface RecordedEvent {
 }
 
 interface EditorState {
+    isDarkMode: boolean; setIsDarkMode: (dark: boolean) => void;
     isPlaying: boolean; setIsPlaying: (playing: boolean) => void;
     videoUrl: string | null; setVideoUrl: (url: string | null) => void;
     audioUrl: string | null; setAudioUrl: (url: string | null) => void;
@@ -63,7 +64,15 @@ interface EditorState {
     setSceneProgress: (p: number) => void;
 }
 
-export const useStore = create<EditorState>((set, get) => ({
+export const useStore = create<EditorState>((set, get) => {
+    // Initialize dark mode from localStorage or default to false (light mode)
+    const savedDarkMode = typeof window !== 'undefined' ? localStorage.getItem('editor-dark-mode') === 'true' : false;
+    return {
+    isDarkMode: savedDarkMode, setIsDarkMode: (dark) => {
+        set({ isDarkMode: dark });
+        localStorage.setItem('editor-dark-mode', String(dark));
+        document.documentElement.classList.toggle('dark', dark);
+    },
     isPlaying: false, setIsPlaying: (playing) => set({ isPlaying: playing }),
     videoUrl: 'https://scrollyvideo.js.org/goldengate.mp4', setVideoUrl: (url) => set({ videoUrl: url }),
     audioUrl: null, setAudioUrl: (url) => set({ audioUrl: url }),
@@ -159,4 +168,5 @@ export const useStore = create<EditorState>((set, get) => ({
     activeLightImageIdx: 0, setActiveLightImageIdx: (i) => set({ activeLightImageIdx: i }),
     activeAdapter: null, setActiveAdapter: (adapter) => set({ activeAdapter: adapter }),
     setSceneProgress: (p) => { get().activeAdapter?.setProgress(p); set({ scrollProgress: p }); },
-}));
+    };
+});
