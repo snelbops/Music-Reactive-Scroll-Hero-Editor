@@ -301,22 +301,22 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     })();
 
     return (
-        <footer className="border-t border-editor-border bg-black flex flex-col z-20" style={{ height }}>
+        <footer className="border-t border-editor-border bg-editor-bg flex flex-col z-20" style={{ height }}>
             {/* Transport Bar */}
-            <div className="h-10 border-b border-editor-border flex items-center px-4 justify-between bg-white/5 shrink-0">
+            <div className="h-10 border-b border-editor-border flex items-center px-4 justify-between bg-editor-surface shrink-0">
                 <div className="flex items-center gap-1">
-                    <button className="p-1 hover:text-white" onClick={() => setIsPlaying(!isPlaying)}>
+                    <button className="p-1 hover:text-editor-fg" onClick={() => setIsPlaying(!isPlaying)}>
                         {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
                     </button>
                     {/* Stop: halt playback; double-click returns to start */}
                     <button
-                        className="p-1 hover:text-white"
+                        className="p-1 hover:text-editor-fg"
                         onClick={() => { setIsPlaying(false); if (isRecording) setIsRecording(false); }}
                     >
                         <Square className="w-4 h-4" />
                     </button>
                     <button
-                        className={`p-1 mx-1 rounded-full transition-all ${isRecording ? 'bg-red-600/30 shadow-[0_0_15px_rgba(220,38,38,0.5)]' : 'hover:bg-white/10'}`}
+                        className={`p-1 mx-1 rounded-full transition-all ${isRecording ? 'bg-red-600/30 shadow-[0_0_15px_rgba(220,38,38,0.5)]' : 'hover:bg-editor-surface-hover'}`}
                         onClick={toggleRecording}
                         title={isRecording ? 'Stop Recording' : 'Arm Recording'}
                     >
@@ -325,22 +325,22 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     <div className="h-4 w-[1px] bg-editor-border mx-2" />
                     {/* Loop button — active state shown in purple when loop is on */}
                     <button
-                        className={`text-xs flex items-center gap-1 ${isLoop ? 'text-editor-accent-purple' : 'text-gray-500 hover:text-white'}`}
+                        className={`text-xs flex items-center gap-1 ${isLoop ? 'text-editor-accent-purple' : 'text-editor-muted hover:text-editor-fg'}`}
                         onClick={() => setIsLoop(!isLoop)}
                     >
                         <Repeat className="w-3 h-3" /> LOOP
                     </button>
                     {isRecording && <span className="text-[9px] text-red-400 font-mono ml-2 animate-pulse">● REC — {recordedEvents.length} pts</span>}
                     <div className="h-4 w-[1px] bg-editor-border mx-2" />
-                    <span className="text-[9px] text-gray-600 font-mono">H</span>
-                    <button className="p-1 text-gray-500 hover:text-white disabled:opacity-30" title="Zoom out (Ctrl+scroll)" onClick={() => { const i = ZOOM_LEVELS.indexOf(timelineZoom); if (i > 0) setTimelineZoom(ZOOM_LEVELS[i-1]); }} disabled={timelineZoom === ZOOM_LEVELS[0]}><ZoomOut className="w-4 h-4" /></button>
-                    <span className="text-xxs text-gray-500 w-6 text-center font-mono">{timelineZoom}x</span>
-                    <button className="p-1 text-gray-500 hover:text-white disabled:opacity-30" title="Zoom in (Ctrl+scroll)" onClick={() => { const i = ZOOM_LEVELS.indexOf(timelineZoom); if (i < ZOOM_LEVELS.length-1) setTimelineZoom(ZOOM_LEVELS[i+1]); }} disabled={timelineZoom === ZOOM_LEVELS[ZOOM_LEVELS.length-1]}><ZoomIn className="w-4 h-4" /></button>
+                    <span className="text-[9px] text-editor-muted font-mono">H</span>
+                    <button className="p-1 text-editor-muted hover:text-editor-fg disabled:opacity-30" title="Zoom out (Ctrl+scroll)" onClick={() => { const i = ZOOM_LEVELS.indexOf(timelineZoom); if (i > 0) setTimelineZoom(ZOOM_LEVELS[i-1]); }} disabled={timelineZoom === ZOOM_LEVELS[0]}><ZoomOut className="w-4 h-4" /></button>
+                    <span className="text-xxs text-editor-muted w-6 text-center font-mono">{timelineZoom}x</span>
+                    <button className="p-1 text-editor-muted hover:text-editor-fg disabled:opacity-30" title="Zoom in (Ctrl+scroll)" onClick={() => { const i = ZOOM_LEVELS.indexOf(timelineZoom); if (i < ZOOM_LEVELS.length-1) setTimelineZoom(ZOOM_LEVELS[i+1]); }} disabled={timelineZoom === ZOOM_LEVELS[ZOOM_LEVELS.length-1]}><ZoomIn className="w-4 h-4" /></button>
                     <div className="h-4 w-[1px] bg-editor-border mx-1" />
-                    <span className="text-[9px] text-gray-600 font-mono">V</span>
-                    <button className="p-1 text-gray-500 hover:text-white disabled:opacity-30" title="Shrink lanes (Alt+scroll)" onClick={() => setVerticalZoom(v => Math.max(0.4, +(v - 0.2).toFixed(2)))} disabled={verticalZoom <= 0.4}><ZoomOut className="w-4 h-4" /></button>
-                    <span className="text-xxs text-gray-500 w-8 text-center font-mono">{verticalZoom.toFixed(1)}x</span>
-                    <button className="p-1 text-gray-500 hover:text-white disabled:opacity-30" title="Expand lanes (Alt+scroll)" onClick={() => setVerticalZoom(v => Math.min(4, +(v + 0.2).toFixed(2)))} disabled={verticalZoom >= 4}><ZoomIn className="w-4 h-4" /></button>
+                    <span className="text-[9px] text-editor-muted font-mono">V</span>
+                    <button className="p-1 text-editor-muted hover:text-editor-fg disabled:opacity-30" title="Shrink lanes (Alt+scroll)" onClick={() => setVerticalZoom(v => Math.max(0.4, +(v - 0.2).toFixed(2)))} disabled={verticalZoom <= 0.4}><ZoomOut className="w-4 h-4" /></button>
+                    <span className="text-xxs text-editor-muted w-8 text-center font-mono">{verticalZoom.toFixed(1)}x</span>
+                    <button className="p-1 text-editor-muted hover:text-editor-fg disabled:opacity-30" title="Expand lanes (Alt+scroll)" onClick={() => setVerticalZoom(v => Math.min(4, +(v + 0.2).toFixed(2)))} disabled={verticalZoom >= 4}><ZoomIn className="w-4 h-4" /></button>
                     <div className="h-4 w-[1px] bg-editor-border mx-1" />
                     {([
                         { id: 'select' as const, Icon: MousePointer2, title: 'Select (V)' },
@@ -351,7 +351,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             key={id}
                             title={title}
                             onClick={() => setActiveTool(id)}
-                            className={`p-1 rounded transition-colors ${activeTool === id ? 'text-white bg-white/15' : 'text-gray-500 hover:text-white'}`}
+                            className={`p-1 rounded transition-colors ${activeTool === id ? 'text-editor-fg bg-editor-surface' : 'text-editor-muted hover:text-editor-fg'}`}
                         >
                             <Icon className="w-4 h-4" />
                         </button>
@@ -361,13 +361,13 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     <div className="flex flex-col items-center">
                         {/* TIME display driven by seqTime state — reactive via onChange */}
                         <span className="text-editor-accent-teal">{new Date(seqTime * 1000).toISOString().slice(14, 22)}</span>
-                        <span className="text-[9px] text-gray-600">TIME</span>
+                        <span className="text-[9px] text-editor-muted">TIME</span>
                     </div>
-                    <div className="flex flex-col items-center"><span className="text-white">120 BPM</span><span className="text-[9px] text-gray-600">TEMPO</span></div>
-                    <div className="flex flex-col items-center"><span className="text-white">4/4</span><span className="text-[9px] text-gray-600">SIGNATURE</span></div>
+                    <div className="flex flex-col items-center"><span className="text-editor-fg">120 BPM</span><span className="text-[9px] text-editor-muted">TEMPO</span></div>
+                    <div className="flex flex-col items-center"><span className="text-editor-fg">4/4</span><span className="text-[9px] text-editor-muted">SIGNATURE</span></div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className="text-xxs text-gray-500 font-mono">{scrollProgress.toFixed(3)}</span>
+                    <span className="text-xxs text-editor-muted font-mono">{scrollProgress.toFixed(3)}</span>
                     <input className="w-48 cursor-pointer accent-editor-accent-purple" type="range" min="0" max="1" step="0.001" value={scrollProgress} onChange={(e) => seekTo(parseFloat(e.target.value))} />
                 </div>
             </div>
@@ -381,8 +381,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 <div style={{ width: timelineZoom > 1 ? `${timelineZoom * 100}%` : '100%', minHeight: '100%' }}>
 
                 {/* Lane 1: Audio */}
-                <div className="flex border-b border-white/5 group relative" style={{ height: laneH('audio') }}>
-                    <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
+                <div className="flex border-b border-editor-border group relative" style={{ height: laneH('audio') }}>
+                    <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-editor-border bg-editor-panel text-editor-fg gap-2 sticky left-0 z-30">
                         <span className="text-[10px] uppercase font-bold text-editor-accent-orange truncate">Audio Wave</span>
                     </div>
                     <div className="flex-1 relative overflow-hidden flex items-center">
@@ -390,7 +390,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             onChange={(e) => { const f = e.target.files?.[0]; if (f) useStore.getState().setAudioUrl(URL.createObjectURL(f)); }} />
                         {!audioUrl ? (
                             <button
-                                className="flex items-center gap-1.5 px-2 text-[10px] text-gray-500 hover:text-editor-accent-orange transition-colors italic"
+                                className="flex items-center gap-1.5 px-2 text-[10px] text-editor-muted hover:text-editor-accent-orange transition-colors italic"
                                 onClick={(e) => { e.stopPropagation(); document.getElementById('timeline-audio-upload')?.click(); }}
                             >
                                 <UploadCloud className="w-3 h-3 shrink-0" /> Import audio...
@@ -412,7 +412,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         className="absolute top-0 bottom-0 w-[2px] bg-white z-10 group/beat hover:bg-editor-accent-orange cursor-pointer transition-colors"
                                         style={{ left: `${(beatTime / 10) * 100}%` }} // Mock simplistic mapping out of 10 seconds total width
                                     >
-                                        <div className="opacity-0 group-hover/beat:opacity-100 text-[8px] absolute top-1 left-2 font-mono text-white whitespace-nowrap bg-black/50 px-1 rounded">BEAT {beatTime.toFixed(1)}s</div>
+                                        <div className="opacity-0 group-hover/beat:opacity-100 text-[8px] absolute top-1 left-2 font-mono text-editor-fg whitespace-nowrap bg-black/50 px-1 rounded">BEAT {beatTime.toFixed(1)}s</div>
                                     </div>
                                 ))}
                             </>
@@ -423,8 +423,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
                 {/* Lane 2: Video Frames — only shown when frames are extracted */}
                 {extractedFrames.length > 0 && (
-                <div className="flex border-b border-white/5 group relative" style={{ height: laneH('videoFrames') }}>
-                    <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${activePreset === 'frames' ? 'bg-editor-accent-blue/15 ring-1 ring-inset ring-editor-accent-blue/40' : 'bg-black/40 hover:bg-white/5'}`}>
+                <div className="flex border-b border-editor-border group relative" style={{ height: laneH('videoFrames') }}>
+                    <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-editor-border sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${activePreset === 'frames' ? 'bg-editor-accent-blue/15 ring-1 ring-inset ring-editor-accent-blue/40' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}>
                         <span className="text-xxs uppercase font-bold text-editor-accent-blue">Video Frames</span>
                         <span className="text-[9px] font-mono text-editor-accent-blue/60">{extractedFrames.length} frames</span>
                     </div>
@@ -442,13 +442,13 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 )}
 
                 {/* Lane 3: Mouse X */}
-                <div className="flex border-b border-white/5 group relative" style={{ height: laneH('mouseX') }}>
-                    <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
+                <div className="flex border-b border-editor-border group relative" style={{ height: laneH('mouseX') }}>
+                    <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-editor-border bg-editor-panel text-editor-fg gap-2 sticky left-0 z-30">
                         <span className="text-[10px] uppercase font-bold text-pink-400 truncate">Mouse X</span>
                     </div>
                     <div className="flex-1 relative overflow-hidden">
                         {recordedEvents.length === 0 ? (
-                            <span className="text-[10px] text-gray-500 italic px-2 leading-[40px]">Arm REC to capture...</span>
+                            <span className="text-[10px] text-editor-muted italic px-2 leading-[40px]">Arm REC to capture...</span>
                         ) : (
                             <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} 100`} preserveAspectRatio="none">
                                 <polyline
@@ -464,13 +464,13 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 </div>
 
                 {/* Lane 4: Mouse Y */}
-                <div className="flex border-b border-white/5 group relative" style={{ height: laneH('mouseY') }}>
-                    <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
+                <div className="flex border-b border-editor-border group relative" style={{ height: laneH('mouseY') }}>
+                    <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-editor-border bg-editor-panel text-editor-fg gap-2 sticky left-0 z-30">
                         <span className="text-[10px] uppercase font-bold text-amber-400 truncate">Mouse Y</span>
                     </div>
                     <div className="flex-1 relative overflow-hidden">
                         {recordedEvents.length === 0 ? (
-                            <span className="text-[10px] text-gray-500 italic px-2 leading-[40px]">Arm REC to capture...</span>
+                            <span className="text-[10px] text-editor-muted italic px-2 leading-[40px]">Arm REC to capture...</span>
                         ) : (
                             <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} 100`} preserveAspectRatio="none">
                                 <polyline
@@ -487,9 +487,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
                 {/* Lane 4: Scroll Pos — live curve */}
                 {/* Lane 4: Scroll POS — draggable height, with audio waveform ghost guide */}
-                <div className="flex border-b border-white/5 group relative" style={{ height: scrollVbH }}>
+                <div className="flex border-b border-editor-border group relative" style={{ height: scrollVbH }}>
                     <div
-                        className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${isRecording ? 'ring-1 ring-inset ring-editor-accent-purple/60 bg-editor-accent-purple/10' : selectedLane === 'scrollPos' ? 'bg-editor-accent-purple/15' : 'bg-black/40 hover:bg-white/5'}`}
+                        className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-editor-border sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${isRecording ? 'ring-1 ring-inset ring-editor-accent-purple/60 bg-editor-accent-purple/10' : selectedLane === 'scrollPos' ? 'bg-editor-accent-purple/15' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}
                         onClick={() => setSelectedLane('scrollPos')}
                     >
                         <div className="flex items-center justify-between">
@@ -580,8 +580,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     const hasPrev = idx > 0;
                                     const handleCircle = (hx: number, hy: number, side: 'in' | 'out', kfTime: number) => (
                                         <circle
-                                            cx={hx} cy={hy} r="4"
-                                            fill="rgba(168,85,247,0.8)" stroke="white" strokeWidth="1"
+                                            cx={hx} cy={hy} r="2.5"
+                                            fill="#a855f7" stroke="var(--color-editor-bg)" strokeWidth="1.5"
                                             className="cursor-move" style={{ pointerEvents: 'all' }}
                                             onMouseDown={(e) => e.stopPropagation()}
                                             onPointerDown={(e) => {
@@ -616,8 +616,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     const hix = kx + inDt  * scaleX, hiy = ky - inDv  * scrollVbH;
                                     return (
                                         <g key={idx}>
-                                            {hasNext && <><line x1={kx} y1={ky} x2={hox} y2={hoy} stroke="rgba(168,85,247,0.4)" strokeWidth="1" strokeDasharray="3 2"/>{handleCircle(hox, hoy, 'out', kf.time)}</>}
-                                            {hasPrev && <><line x1={kx} y1={ky} x2={hix} y2={hiy} stroke="rgba(168,85,247,0.4)" strokeWidth="1" strokeDasharray="3 2"/>{handleCircle(hix, hiy, 'in', kf.time)}</>}
+                                            {hasNext && <><line x1={kx} y1={ky} x2={hox} y2={hoy} stroke="#a855f7" strokeWidth="2" />{handleCircle(hox, hoy, 'out', kf.time)}</>}
+                                            {hasPrev && <><line x1={kx} y1={ky} x2={hix} y2={hiy} stroke="#a855f7" strokeWidth="2" />{handleCircle(hix, hiy, 'in', kf.time)}</>}
                                         </g>
                                     );
                                 });
@@ -625,15 +625,15 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             {/* Keyframe dots */}
                             {scrollKeyframes.map((kf, i) => {
                                 const isSelected = selectedKeyframes.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.01);
+                                const diamSize = isSelected ? 4 : 2.5;
                                 return (
-                                <circle
+                                <path
                                     key={i}
-                                    cx={(kf.time / SEQUENCE_DURATION) * VB_W}
-                                    cy={(1 - kf.value) * scrollVbH}
-                                    r={isSelected ? '3' : '1.5'}
-                                    fill={isSelected ? 'white' : '#c084fc'}
+                                    d={`M 0 -${diamSize} L ${diamSize} 0 L 0 ${diamSize} L -${diamSize} 0 Z`}
+                                    transform={`translate(${(kf.time / SEQUENCE_DURATION) * VB_W}, ${(1 - kf.value) * scrollVbH})`}
+                                    fill={isSelected ? 'var(--color-editor-fill)' : '#c084fc'}
                                     stroke={isSelected ? '#a855f7' : 'none'}
-                                    strokeWidth="1"
+                                    strokeWidth="1.5"
                                     className={activeTool === 'eraser' ? 'cursor-cell' : 'cursor-move'}
                                     style={{ pointerEvents: 'all' }}
                                     onMouseDown={(e) => e.stopPropagation()}
@@ -690,17 +690,17 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     const fillPath = buildParamFillPath(kfs, lane.min, lane.max);
                     const isSelected = selectedLane === lane.id;
                     return (
-                        <div key={lane.id} className="flex border-b border-white/5 group relative" style={{ height: laneH(lane.id) }}>
+                        <div key={lane.id} className="flex border-b border-editor-border group relative" style={{ height: laneH(lane.id) }}>
                             {/* Label */}
                             <div
-                                className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-white/10 sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${isSelected ? lane.selBg : 'bg-black/40 hover:bg-white/5'}`}
+                                className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-editor-border sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors ${isSelected ? lane.selBg : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}
                                 onClick={() => setSelectedLane(lane.id)}
                             >
                                 <div className="flex items-center justify-between">
                                     <span className="text-xxs uppercase font-bold truncate" style={{ color: lane.color }}>{lane.label}</span>
                                     {kfs.length > 0 && (
                                         <button
-                                            className="text-[9px] text-white/20 hover:text-red-400 transition-colors ml-1"
+                                            className="text-[9px] text-editor-fg/20 hover:text-red-400 transition-colors ml-1"
                                             title="Clear keyframes"
                                             onClick={(e) => { e.stopPropagation(); useStore.getState().clearParamKeyframes(lane.id); }}
                                         >✕</button>
@@ -749,7 +749,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     )}
                                     {/* Curve */}
                                     {curvePath && (
-                                        <path d={curvePath} fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5" strokeLinecap="round"/>
+                                        <path d={curvePath} fill="none" stroke="var(--color-editor-fill)" strokeOpacity="0.7" strokeWidth="1.5" strokeLinecap="round"/>
                                     )}
                                     {/* Bezier handles for selected keyframes (select tool only) */}
                                     {activeTool === 'select' && kfs.map((kf, idx) => {
@@ -769,8 +769,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         const hix = kx + inDt  * scaleX, hiy = ky - (inDv  / valueRange) * VB_H;
                                         const handleCircle = (hx: number, hy: number, side: 'in' | 'out') => (
                                             <circle
-                                                cx={hx} cy={hy} r="4"
-                                                fill={lane.color + 'cc'} stroke="white" strokeWidth="1"
+                                                cx={hx} cy={hy} r="2.5"
+                                                fill={lane.color} stroke="var(--color-editor-bg)" strokeWidth="1.5"
                                                 className="cursor-move" style={{ pointerEvents: 'all' }}
                                                 onMouseDown={(e) => e.stopPropagation()}
                                                 onPointerDown={(e) => {
@@ -800,23 +800,23 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         );
                                         return (
                                             <g key={`h-${idx}`}>
-                                                {hasNext && <><line x1={kx} y1={ky} x2={hox} y2={hoy} stroke={lane.color + '66'} strokeWidth="1" strokeDasharray="3 2"/>{handleCircle(hox, hoy, 'out')}</>}
-                                                {hasPrev && <><line x1={kx} y1={ky} x2={hix} y2={hiy} stroke={lane.color + '66'} strokeWidth="1" strokeDasharray="3 2"/>{handleCircle(hix, hiy, 'in')}</>}
+                                                {hasNext && <><line x1={kx} y1={ky} x2={hox} y2={hoy} stroke={lane.color} strokeWidth="2" />{handleCircle(hox, hoy, 'out')}</>}
+                                                {hasPrev && <><line x1={kx} y1={ky} x2={hix} y2={hiy} stroke={lane.color} strokeWidth="2" />{handleCircle(hix, hiy, 'in')}</>}
                                             </g>
                                         );
                                     })}
                                     {/* Keyframe dots */}
                                     {kfs.map((kf, i) => {
                                         const kfSelected = selectedKeyframes.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.01);
+                                        const diamSize = kfSelected ? 4 : 2.5;
                                         return (
-                                            <circle
+                                            <path
                                                 key={i}
-                                                cx={(kf.time / SEQUENCE_DURATION) * VB_W}
-                                                cy={normalY(kf.value)}
-                                                r={kfSelected ? '3.5' : '2'}
-                                                fill={kfSelected ? 'white' : lane.color}
+                                                d={`M 0 -${diamSize} L ${diamSize} 0 L 0 ${diamSize} L -${diamSize} 0 Z`}
+                                                transform={`translate(${(kf.time / SEQUENCE_DURATION) * VB_W}, ${normalY(kf.value)})`}
+                                                fill={kfSelected ? 'var(--color-editor-fill)' : lane.color}
                                                 stroke={kfSelected ? lane.color : 'none'}
-                                                strokeWidth="1"
+                                                strokeWidth="1.5"
                                                 className={activeTool === 'eraser' ? 'cursor-cell' : 'cursor-move'}
                                                 style={{ pointerEvents: 'all' }}
                                                 onMouseDown={(e) => e.stopPropagation()}
@@ -893,8 +893,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 })}
 
                 {/* Lane 9: Scroll Speed (mock) */}
-                <div className="flex border-b border-white/5 group relative" style={{ height: laneH('scrollSpeed') }}>
-                    <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
+                <div className="flex border-b border-editor-border group relative" style={{ height: laneH('scrollSpeed') }}>
+                    <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-editor-border bg-editor-panel text-editor-fg gap-2 sticky left-0 z-30">
                         <span className="text-[10px] uppercase font-bold text-editor-accent-teal">Scroll Speed</span>
                     </div>
                     <div className="flex-1 relative overflow-hidden">
@@ -906,8 +906,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 </div>
 
                 {/* Lane 10: Scroll Dir */}
-                <div className="flex h-10 border-b border-white/5 group">
-                    <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
+                <div className="flex h-10 border-b border-editor-border group">
+                    <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-editor-border bg-editor-panel text-editor-fg gap-2 sticky left-0 z-30">
                         <span className="text-[10px] uppercase font-bold text-editor-accent-blue">Scroll DIR</span>
                     </div>
                     <div className="flex-1 relative overflow-hidden flex items-center relative">
@@ -921,13 +921,13 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 </div>
 
                 {/* Lane 11: Click Events */}
-                <div className="flex h-10 border-b border-white/5 group">
-                    <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-white/10 bg-black/40 gap-2 sticky left-0 z-30">
+                <div className="flex h-10 border-b border-editor-border group">
+                    <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-editor-border bg-editor-panel text-editor-fg gap-2 sticky left-0 z-30">
                         <span className="text-[10px] uppercase font-bold text-red-400 truncate">Clicks</span>
                     </div>
                     <div className="flex-1 relative overflow-hidden flex items-center">
                         {recordedEvents.filter(e => e.click).length === 0 ? (
-                            <span className="text-[10px] text-gray-500 italic px-2">No clicks recorded</span>
+                            <span className="text-[10px] text-editor-muted italic px-2">No clicks recorded</span>
                         ) : (
                             recordedEvents.filter(e => e.click).map((ev, i) => (
                                 <div
