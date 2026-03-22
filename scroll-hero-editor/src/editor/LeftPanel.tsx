@@ -7,7 +7,7 @@ const ControlSlider = ({ label, value, min, max, step = 0.01, onChange }: {
     onChange: (v: number) => void;
 }) => (
     <div className="space-y-1">
-        <div className="flex justify-between text-[9px] text-gray-400">
+        <div className="flex justify-between text-[9px] text-editor-muted">
             <span className="uppercase tracking-wider">{label}</span>
             <span className="font-mono tabular-nums">{value.toFixed(2)}</span>
         </div>
@@ -98,26 +98,35 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
     }, []);
 
     return (
-        <aside className="flex flex-col border-r border-editor-border bg-black/20 p-2 gap-2 overflow-y-auto thin-scrollbar" style={{ width }}>
+        <aside className="flex flex-col border-r border-editor-border bg-editor-panel text-editor-fg overflow-hidden" style={{ width }}>
+            <div className="h-8 border-b border-editor-border flex items-center justify-between px-2 bg-editor-panel shrink-0 gap-2">
+                <div className="flex items-center text-xxs font-medium uppercase text-editor-muted">
+                    <span className="text-editor-fg">Master</span>
+                </div>
+                <div className="flex-1 flex justify-end">
+                    <input className="bg-[#111] border border-editor-border rounded px-2 py-0.5 text-[10px] w-full max-w-[120px] focus:outline-none focus:border-editor-accent-blue text-editor-fg placeholder:text-editor-muted/50" placeholder="Search" type="text"/>
+                </div>
+            </div>
+            <div className="flex-1 overflow-y-auto thin-scrollbar p-2 flex flex-col gap-2">
             {/* Components */}
             <section>
                 <button
                     onClick={() => setIsComponentsOpen(!isComponentsOpen)}
-                    className="w-full flex justify-between items-center py-1 px-2 text-xxs font-bold text-gray-400 uppercase tracking-tighter mb-1 hover:text-white"
+                    className="w-full flex justify-between items-center py-1 px-2 text-xxs font-bold text-editor-muted uppercase tracking-tighter mb-1 hover:text-editor-fg"
                 >
                     Components {isComponentsOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                 </button>
                 {isComponentsOpen && (
                     <div className="space-y-1 mb-2">
                         {/* Particle Lab */}
-                        <div className="rounded border border-white/5 bg-white/2 overflow-hidden">
+                        <div className="rounded border border-editor-border bg-editor-surface overflow-hidden">
                             <button
                                 onClick={() => setIsParticleLabOpen(!isParticleLabOpen)}
-                                className="w-full flex items-center gap-2 px-2 py-1.5 text-xxs text-gray-300 hover:bg-white/5 transition-colors"
+                                className="w-full flex items-center gap-2 px-2 py-1.5 text-xxs text-editor-muted hover:bg-editor-surface transition-colors"
                             >
                                 <Layers className="w-3 h-3 text-editor-accent-purple shrink-0" />
                                 <span className="flex-1 text-left font-medium">Particle Lab</span>
-                                {isParticleLabOpen ? <ChevronDown className="w-3 h-3 text-gray-500" /> : <ChevronRight className="w-3 h-3 text-gray-500" />}
+                                {isParticleLabOpen ? <ChevronDown className="w-3 h-3 text-editor-muted" /> : <ChevronRight className="w-3 h-3 text-editor-muted" />}
                             </button>
                             {isParticleLabOpen && (
                                 <div className="px-2 pb-2 space-y-1">
@@ -127,8 +136,8 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                             onClick={() => setActivePreset(id)}
                                             className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-left transition-colors ${
                                                 activePreset === id
-                                                    ? 'bg-editor-accent-purple/15 border border-editor-accent-purple/50 text-white'
-                                                    : 'bg-white/3 border border-white/5 text-gray-400 hover:bg-white/8 hover:text-gray-200'
+                                                    ? 'bg-editor-accent-purple/15 border border-editor-accent-purple/50 text-editor-fg'
+                                                    : 'bg-editor-surface border border-editor-border text-editor-muted hover:bg-editor-surface-hover hover:text-[11px] text-editor-fg'
                                             }`}
                                         >
                                             <span className={`w-2 h-2 rounded-full shrink-0 ${
@@ -136,7 +145,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                             }`} />
                                             <div className="min-w-0">
                                                 <div className="text-xxs font-medium leading-tight">{label}</div>
-                                                <div className="text-[9px] text-gray-500 leading-tight truncate">{description}</div>
+                                                <div className="text-[9px] text-editor-muted leading-tight truncate">{description}</div>
                                             </div>
                                         </button>
                                     ))}
@@ -150,24 +159,24 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
             {/* Light Images panel */}
             {activePreset === 'light-images' && (
                 <section>
-                    <div className="w-full flex justify-between items-center py-1 px-2 text-xxs font-bold text-gray-400 uppercase tracking-tighter mb-1">
+                    <div className="w-full flex justify-between items-center py-1 px-2 text-xxs font-bold text-editor-muted uppercase tracking-tighter mb-1">
                         <span>Light Images</span>
                         <ImageIcon className="w-3 h-3" />
                     </div>
                     <input type="file" accept="image/*" multiple ref={lightImgInputRef} className="hidden" onChange={handleLightImageUpload} />
                     {lightImages.length === 0 ? (
-                        <div className="rounded border border-white/5 bg-white/2 px-3 py-5 flex flex-col items-center gap-2 text-center">
-                            <ImageIcon className="w-6 h-6 text-gray-600" />
-                            <p className="text-[9px] text-gray-500 leading-tight">No images in this folder</p>
+                        <div className="rounded border border-editor-border bg-editor-surface px-3 py-5 flex flex-col items-center gap-2 text-center">
+                            <ImageIcon className="w-6 h-6 text-editor-muted" />
+                            <p className="text-[9px] text-editor-muted leading-tight">No images in this folder</p>
                             <button
                                 onClick={() => lightImgInputRef.current?.click()}
-                                className="mt-1 flex items-center gap-1 px-2 py-1 text-[9px] bg-white/5 border border-white/10 text-gray-300 rounded hover:bg-white/10 transition-colors"
+                                className="mt-1 flex items-center gap-1 px-2 py-1 text-[9px] bg-editor-surface border border-editor-border text-editor-muted rounded hover:bg-editor-surface-hover transition-colors"
                             >
                                 <UploadCloud className="w-3 h-3" /> Upload Images
                             </button>
                         </div>
                     ) : (
-                        <div className="rounded border border-white/5 bg-white/2 px-2 py-2 space-y-1">
+                        <div className="rounded border border-editor-border bg-editor-surface px-2 py-2 space-y-1">
                             {lightImages.map((img, i) => (
                                 <div
                                     key={img.name}
@@ -175,14 +184,14 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                     className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${
                                         activeLightImageIdx === i
                                             ? 'bg-editor-accent-purple/15 border border-editor-accent-purple/40'
-                                            : 'hover:bg-white/5 border border-transparent'
+                                            : 'hover:bg-editor-surface border border-transparent'
                                     }`}
                                 >
                                     <img src={img.url} alt={img.name} className="w-7 h-7 object-cover rounded shrink-0 bg-white/10" />
-                                    <span className="flex-1 text-[9px] text-gray-300 truncate">{img.name}</span>
+                                    <span className="flex-1 text-[9px] text-editor-muted truncate">{img.name}</span>
                                     <button
                                         onClick={(e) => { e.stopPropagation(); removeLightImage(img.name); if (activeLightImageIdx >= lightImages.length - 1) setActiveLightImageIdx(Math.max(0, lightImages.length - 2)); }}
-                                        className="text-gray-600 hover:text-red-400 transition-colors"
+                                        className="text-editor-muted hover:text-red-400 transition-colors"
                                     >
                                         <X className="w-3 h-3" />
                                     </button>
@@ -190,7 +199,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                             ))}
                             <button
                                 onClick={() => lightImgInputRef.current?.click()}
-                                className="w-full flex items-center justify-center gap-1 py-1 text-[9px] text-gray-500 hover:text-gray-300 transition-colors"
+                                className="w-full flex items-center justify-center gap-1 py-1 text-[9px] text-editor-muted hover:text-editor-muted transition-colors"
                             >
                                 <UploadCloud className="w-3 h-3" /> Add more
                             </button>
@@ -200,21 +209,21 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
             )}
 
             {/* Classic Controls — shown for classic-dark and classic-light */}
-            {(activePreset === 'classic-dark' || activePreset === 'classic-light') && (
+            {(activePreset === 'classic-dark' || activePreset === 'classic-dark-copy' || activePreset === 'classic-light' || activePreset === 'classic-inverted') && (
                 <section>
-                    <div className="w-full flex justify-between items-center py-1 px-2 text-xxs font-bold text-gray-400 uppercase tracking-tighter mb-1">
+                    <div className="w-full flex justify-between items-center py-1 px-2 text-xxs font-bold text-editor-muted uppercase tracking-tighter mb-1">
                         <span>Controls</span>
                         <SlidersHorizontal className="w-3 h-3" />
                     </div>
-                    <div className="rounded border border-white/5 bg-white/2 px-3 py-3 space-y-4">
-                        <div className="text-[9px] text-gray-500 uppercase tracking-widest mb-1">Particles</div>
+                    <div className="rounded border border-editor-border bg-editor-surface px-3 py-3 space-y-4">
+                        <div className="text-[9px] text-editor-muted uppercase tracking-widest mb-1">Particles</div>
                         <ControlSlider label="Random Scatter" value={classicDarkControls.random} min={1} max={10}
                             onChange={v => setClassicDarkControls({ ...classicDarkControls, random: v })} />
                         <ControlSlider label="Depth" value={classicDarkControls.depth} min={1} max={10}
                             onChange={v => setClassicDarkControls({ ...classicDarkControls, depth: v })} />
                         <ControlSlider label="Size" value={classicDarkControls.size} min={0} max={3}
                             onChange={v => setClassicDarkControls({ ...classicDarkControls, size: v })} />
-                        <div className="text-[9px] text-gray-500 uppercase tracking-widest mt-2">Touch</div>
+                        <div className="text-[9px] text-editor-muted uppercase tracking-widest mt-2">Touch</div>
                         <ControlSlider label="Touch Radius" value={classicDarkControls.touchRadius} min={0} max={0.5}
                             onChange={v => setClassicDarkControls({ ...classicDarkControls, touchRadius: v })} />
                     </div>
@@ -225,7 +234,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
             <section>
                 <button
                     onClick={() => setIsAssetsOpen(!isAssetsOpen)}
-                    className="w-full flex justify-between items-center py-1 px-2 text-xxs font-bold text-gray-400 uppercase tracking-tighter mb-1 hover:text-white"
+                    className="w-full flex justify-between items-center py-1 px-2 text-xxs font-bold text-editor-muted uppercase tracking-tighter mb-1 hover:text-editor-fg"
                 >
                     Assets {isAssetsOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                 </button>
@@ -239,11 +248,11 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                         {/* Upload buttons */}
                         <div className="flex gap-2">
                             <button onClick={() => mp4InputRef.current?.click()}
-                                className="flex-1 flex items-center justify-center gap-1 p-1 glass-panel text-xxs text-gray-300 hover:bg-white/10 border border-dashed border-white/20">
+                                className="flex-1 flex items-center justify-center gap-1 p-1 glass-panel text-xxs text-editor-muted hover:bg-editor-surface-hover border border-dashed border-editor-border">
                                 <UploadCloud className="w-3 h-3" /> MP4
                             </button>
                             <button onClick={() => document.getElementById('audio-upload')?.click()}
-                                className="flex-1 flex items-center justify-center gap-1 p-1 glass-panel text-xxs text-gray-300 hover:bg-white/10 border border-dashed border-white/20">
+                                className="flex-1 flex items-center justify-center gap-1 p-1 glass-panel text-xxs text-editor-muted hover:bg-editor-surface-hover border border-dashed border-editor-border">
                                 <UploadCloud className="w-3 h-3" /> Audio
                             </button>
                         </div>
@@ -255,17 +264,17 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                     <div className="w-6 h-6 bg-editor-accent-blue/20 rounded flex items-center justify-center text-editor-accent-blue shrink-0">
                                         <Video className="w-3 h-3" />
                                     </div>
-                                    <span className="truncate text-xxs text-gray-300 flex-1">{mp4Asset.name}</span>
+                                    <span className="truncate text-xxs text-editor-muted flex-1">{mp4Asset.name}</span>
                                 </div>
 
                                 {/* Extraction progress */}
                                 {extractionStatus === 'extracting' && (
                                     <div className="space-y-1">
-                                        <div className="flex justify-between text-[9px] text-gray-500">
+                                        <div className="flex justify-between text-[9px] text-editor-muted">
                                             <span className="animate-pulse">Extracting frames…</span>
                                             <span>{Math.round(extractionProgress * 100)}%</span>
                                         </div>
-                                        <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                                        <div className="w-full h-1 bg-editor-surface rounded-full overflow-hidden">
                                             <div className="h-full bg-editor-accent-orange rounded-full transition-all" style={{ width: `${extractionProgress * 100}%` }} />
                                         </div>
                                     </div>
@@ -282,7 +291,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                 {/* Action buttons */}
                                 <div className="flex gap-1.5">
                                     {extractionStatus !== 'done' && extractionStatus !== 'extracting' && (
-                                        <button onClick={handleExtract}
+                                        <button onClick={() => handleExtract()}
                                             className="flex-1 flex items-center justify-center gap-1 py-1 text-[9px] bg-editor-accent-orange/20 border border-editor-accent-orange/40 text-editor-accent-orange rounded hover:bg-editor-accent-orange/30 transition-colors">
                                             <Film className="w-2.5 h-2.5" /> Extract Frames
                                         </button>
@@ -293,7 +302,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                             className={`flex-1 py-1 text-[9px] rounded border transition-colors ${
                                                 activePreset === 'frames'
                                                     ? 'bg-editor-accent-purple/20 border-editor-accent-purple/50 text-editor-accent-purple'
-                                                    : 'bg-white/5 border-white/20 text-gray-300 hover:bg-white/10'
+                                                    : 'bg-editor-surface border-editor-border text-editor-muted hover:bg-editor-surface-hover'
                                             }`}>
                                             {activePreset === 'frames' ? '✓ Loaded' : 'Load as Scene'}
                                         </button>
@@ -304,6 +313,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                     </div>
                 )}
             </section>
+            </div>
         </aside>
     );
 }

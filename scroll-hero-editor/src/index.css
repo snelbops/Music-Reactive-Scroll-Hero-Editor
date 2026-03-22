@@ -12,14 +12,14 @@
 }
 
 .dark {
-  --theme-bg: #0a0a0f;
-  --theme-panel: rgba(255, 255, 255, 0.03);
-  --theme-border: rgba(255, 255, 255, 0.1);
-  --theme-text: #ffffff;
-  --theme-muted: #9ca3af;
-  --theme-surface: rgba(255, 255, 255, 0.05);
-  --theme-surface-hover: rgba(255, 255, 255, 0.1);
-  --theme-fill: #ffffff;
+  --theme-bg: #101010;
+  --theme-panel: #1a1a1a;
+  --theme-border: #2a2a2a;
+  --theme-text: #b0b0b0;
+  --theme-muted: #6b7280;
+  --theme-surface: #1e1e1e;
+  --theme-surface-hover: #2d2d2d;
+  --theme-fill: #3b82f6;
 }
 
 @theme {
@@ -66,10 +66,16 @@
   }
   .thin-scrollbar::-webkit-scrollbar-thumb {
     background: var(--theme-border);
-    border-radius: 10px;
+    border-radius: 2px;
+  }
+  .dark .thin-scrollbar::-webkit-scrollbar-track {
+    background: #101010;
   }
   .dark .thin-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: #333;
+  }
+  .dark .thin-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #444;
   }
   .waveform-bg {
     background-image: linear-gradient(to right, rgba(249, 115, 22, 0.3) 1px, transparent 1px);

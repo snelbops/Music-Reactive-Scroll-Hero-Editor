@@ -200,7 +200,7 @@ function CustomBezierEditor({ laneId, position, laneColor }: { laneId: string; p
 
     return (
         <div>
-            <label className="text-xxs font-bold text-gray-500 uppercase tracking-widest block mb-2">Custom Bezier</label>
+            <label className="text-xxs font-bold text-editor-muted uppercase tracking-widest block mb-2">Custom Bezier</label>
             <div className="glass-panel rounded p-2 flex flex-col items-center gap-2">
                 <svg
                     viewBox={`0 0 ${SIZE} ${SIZE}`}
@@ -217,31 +217,31 @@ function CustomBezierEditor({ laneId, position, laneColor }: { laneId: string; p
                     {/* Linear reference */}
                     <line x1={p0.x} y1={p0.y} x2={p3.x} y2={p3.y} stroke="rgba(255,255,255,0.08)" strokeWidth="1" strokeDasharray="3 3" />
                     {/* Handle lines */}
-                    <line x1={p0.x} y1={p0.y} x2={c1.x} y2={c1.y} stroke={laneColor + '66'} strokeWidth="1" />
-                    <line x1={p3.x} y1={p3.y} x2={c2.x} y2={c2.y} stroke={laneColor + '66'} strokeWidth="1" />
+                    <line x1={p0.x} y1={p0.y} x2={c1.x} y2={c1.y} stroke={laneColor} strokeWidth="2" />
+                    <line x1={p3.x} y1={p3.y} x2={c2.x} y2={c2.y} stroke={laneColor} strokeWidth="2" />
                     {/* Curve */}
                     <path d={curvePath} fill="none" stroke={laneColor} strokeWidth="2" strokeLinecap="round" />
                     {/* CP1 */}
                     <circle
-                        cx={c1.x} cy={c1.y} r="5"
-                        fill={dragging === 'cp1' ? laneColor : laneColor + 'cc'}
-                        stroke="white" strokeWidth="1.5"
+                        cx={c1.x} cy={c1.y} r="4"
+                        fill={laneColor}
+                        stroke="var(--color-editor-bg)" strokeWidth="2"
                         className="cursor-move"
                         onPointerDown={(e) => { e.stopPropagation(); setDragging('cp1'); }}
                     />
                     {/* CP2 */}
                     <circle
-                        cx={c2.x} cy={c2.y} r="5"
-                        fill={dragging === 'cp2' ? laneColor : laneColor + 'cc'}
-                        stroke="white" strokeWidth="1.5"
+                        cx={c2.x} cy={c2.y} r="4"
+                        fill={laneColor}
+                        stroke="var(--color-editor-bg)" strokeWidth="2"
                         className="cursor-move"
                         onPointerDown={(e) => { e.stopPropagation(); setDragging('cp2'); }}
                     />
                     {/* Endpoints */}
-                    <circle cx={p0.x} cy={p0.y} r="3" fill="white" opacity="0.5" />
-                    <circle cx={p3.x} cy={p3.y} r="3" fill="white" opacity="0.5" />
+                    <path d="M 0 -4 L 4 0 L 0 4 L -4 0 Z" transform={`translate(${p0.x}, ${p0.y})`} fill="var(--color-editor-fill)" opacity="0.5" />
+                    <path d="M 0 -4 L 4 0 L 0 4 L -4 0 Z" transform={`translate(${p3.x}, ${p3.y})`} fill="var(--color-editor-fill)" opacity="0.5" />
                 </svg>
-                <div className="flex justify-between w-full text-[9px] text-gray-500 font-mono px-1">
+                <div className="flex justify-between w-full text-[9px] text-editor-muted font-mono px-1">
                     <span>CP1: ({cp1.x.toFixed(2)}, {cp1.y.toFixed(2)})</span>
                     <span>CP2: ({cp2.x.toFixed(2)}, {cp2.y.toFixed(2)})</span>
                 </div>
@@ -254,18 +254,18 @@ function CustomBezierEditor({ laneId, position, laneColor }: { laneId: string; p
 function EmptyState() {
     return (
         <div className="flex flex-col gap-4 text-center py-4">
-            <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center mx-auto">
+            <div className="w-10 h-10 rounded-full bg-editor-surface flex items-center justify-center mx-auto">
                 <span className="text-lg">◇</span>
             </div>
-            <p className="text-xxs text-gray-500">Click a <span className="text-white/40">lane label</span> or <span className="text-white/40">keyframe dot</span> to inspect</p>
+            <p className="text-xxs text-editor-muted">Click a <span className="text-editor-fg/40">lane label</span> or <span className="text-editor-fg/40">keyframe dot</span> to inspect</p>
             <div className="text-left mt-2 space-y-2">
-                <p className="text-xxs font-bold text-gray-600 uppercase tracking-widest">Quick Hints</p>
-                <div className="space-y-1.5 text-[10px] text-gray-500">
-                    <div className="flex justify-between"><span>Arm record</span><kbd className="bg-white/5 px-1 rounded text-[9px]">⏺</kbd></div>
-                    <div className="flex justify-between"><span>Play / Pause</span><kbd className="bg-white/5 px-1 rounded text-[9px]">▶ btn</kbd></div>
-                    <div className="flex justify-between"><span>Scrub</span><kbd className="bg-white/5 px-1 rounded text-[9px]">drag lane</kbd></div>
-                    <div className="flex justify-between"><span>Wheel scrub</span><kbd className="bg-white/5 px-1 rounded text-[9px]">scroll</kbd></div>
-                    <div className="flex justify-between"><span>Zoom timeline</span><kbd className="bg-white/5 px-1 rounded text-[9px]">± btns</kbd></div>
+                <p className="text-xxs font-bold text-editor-muted uppercase tracking-widest">Quick Hints</p>
+                <div className="space-y-1.5 text-[10px] text-editor-muted">
+                    <div className="flex justify-between"><span>Arm record</span><kbd className="bg-editor-surface px-1 rounded text-[9px]">⏺</kbd></div>
+                    <div className="flex justify-between"><span>Play / Pause</span><kbd className="bg-editor-surface px-1 rounded text-[9px]">▶ btn</kbd></div>
+                    <div className="flex justify-between"><span>Scrub</span><kbd className="bg-editor-surface px-1 rounded text-[9px]">drag lane</kbd></div>
+                    <div className="flex justify-between"><span>Wheel scrub</span><kbd className="bg-editor-surface px-1 rounded text-[9px]">scroll</kbd></div>
+                    <div className="flex justify-between"><span>Zoom timeline</span><kbd className="bg-editor-surface px-1 rounded text-[9px]">± btns</kbd></div>
                 </div>
             </div>
         </div>
@@ -296,19 +296,19 @@ function LaneInspector({ laneId }: { laneId: string }) {
             {/* Lane header */}
             <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full shrink-0" style={{ background: lane.color, boxShadow: `0 0 8px ${lane.color}80` }} />
-                <span className="text-xs font-bold text-white">{lane.name}</span>
+                <span className="text-xs font-bold text-editor-fg">{lane.name}</span>
             </div>
 
             {/* Current value */}
             <div className="glass-panel p-3 rounded space-y-2">
                 <div className="flex justify-between items-center">
-                    <span className="text-xxs text-gray-500">Current Value</span>
+                    <span className="text-xxs text-editor-muted">Current Value</span>
                     <span className="font-mono text-xs" style={{ color: lane.color }}>{currentValue.toFixed(3)}{lane.unit}</span>
                 </div>
-                <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                <div className="w-full h-1 bg-editor-surface rounded-full overflow-hidden">
                     <div className="h-full rounded-full transition-all" style={{ width: `${normalised * 100}%`, background: lane.color }} />
                 </div>
-                <div className="flex justify-between text-[9px] text-gray-600">
+                <div className="flex justify-between text-[9px] text-editor-muted">
                     <span>{min}</span><span>{max}</span>
                 </div>
             </div>
@@ -316,19 +316,19 @@ function LaneInspector({ laneId }: { laneId: string }) {
             {/* Scroll pattern presets */}
             {laneId === 'scrollPos' && (
                 <div>
-                    <label className="text-xxs font-bold text-gray-500 uppercase tracking-widest block mb-2">Pattern Presets</label>
-                    <p className="text-[9px] text-gray-600 mb-2 leading-relaxed">Replaces current scroll automation.</p>
+                    <label className="text-xxs font-bold text-editor-muted uppercase tracking-widest block mb-2">Pattern Presets</label>
+                    <p className="text-[9px] text-editor-muted mb-2 leading-relaxed">Replaces current scroll automation.</p>
                     <div className="grid grid-cols-2 gap-1.5">
                         {SCROLL_PATTERNS.map(preset => (
                             <button
                                 key={preset.id}
                                 onClick={() => useStore.getState().setScrollKeyframes(preset.generate(SEQUENCE_DURATION))}
-                                className="group flex flex-col items-center gap-1 p-2 glass-panel hover:bg-white/10 rounded transition-colors"
+                                className="group flex flex-col items-center gap-1 p-2 glass-panel hover:bg-editor-surface-hover rounded transition-colors"
                             >
                                 <svg viewBox="0 0 60 30" className="w-full h-7" preserveAspectRatio="none">
                                     <path d={preset.thumb} fill="none" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.7" className="group-hover:opacity-100 transition-opacity" />
                                 </svg>
-                                <span className="text-[9px] text-gray-500 group-hover:text-white transition-colors">{preset.label}</span>
+                                <span className="text-[9px] text-editor-muted group-hover:text-editor-fg transition-colors">{preset.label}</span>
                             </button>
                         ))}
                     </div>
@@ -338,8 +338,8 @@ function LaneInspector({ laneId }: { laneId: string }) {
             {/* Interpolation mode hint */}
             {laneId !== 'scrollPos' && (
                 <div>
-                    <label className="text-xxs font-bold text-gray-500 uppercase tracking-widest block mb-2">Interpolation</label>
-                    <p className="text-[10px] text-gray-500 leading-relaxed">Click a keyframe dot on this lane to edit its easing.</p>
+                    <label className="text-xxs font-bold text-editor-muted uppercase tracking-widest block mb-2">Interpolation</label>
+                    <p className="text-[10px] text-editor-muted leading-relaxed">Click a keyframe dot on this lane to edit its easing.</p>
                 </div>
             )}
         </div>
@@ -375,34 +375,34 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
                 <div className="w-3 h-3 rounded-full shrink-0" style={{ background: lane.color, boxShadow: `0 0 8px ${lane.color}80` }} />
                 <div className="flex-1">
                     <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-white">{lane.name}</span>
+                        <span className="text-xs font-bold text-editor-fg">{lane.name}</span>
                         {isMulti && (
                             <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full" style={{ background: lane.color + '30', color: lane.color }}>
                                 {selectedCount} selected
                             </span>
                         )}
                     </div>
-                    <p className="text-[9px] text-gray-500 font-mono">{isMulti ? 'Shift+click to toggle' : `Keyframe @ ${timeLabel}s`}</p>
+                    <p className="text-[9px] text-editor-muted font-mono">{isMulti ? 'Shift+click to toggle' : `Keyframe @ ${timeLabel}s`}</p>
                 </div>
             </div>
 
             {/* Value display */}
             <div className="glass-panel p-3 rounded">
                 <div className="flex justify-between items-center">
-                    <span className="text-xxs text-gray-500">Value</span>
+                    <span className="text-xxs text-editor-muted">Value</span>
                     <span className="font-mono text-sm" style={{ color: lane.color }}>{kf.value.toFixed(4)}{lane.unit}</span>
                 </div>
                 <div className="flex justify-between items-center mt-1">
-                    <span className="text-xxs text-gray-500">Position</span>
-                    <span className="font-mono text-xs text-gray-400">{kf.position.toFixed(3)}s</span>
+                    <span className="text-xxs text-editor-muted">Position</span>
+                    <span className="font-mono text-xs text-editor-muted">{kf.position.toFixed(3)}s</span>
                 </div>
                 {kf.laneId !== 'scrollPos' && !isMulti && (
                     <div className="mt-2">
-                        <label className="text-xxs text-gray-500 block mb-1">Edit Value</label>
+                        <label className="text-xxs text-editor-muted block mb-1">Edit Value</label>
                         <input
                             key={`${kf.laneId}-${kf.position}`}
                             type="number"
-                            className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs font-mono text-white focus:outline-none focus:border-white/30"
+                            className="w-full bg-editor-surface border border-editor-border rounded px-2 py-1 text-xs font-mono text-editor-fg focus:outline-none focus:border-white/30"
                             defaultValue={kf.value.toFixed(4)}
                             step={(lane.range[1] - lane.range[0]) / 100}
                             min={lane.range[0]}
@@ -423,10 +423,10 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
             {/* Easing presets */}
             <div>
                 <div className="flex justify-between items-center mb-2">
-                    <label className="text-xxs font-bold text-gray-500 uppercase tracking-widest">
+                    <label className="text-xxs font-bold text-editor-muted uppercase tracking-widest">
                         Easing to Next{isMulti ? ` (${selectedCount})` : ''}
                     </label>
-                    <span className="text-[9px] text-gray-600">right-click / Delete to remove</span>
+                    <span className="text-[9px] text-editor-muted">right-click / Delete to remove</span>
                 </div>
                 <div className="grid grid-cols-3 gap-1.5">
                     {EASING_PRESETS.map((preset) => {
@@ -438,14 +438,14 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
                                 applyEasingToAllSelected(preset.id);
                                 setSelectedKeyframe({ ...kf });
                             }}
-                            className="group flex flex-col items-center gap-1 p-2 glass-panel hover:bg-white/10 rounded transition-colors"
+                            className="group flex flex-col items-center gap-1 p-2 glass-panel hover:bg-editor-surface-hover rounded transition-colors"
                             style={isActive ? { outline: `1px solid ${lane.color}60`, background: `${lane.color}18` } : undefined}
                             title={preset.label}
                         >
                             <svg viewBox="0 0 40 40" className="w-8 h-8" style={{ color: isActive ? lane.color : undefined }}>
                                 <path d={preset.d} fill="none" stroke={isActive ? lane.color : 'rgba(255,255,255,0.5)'} strokeWidth="2.5" strokeLinecap="round" />
                             </svg>
-                            <span className={`text-[9px] transition-colors ${isActive ? 'text-white' : 'text-gray-500 group-hover:text-white'}`}>{preset.label}</span>
+                            <span className={`text-[9px] transition-colors ${isActive ? 'text-editor-fg' : 'text-editor-muted group-hover:text-editor-fg'}`}>{preset.label}</span>
                         </button>
                         );
                     })}
@@ -467,9 +467,9 @@ export default function Inspector({ width = 240 }: { width?: number }) {
     const primaryKeyframe = selectedKeyframes.at(-1) ?? null;
 
     return (
-        <aside className="border-l border-editor-border bg-black/20 flex flex-col overflow-y-auto thin-scrollbar" style={{ width }}>
+        <aside className="border-l border-editor-border bg-editor-panel text-editor-fg flex flex-col overflow-y-auto thin-scrollbar" style={{ width }}>
             <div className="h-10 border-b border-editor-border flex items-center px-4 shrink-0">
-                <span className="text-xxs font-bold text-gray-500 uppercase tracking-widest">Inspector</span>
+                <span className="text-xxs font-bold text-editor-muted uppercase tracking-widest">Inspector</span>
             </div>
             <div className="p-4 flex-1">
                 {primaryKeyframe ? (

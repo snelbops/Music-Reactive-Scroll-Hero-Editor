@@ -105,41 +105,30 @@ export default function Layout() {
 
     return (
         <div className="flex flex-col h-screen w-full bg-editor-bg text-editor-fg overflow-hidden font-sans select-none text-sm">
-            <header className="h-10 border-b border-editor-border flex items-center px-4 justify-between bg-editor-panel">
-                <div className="flex items-center gap-4">
-                    <span className="font-bold text-editor-fg tracking-tighter text-base">SCROLL HERO EDITOR</span>
-                    <div className="flex gap-4 text-xxs uppercase tracking-widest text-editor-muted">
-                        <span className="text-editor-accent-purple">Project: Neon_Horizon_01</span>
-                        <span>Draft Saved just now</span>
-                    </div>
+            <header className="h-8 border-b border-[#222] bg-[#1a1a1a] text-[#808080] flex items-center px-4 justify-between text-[11px] font-medium tracking-wide shrink-0 font-sans select-none">
+                <div className="flex items-center space-x-6">
+                    <span className="cursor-pointer hover:text-[#d9d9d9]">Media Pool</span>
+                    <span className="cursor-pointer hover:text-[#d9d9d9]">Sync Bin</span>
+                    <span className="cursor-pointer hover:text-[#d9d9d9]">Transitions</span>
+                    <span className="cursor-pointer hover:text-[#d9d9d9]">Titles</span>
+                    <span className="cursor-pointer hover:text-[#d9d9d9]">Effects</span>
+                    <span className="cursor-pointer hover:text-[#d9d9d9]">Keyframes</span>
                 </div>
-                <div className="flex items-center gap-3">
-                    <button onClick={handleExportJson} className="bg-editor-accent-purple/20 hover:bg-editor-accent-purple/40 text-editor-accent-purple px-3 py-1 rounded text-xs transition-colors border border-editor-accent-purple/30">EXPORT JSON</button>
-                    <button onClick={exportCurvesJson} className="bg-editor-surface hover:bg-editor-surface-hover text-editor-muted hover:text-editor-fg px-3 py-1 rounded text-xs transition-colors border border-editor-border" title="Export scroll keyframes as curves.json">CURVES JSON</button>
-                    <button
-                        onClick={handleExportHtml}
-                        disabled={isExportingHtml}
-                        title={activePreset === 'frames' && mp4Asset && extractionStatus === 'done' ? 'Export frame sequence hero' : 'Export particle hero'}
-                        className="bg-editor-accent-teal/20 hover:bg-editor-accent-teal/40 text-editor-accent-teal px-3 py-1 rounded text-xs transition-colors border border-editor-accent-teal/30 disabled:opacity-40 disabled:cursor-wait"
-                    >
-                        {isExportingHtml ? 'EXPORTING…' : 'EXPORT HTML'}
-                    </button>
-                    <div className="w-px h-6 bg-editor-border"></div>
-                    <div className="flex bg-editor-surface border border-editor-border rounded-full p-0.5 gap-0.5">
-                        <button
-                            onClick={() => setIsDarkMode(false)}
-                            className={`px-2.5 py-0.5 rounded-full text-xs transition-colors ${!isDarkMode ? 'bg-editor-panel text-editor-fg shadow-sm' : 'text-editor-muted hover:text-editor-fg'}`}
-                        >
-                            Light
-                        </button>
-                        <button
-                            onClick={() => setIsDarkMode(true)}
-                            className={`px-2.5 py-0.5 rounded-full text-xs transition-colors ${isDarkMode ? 'bg-editor-panel text-editor-fg shadow-sm' : 'text-editor-muted hover:text-editor-fg'}`}
-                        >
-                            Dark
-                        </button>
+
+                <div className="absolute left-1/2 -translate-x-1/2 text-[#d9d9d9]">
+                    Untitled Project 2 <span className="text-[#808080] ml-1 font-normal">| Edited</span>
+                </div>
+
+                <div className="flex items-center space-x-6">
+                    <span className="cursor-pointer hover:text-[#d9d9d9]" onClick={handleExportJson}>Export JSON</span>
+                    <span className="cursor-pointer hover:text-[#d9d9d9]" onClick={exportCurvesJson}>Export Curves</span>
+                    <span className="cursor-pointer hover:text-[#d9d9d9]" onClick={handleExportHtml}>Export HTML</span>
+                    <span className="cursor-pointer hover:text-[#d9d9d9]">Inspector</span>
+                    {/* Exposing editor features natively as hidden buttons or inline toggles */}
+                    <div className="flex bg-[#222] p-0.5 rounded gap-1 ml-4 border border-[#333]">
+                        <button onClick={() => setIsDarkMode(false)} className={`px-2 py-0.5 rounded text-xxs transition-colors ${!isDarkMode ? 'bg-[#333] text-[#d9d9d9]' : 'text-[#808080] hover:text-[#d9d9d9]'}`}>L</button>
+                        <button onClick={() => setIsDarkMode(true)} className={`px-2 py-0.5 rounded text-xxs transition-colors ${isDarkMode ? 'bg-[#333] text-[#d9d9d9]' : 'text-[#808080] hover:text-[#d9d9d9]'}`}>D</button>
                     </div>
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-teal-500 border border-editor-border"></div>
                 </div>
             </header>
 
@@ -162,6 +151,36 @@ export default function Layout() {
                 onPointerDown={(e) => startDrag(e, setTimelineH, timelineH, 80, 600, 'y', -1)}
             />
             <Timeline height={timelineH} />
+
+            <footer className="h-10 bg-[#141414] border-t border-[#1a1a1a] flex items-center px-4 shrink-0 text-[11px] font-medium tracking-wide font-sans select-none">
+                <div className="w-48 text-[#d9d9d9] font-semibold flex items-center gap-2">
+                    {/* Simulate Davinci Logo */}
+                    <div className="w-3.5 h-3.5 rounded-full border-[1.5px] border-[#d9d9d9] opacity-80 flex items-center justify-center">
+                        <div className="w-1 h-1 bg-[#d9d9d9] rounded-full"></div>
+                    </div>
+                    <span>DaVinci Resolve 20</span>
+                </div>
+                
+                <div className="flex-1 flex justify-center space-x-12 h-full text-[#808080]">
+                    <div className="h-full flex items-center hover:text-[#d9d9d9] cursor-pointer pt-0.5">Media</div>
+                    <div className="h-full flex items-center hover:text-[#d9d9d9] cursor-pointer pt-0.5">Cut</div>
+                    {/* Active tab */}
+                    <div className="h-full flex items-center text-[#d9d9d9] border-b-[3px] border-red-500 cursor-pointer">Edit</div>
+                    <div className="h-full flex items-center hover:text-[#d9d9d9] cursor-pointer pt-0.5">Fusion</div>
+                    <div className="h-full flex items-center hover:text-[#d9d9d9] cursor-pointer pt-0.5">Color</div>
+                    <div className="h-full flex items-center hover:text-[#d9d9d9] cursor-pointer pt-0.5">Fairlight</div>
+                    <div className="h-full flex items-center hover:text-[#d9d9d9] cursor-pointer pt-0.5">Deliver</div>
+                </div>
+
+                <div className="w-48 flex justify-end items-center space-x-6 text-[#808080]">
+                    <span className="cursor-pointer hover:text-[#d9d9d9]">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                    </span>
+                    <span className="cursor-pointer hover:text-[#d9d9d9]">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    </span>
+                </div>
+            </footer>
         </div>
     );
 }

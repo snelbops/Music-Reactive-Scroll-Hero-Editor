@@ -291,9 +291,13 @@ export const GithubTestParticleField = ({ imageUrl, theme, rotationSpeed = 0.1, 
             timeRef.current += delta;
         }
         u.uTime.value = timeRef.current;
-        // Always use the internal timer for assembly — particles animate in on mount.
-        // Scroll progress drives scene params (rotationSpeed, depth, size) via Theatre.js lanes.
-        u.uAssemble.value = Math.min(1.0, timeRef.current / 2.0);
+        // uAssemble logic: if progress is provided (from Theatre.js), it drives the assembly.
+        // Otherwise, we use the internal timer for a one-off 2s intro animation.
+        if (progress !== undefined) {
+            u.uAssemble.value = progress;
+        } else {
+            u.uAssemble.value = Math.min(1.0, timeRef.current / 2.0);
+        }
         u.uInvert.value = isDark ? 0.0 : 1.0;
         u.uDepth.value = depth;
         u.uRandom.value = randomScatter;

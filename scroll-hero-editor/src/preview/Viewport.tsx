@@ -37,14 +37,14 @@ export default function Viewport() {
     const lightImages = useStore(s => s.lightImages);
     const activeLightImageIdx = useStore(s => s.activeLightImageIdx);
 
-    // Ref for the classic iframe element
-    const iframeRef = useRef<HTMLIFrameElement>(null);
-
     // Ref for the scrub handle track (vertical bar on the right)
     const trackRef = useRef<HTMLDivElement>(null);
 
     // Ref for the preview area — used for wheel scrub
     const previewRef = useRef<HTMLDivElement>(null);
+
+    // Ref for the classic dark iframe
+    const iframeRef = useRef<HTMLIFrameElement>(null);
 
     const lastRecordedTimeRef = useRef<number | null>(null);
 
@@ -98,25 +98,30 @@ export default function Viewport() {
     // Wire the appropriate adapter whenever activePreset changes
     useEffect(() => {
         if (activePreset === 'orbit' || activePreset === 'light') {
-            // OrbitAdapter forwards progress to scrollProgress (already in Zustand,
-            // GithubTestParticleField reads it via the progress prop below)
-            setActiveAdapter(new OrbitAdapter((v) => {
-                // setSceneProgress has already updated scrollProgress in Zustand;
-                // this callback is intentionally a no-op since the progress prop
-                // on GithubTestParticleField reads scrollProgress directly.
-                void v;
-            }));
+            setActiveAdapter(new OrbitAdapter((v) => { void v; }));
         } else if (activePreset === 'classic-dark' || activePreset === 'classic-dark-copy') {
             setActiveAdapter(new ClassicAdapter(iframeRef));
         } else if (activePreset === 'classic-light' || activePreset === 'classic-inverted' || activePreset === 'light-images') {
             setActiveAdapter(new OrbitAdapter((v) => { void v; }));
-        } else {
+        } else if (activePreset === 'frames') {
             setActiveAdapter(new FrameSequenceAdapter());
         }
-        return () => {
-            setActiveAdapter(null);
-        };
+        return () => setActiveAdapter(null);
     }, [activePreset, setActiveAdapter]);
+
+    // Forward timeline parameters to the classic iframe when active
+    useEffect(() => {
+        if (activePreset !== 'classic-dark' && activePreset !== 'classic-dark-copy') return;
+        iframeRef.current?.contentWindow?.postMessage({
+            type: 'CONTROLS_UPDATE',
+            payload: {
+                random: classicDarkControls.random,
+                depth: particleDepth,
+                size: particleSize,
+                touchRadius: classicDarkControls.touchRadius
+            }
+        }, '*');
+    }, [activePreset, particleDepth, particleSize, classicDarkControls]);
 
 
     return (
@@ -211,7 +216,7 @@ export default function Viewport() {
                         </Canvas>
                     )}
 
-                    {/* Classic Dark: original iframe */}
+                    {/* Classic Dark: original iframe — exactly as it was in the package copy */}
                     {activePreset === 'classic-dark' && (
                         <iframe
                             ref={iframeRef}
@@ -221,8 +226,8 @@ export default function Viewport() {
                         />
                     )}
 
-                    {/* Classic Light (Three.js, white bg, dark particles, standard images) */}
-                    {activePreset === 'classic-dark-copy' && (
+                    {/* Classic Light: Three.js version — white bg, dark particles */}
+                    {activePreset === 'classic-light' && (
                         <Canvas
                             camera={{ position: [0, 0, 5], fov: 50 }}
                             style={{ width: '100%', height: '100%', background: 'white', display: 'block' }}
@@ -232,7 +237,6 @@ export default function Viewport() {
                                 theme="light"
                                 progress={scrollProgress}
                                 rotationSpeed={0}
-                                staticAfterAssembly
                                 depth={classicDarkControls.depth}
                                 size={classicDarkControls.size}
                                 touchRadius={classicDarkControls.touchRadius}
@@ -269,8 +273,8 @@ export default function Viewport() {
                         )
                     )}
 
-                    {/* Classic Light: Three.js duplicate of Classic Dark — to be tweaked */}
-                    {activePreset === 'classic-light' && (
+                    {/* Classic Dark Copy: just in case it's still in the store, making it dark */}
+                    {activePreset === 'classic-dark-copy' && (
                         <Canvas
                             camera={{ position: [0, 0, 5], fov: 50 }}
                             style={{ width: '100%', height: '100%', background: '#0a0a0a', display: 'block' }}
@@ -288,7 +292,7 @@ export default function Viewport() {
                         </Canvas>
                     )}
 
-                    {/* Classic Light: R3F Canvas — white bg, dark particles, no rotation */}
+                    {/* Classic Inverted: R3F Canvas — white bg, dark particles, no rotation */}
                     {activePreset === 'classic-inverted' && (
                         <Canvas
                             camera={{ position: [0, 0, 5], fov: 50 }}
@@ -301,6 +305,8 @@ export default function Viewport() {
                                 rotationSpeed={0}
                                 depth={particleDepth}
                                 size={particleSize}
+                                touchRadius={classicDarkControls.touchRadius}
+                                randomScatter={classicDarkControls.random}
                             />
                         </Canvas>
                     )}
