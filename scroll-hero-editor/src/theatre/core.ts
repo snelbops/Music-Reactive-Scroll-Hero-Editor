@@ -44,3 +44,5 @@ export const sceneParamsObj = sheet.object('Scene Parameters', {
 export const cssOpacityObj = sheet.object('CSS Opacity', {
     opacity: types.number(1, { range: [0, 1] }),
 });
+
+// studio.initialize() intentionally disabled — overlay not needed while Theatre.js is dormant

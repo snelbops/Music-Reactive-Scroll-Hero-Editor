@@ -166,6 +166,15 @@ function buildBuffers(imageData: ImageData, canvas: HTMLCanvasElement): Particle
     };
 }
 
+function applyEase(t: number, ease: string): number {
+    switch (ease) {
+        case 'easeIn':    return t * t;
+        case 'easeOut':   return 1 - (1 - t) * (1 - t);
+        case 'easeInOut': return t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t);
+        default:          return t;
+    }
+}
+
 interface GithubTestParticleFieldProps {
     imageUrl: string;
     theme: 'light' | 'dark';
@@ -178,9 +187,13 @@ interface GithubTestParticleFieldProps {
     staticAfterAssembly?: boolean;
     /** Optional external progress (0–1). When provided, drives uAssemble instead of the internal timer. */
     progress?: number;
+    /** How many seconds the assembly intro takes (default 2.0) */
+    assemblyDuration?: number;
+    /** Easing curve for the assembly intro */
+    assemblyEase?: string;
 }
 
-export const GithubTestParticleField = ({ imageUrl, theme, rotationSpeed = 0.1, depth = 2.0, size = 1.4, touchRadius = 0.15, randomScatter = 0, staticAfterAssembly = false, progress }: GithubTestParticleFieldProps) => {
+export const GithubTestParticleField = ({ imageUrl, theme, rotationSpeed = 0.1, depth = 2.0, size = 1.4, touchRadius = 0.15, randomScatter = 0, staticAfterAssembly = false, progress, assemblyDuration = 2.0, assemblyEase = 'linear' }: GithubTestParticleFieldProps) => {
     const meshRef = useRef<THREE.Mesh>(null);
     const matRef = useRef<THREE.RawShaderMaterial>(null);
     const touchRef = useRef<TouchTexture | null>(null);
@@ -286,7 +299,7 @@ export const GithubTestParticleField = ({ imageUrl, theme, rotationSpeed = 0.1, 
     useFrame((_, delta) => {
         if (!matRef.current) return;
         const u = matRef.current.uniforms;
-        const assemblyDone = timeRef.current >= 2.0;
+        const assemblyDone = timeRef.current >= assemblyDuration;
         if (!assemblyDone || !staticAfterAssembly) {
             timeRef.current += delta;
         }
@@ -296,7 +309,8 @@ export const GithubTestParticleField = ({ imageUrl, theme, rotationSpeed = 0.1, 
         if (progress !== undefined) {
             u.uAssemble.value = progress;
         } else {
-            u.uAssemble.value = Math.min(1.0, timeRef.current / 2.0);
+            const t = Math.min(1.0, timeRef.current / assemblyDuration);
+            u.uAssemble.value = applyEase(t, assemblyEase);
         }
         u.uInvert.value = isDark ? 0.0 : 1.0;
         u.uDepth.value = depth;

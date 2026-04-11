@@ -34,6 +34,7 @@ export default function Viewport() {
     const cssOpacity = useStore(s => s.cssOpacity);
     const extractedFrames = useStore(s => s.extractedFrames);
     const classicDarkControls = useStore(s => s.classicDarkControls);
+    const orbitControls = useStore(s => s.orbitControls);
     const lightImages = useStore(s => s.lightImages);
     const activeLightImageIdx = useStore(s => s.activeLightImageIdx);
 
@@ -54,16 +55,23 @@ export default function Viewport() {
         if (!el) return;
         const onWheel = (e: WheelEvent) => {
             e.preventDefault();
-            const delta = e.deltaY / 800;
-            const current = useStore.getState().scrollProgress;
-            const next = Math.max(0, Math.min(1, current + delta));
-            sheet.sequence.position = next * SEQUENCE_DURATION;
-            useStore.getState().setSceneProgress(next);
-            const { isRecording, isPlaying } = useStore.getState();
-            if (isRecording && isPlaying) {
-                const t = sheet.sequence.position;
-                useStore.getState().addScrollKeyframe(t, next, lastRecordedTimeRef.current ?? t);
-                lastRecordedTimeRef.current = t;
+            if (e.shiftKey) {
+                // Shift+scroll → scrub playhead only, don't touch scroll progress
+                const delta = (e.deltaY / 800) * SEQUENCE_DURATION;
+                const next = Math.max(0, Math.min(SEQUENCE_DURATION, sheet.sequence.position + delta));
+                sheet.sequence.position = next;
+            } else {
+                // Normal scroll → move scroll handle / scene progress only
+                const delta = e.deltaY / 800;
+                const current = useStore.getState().scrollProgress;
+                const next = Math.max(0, Math.min(1, current + delta));
+                useStore.getState().setSceneProgress(next);
+                const { isRecording, isPlaying } = useStore.getState();
+                if (isRecording && isPlaying) {
+                    const t = sheet.sequence.position;
+                    useStore.getState().addScrollKeyframe(t, next, lastRecordedTimeRef.current ?? t);
+                    lastRecordedTimeRef.current = t;
+                }
             }
         };
         el.addEventListener('wheel', onWheel, { passive: false });
@@ -125,9 +133,9 @@ export default function Viewport() {
 
 
     return (
-        <main className="flex-1 flex flex-col relative bg-[#050508]">
+        <main className="flex-1 flex flex-col relative bg-editor-bg">
             {/* Viewport Controls — hidden in fullscreen */}
-            {!isFullscreen && <div className="h-10 border-b border-editor-border flex items-center justify-between px-4 z-10 bg-black/40">
+            {!isFullscreen && <div className="h-10 border-b border-editor-border flex items-center justify-between px-4 z-10 bg-editor-panel">
                 <div className="flex items-center gap-4 text-xs">
                     <div className="flex items-center gap-2">
                         <span className="text-gray-500">Zoom</span>
@@ -159,7 +167,7 @@ export default function Viewport() {
             </div>}
 
             {/* Preview Area */}
-            <div ref={previewRef} className="flex-1 flex items-center justify-center overflow-hidden bg-black/60 relative">
+            <div ref={previewRef} className="flex-1 flex items-center justify-center overflow-hidden bg-editor-surface relative">
                 {/* Letterbox Stage */}
                 <div
                     className={`relative overflow-hidden ${isRecording ? 'ring-2 ring-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.15)]' : ''}`}
@@ -184,6 +192,9 @@ export default function Viewport() {
                                 rotationSpeed={rotationSpeed}
                                 depth={particleDepth}
                                 size={particleSize}
+                                assemblyDuration={orbitControls.assemblyDuration}
+                                assemblyEase={orbitControls.assemblyEase}
+                                staticAfterAssembly={orbitControls.pauseAfterAssembly}
                             />
                         </Canvas>
                     )}
@@ -201,6 +212,9 @@ export default function Viewport() {
                                 rotationSpeed={rotationSpeed}
                                 depth={particleDepth}
                                 size={particleSize}
+                                assemblyDuration={orbitControls.assemblyDuration}
+                                assemblyEase={orbitControls.assemblyEase}
+                                staticAfterAssembly={orbitControls.pauseAfterAssembly}
                             />
                         </Canvas>
                     )}

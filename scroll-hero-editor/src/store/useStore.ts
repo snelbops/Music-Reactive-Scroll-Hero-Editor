@@ -58,6 +58,8 @@ interface EditorState {
     cssOpacity: number; setCssOpacity: (v: number) => void;
     classicDarkControls: { random: number; depth: number; size: number; touchRadius: number };
     setClassicDarkControls: (c: { random: number; depth: number; size: number; touchRadius: number }) => void;
+    orbitControls: { assemblyDuration: number; assemblyEase: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut'; pauseAfterAssembly: boolean };
+    setOrbitControls: (c: Partial<{ assemblyDuration: number; assemblyEase: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut'; pauseAfterAssembly: boolean }>) => void;
     lightImages: { name: string; url: string }[]; addLightImage: (img: { name: string; url: string }) => void; removeLightImage: (name: string) => void;
     activeLightImageIdx: number; setActiveLightImageIdx: (i: number) => void;
     activeAdapter: SceneAdapter | null; setActiveAdapter: (adapter: SceneAdapter | null) => void;
@@ -164,6 +166,8 @@ export const useStore = create<EditorState>((set, get) => {
     cssOpacity: 1, setCssOpacity: (v) => set({ cssOpacity: v }),
     classicDarkControls: { random: 2.0, depth: 4.0, size: 1.5, touchRadius: 0.15 },
     setClassicDarkControls: (c) => set({ classicDarkControls: c }),
+    orbitControls: { assemblyDuration: 2.0, assemblyEase: 'easeOut', pauseAfterAssembly: false },
+    setOrbitControls: (c) => set((s) => ({ orbitControls: { ...s.orbitControls, ...c } })),
     lightImages: [], addLightImage: (img) => set((s) => ({ lightImages: [...s.lightImages, img] })), removeLightImage: (name) => set((s) => ({ lightImages: s.lightImages.filter(i => i.name !== name) })),
     activeLightImageIdx: 0, setActiveLightImageIdx: (i) => set({ activeLightImageIdx: i }),
     activeAdapter: null, setActiveAdapter: (adapter) => set({ activeAdapter: adapter }),

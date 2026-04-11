@@ -37,6 +37,10 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
     const setActivePreset = useStore(state => state.setActivePreset);
     const classicDarkControls = useStore(s => s.classicDarkControls);
     const setClassicDarkControls = useStore(s => s.setClassicDarkControls);
+    const orbitControls = useStore(s => s.orbitControls);
+    const setOrbitControls = useStore(s => s.setOrbitControls);
+    const rotationSpeed = useStore(s => s.rotationSpeed);
+    const setRotationSpeed = useStore(s => s.setRotationSpeed);
     const lightImages = useStore(s => s.lightImages);
     const addLightImage = useStore(s => s.addLightImage);
     const removeLightImage = useStore(s => s.removeLightImage);
@@ -104,7 +108,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                     <span className="text-editor-fg">Master</span>
                 </div>
                 <div className="flex-1 flex justify-end">
-                    <input className="bg-[#111] border border-editor-border rounded px-2 py-0.5 text-[10px] w-full max-w-[120px] focus:outline-none focus:border-editor-accent-blue text-editor-fg placeholder:text-editor-muted/50" placeholder="Search" type="text"/>
+                    <input className="bg-editor-surface border border-editor-border rounded px-2 py-0.5 text-[10px] w-full max-w-[120px] focus:outline-none focus:border-editor-accent-blue text-editor-fg placeholder:text-editor-muted/50" placeholder="Search" type="text"/>
                 </div>
             </div>
             <div className="flex-1 overflow-y-auto thin-scrollbar p-2 flex flex-col gap-2">
@@ -226,6 +230,51 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                         <div className="text-[9px] text-editor-muted uppercase tracking-widest mt-2">Touch</div>
                         <ControlSlider label="Touch Radius" value={classicDarkControls.touchRadius} min={0} max={0.5}
                             onChange={v => setClassicDarkControls({ ...classicDarkControls, touchRadius: v })} />
+                    </div>
+                </section>
+            )}
+
+            {/* Orbit Controls — shown for orbit and light presets */}
+            {(activePreset === 'orbit' || activePreset === 'light') && (
+                <section>
+                    <div className="w-full flex justify-between items-center py-1 px-2 text-xxs font-bold text-editor-muted uppercase tracking-tighter mb-1">
+                        <span>Controls</span>
+                        <SlidersHorizontal className="w-3 h-3" />
+                    </div>
+                    <div className="rounded border border-editor-border bg-editor-surface px-3 py-3 space-y-4">
+                        <ControlSlider label="Rotation Speed" value={rotationSpeed} min={0} max={0.5} step={0.005}
+                            onChange={v => setRotationSpeed(v)} />
+                        <ControlSlider label="Intro Duration (s)" value={orbitControls.assemblyDuration} min={0.5} max={8} step={0.1}
+                            onChange={v => setOrbitControls({ assemblyDuration: v })} />
+                        {/* Assembly ease picker */}
+                        <div className="space-y-1">
+                            <div className="text-[9px] text-editor-muted uppercase tracking-widest">Intro Ease</div>
+                            <div className="grid grid-cols-2 gap-1">
+                                {(['linear', 'easeIn', 'easeOut', 'easeInOut'] as const).map(ease => (
+                                    <button
+                                        key={ease}
+                                        onClick={() => setOrbitControls({ assemblyEase: ease })}
+                                        className={`py-1 text-[9px] rounded border transition-colors ${
+                                            orbitControls.assemblyEase === ease
+                                                ? 'bg-editor-accent-purple/20 border-editor-accent-purple/50 text-editor-accent-purple'
+                                                : 'bg-editor-surface border-editor-border text-editor-muted hover:bg-editor-surface-hover'
+                                        }`}
+                                    >
+                                        {ease === 'easeInOut' ? 'ease in+out' : ease === 'easeIn' ? 'ease in' : ease === 'easeOut' ? 'ease out' : 'linear'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        {/* Pause after assembly toggle */}
+                        <div className="flex items-center justify-between">
+                            <span className="text-[9px] text-editor-muted uppercase tracking-widest">Pause After Intro</span>
+                            <button
+                                onClick={() => setOrbitControls({ pauseAfterAssembly: !orbitControls.pauseAfterAssembly })}
+                                className={`relative w-7 h-4 rounded-full transition-colors ${orbitControls.pauseAfterAssembly ? 'bg-editor-accent-purple' : 'bg-editor-border'}`}
+                            >
+                                <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${orbitControls.pauseAfterAssembly ? 'left-3.5' : 'left-0.5'}`} />
+                            </button>
+                        </div>
                     </div>
                 </section>
             )}
