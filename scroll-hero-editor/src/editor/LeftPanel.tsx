@@ -93,11 +93,22 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
         }
     };
 
-    // Auto-extract sample.mp4 on first load
+    // Auto-extract sample.mp4 on first load and setup 1-4 drumpad key shortcuts
     useEffect(() => {
         if (extractionStatus === 'idle' && extractedFrames.length === 0) {
             handleExtract('/sample.mp4');
         }
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
+            if (['1', '2', '3', '4'].includes(e.key)) {
+                const padIdx = parseInt(e.key, 10) - 1;
+                useStore.getState().setActiveVideoPadIdx(padIdx);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -308,12 +319,19 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
 
                         {/* MP4 asset card */}
                         {mp4Asset && (
-                            <div className="glass-panel rounded p-2 space-y-2">
+                            <div className="glass-panel rounded p-2 space-y-2 relative">
                                 <div className="flex items-center gap-2">
                                     <div className="w-6 h-6 bg-editor-accent-blue/20 rounded flex items-center justify-center text-editor-accent-blue shrink-0">
                                         <Video className="w-3 h-3" />
                                     </div>
                                     <span className="truncate text-xxs text-editor-muted flex-1">{mp4Asset.name}</span>
+                                    <button
+                                        onClick={() => useStore.getState().removeMp4Asset()}
+                                        title="Delete Asset"
+                                        className="text-editor-muted hover:text-red-400 p-0.5 rounded transition-colors"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
                                 </div>
 
                                 {/* Extraction progress */}
@@ -359,6 +377,38 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                 </div>
                             </div>
                         )}
+
+                        {/* Video Drumpad Launcher */}
+                        <div className="mt-3 space-y-1">
+                            <div className="flex justify-between items-center text-[9px] text-editor-muted uppercase tracking-widest px-1">
+                                <span>Video Drumpad</span>
+                                <span className="text-editor-accent-purple font-mono">Pads [1-4]</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1.5">
+                                {useStore(s => s.videoPads).map((pad, idx) => {
+                                    const activeVideoPadIdx = useStore(s => s.activeVideoPadIdx);
+                                    const setActiveVideoPadIdx = useStore(s => s.setActiveVideoPadIdx);
+                                    const isActive = activeVideoPadIdx === idx;
+                                    return (
+                                        <button
+                                            key={pad.id}
+                                            onClick={() => setActiveVideoPadIdx(idx)}
+                                            className={`p-2 rounded border flex flex-col justify-between text-left transition-all ${
+                                                isActive
+                                                    ? 'bg-editor-accent-purple/20 border-editor-accent-purple shadow-[0_0_10px_rgba(168,85,247,0.3)] text-editor-fg'
+                                                    : 'bg-editor-surface border-editor-border text-editor-muted hover:bg-editor-surface-hover'
+                                            }`}
+                                        >
+                                            <div className="flex justify-between items-center w-full mb-1">
+                                                <span className="text-[9px] font-bold font-mono px-1 rounded bg-black/40 text-editor-accent-purple">PAD {pad.id}</span>
+                                                <span className="text-[8px] opacity-60">Key {pad.id}</span>
+                                            </div>
+                                            <div className="text-[9px] font-medium truncate w-full">{pad.name || 'Empty'}</div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
                 )}
             </section>

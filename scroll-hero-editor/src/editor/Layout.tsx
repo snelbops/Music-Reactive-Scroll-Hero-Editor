@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Minimize2 } from 'lucide-react';
 import studio from '@theatre/studio';
 import LeftPanel from './LeftPanel';
@@ -8,6 +8,7 @@ import Timeline from './Timeline';
 import Viewport from '../preview/Viewport';
 import { useStore } from '../store/useStore';
 import { exportParticleHeroHtml, exportFrameSequenceHeroHtml, exportCurvesJson } from '../export/exportHtml';
+import { saveProject, loadProject } from '../utils/project';
 
 export default function Layout() {
     const isDarkMode = useStore(state => state.isDarkMode);
@@ -19,6 +20,8 @@ export default function Layout() {
     const extractionStatus = useStore(state => state.extractionStatus);
 
     const [isExportingHtml, setIsExportingHtml] = useState(false);
+    const [isLoadError, setIsLoadError] = useState(false);
+    const loadInputRef = useRef<HTMLInputElement>(null);
     const [timelineH, setTimelineH] = useState(280);
     const [leftW, setLeftW] = useState(220);
     const [rightW, setRightW] = useState(240);
@@ -109,6 +112,11 @@ export default function Layout() {
                 <span className="text-editor-fg font-semibold tracking-tight">Scroll Hero Editor</span>
 
                 <div className="flex items-center space-x-6">
+                    <span className="cursor-pointer hover:text-editor-fg transition-colors" onClick={() => saveProject()}>Save</span>
+                    <span className="cursor-pointer hover:text-editor-fg transition-colors" onClick={() => loadInputRef.current?.click()}>
+                        {isLoadError ? 'Load failed' : 'Load'}
+                    </span>
+                    <span className="text-editor-border">|</span>
                     <span className="cursor-pointer hover:text-editor-fg transition-colors" onClick={handleExportJson}>Export JSON</span>
                     <span className="cursor-pointer hover:text-editor-fg transition-colors" onClick={exportCurvesJson}>Export Curves</span>
                     <span className="cursor-pointer hover:text-editor-fg transition-colors" onClick={handleExportHtml}>
@@ -120,6 +128,20 @@ export default function Layout() {
                     </div>
                 </div>
             </header>
+            <input
+                ref={loadInputRef}
+                type="file"
+                accept=".shero,application/json"
+                className="hidden"
+                onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setIsLoadError(false);
+                    try { await loadProject(file); }
+                    catch { setIsLoadError(true); setTimeout(() => setIsLoadError(false), 3000); }
+                    e.target.value = '';
+                }}
+            />
 
             <div className="flex flex-1 overflow-hidden">
                 <LeftPanel width={leftW} />

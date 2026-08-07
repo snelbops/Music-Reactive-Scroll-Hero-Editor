@@ -5,6 +5,10 @@ import { interpolateParamAt, type ParamKf } from '../utils/interpolate';
 type PresetId = 'orbit' | 'light' | 'classic-dark' | 'classic-dark-copy' | 'classic-light' | 'classic-inverted' | 'light-images' | 'frames';
 type AspectRatio = '16:9' | '9:16' | '1:1' | 'free';
 
+type ScrollKf = { time: number; value: number; easing?: string; handleOut?: { dt: number; dv: number }; handleIn?: { dt: number; dv: number } };
+type HistorySnapshot = { scrollKeyframes: ScrollKf[]; paramKeyframes: Record<string, ParamKf[]> };
+type ClipboardEntry = { laneId: string; time: number; value: number; easing?: string; handleOut?: { dt: number; dv: number }; handleIn?: { dt: number; dv: number } };
+
 export interface RecordedEvent {
     time: number;
     x: number;
@@ -27,6 +31,11 @@ interface EditorState {
     isLoop: boolean; setIsLoop: (v: boolean) => void;
     recordStartPosition: number; setRecordStartPosition: (v: number) => void;
     mp4Asset: { name: string; url: string } | null; setMp4Asset: (asset: { name: string; url: string } | null) => void;
+    removeMp4Asset: () => void;
+    videoPads: Array<{ id: number; name: string; url: string }>;
+    activeVideoPadIdx: number;
+    setActiveVideoPadIdx: (idx: number) => void;
+    setVideoPad: (idx: number, pad: { name: string; url: string }) => void;
     extractedFrames: Blob[]; setExtractedFrames: (frames: Blob[]) => void;
     extractionProgress: number; setExtractionProgress: (p: number) => void;
     extractionStatus: 'idle' | 'extracting' | 'done' | 'error'; setExtractionStatus: (s: 'idle' | 'extracting' | 'done' | 'error') => void;
@@ -64,6 +73,15 @@ interface EditorState {
     activeLightImageIdx: number; setActiveLightImageIdx: (i: number) => void;
     activeAdapter: SceneAdapter | null; setActiveAdapter: (adapter: SceneAdapter | null) => void;
     setSceneProgress: (p: number) => void;
+    // Undo / Redo
+    _past: HistorySnapshot[]; _future: HistorySnapshot[];
+    pushHistory: () => void;
+    undo: () => void;
+    redo: () => void;
+    // Copy / Paste
+    _clipboard: ClipboardEntry[] | null;
+    copySelectedKeyframes: () => void;
+    pasteKeyframes: (atTime: number) => void;
 }
 
 export const useStore = create<EditorState>((set, get) => {
@@ -87,7 +105,29 @@ export const useStore = create<EditorState>((set, get) => {
     isFullscreen: false, setIsFullscreen: (v) => set({ isFullscreen: v }),
     isLoop: false, setIsLoop: (v) => set({ isLoop: v }),
     recordStartPosition: 0, setRecordStartPosition: (v) => set({ recordStartPosition: v }),
-    mp4Asset: { name: 'sample.mp4', url: '/sample.mp4' }, setMp4Asset: (asset) => set({ mp4Asset: asset }),
+    mp4Asset: { name: 'sample.mp4', url: '/sample.mp4' },
+    setMp4Asset: (asset) => set({ mp4Asset: asset, videoUrl: asset ? asset.url : null }),
+    removeMp4Asset: () => set({ mp4Asset: null, videoUrl: null, extractedFrames: [], extractionStatus: 'idle' }),
+    videoPads: [
+        { id: 1, name: 'Golden Gate MP4', url: 'https://scrollyvideo.js.org/goldengate.mp4' },
+        { id: 2, name: 'Sample Video MP4', url: '/sample.mp4' },
+        { id: 3, name: 'Empty Pad 3', url: '' },
+        { id: 4, name: 'Empty Pad 4', url: '' },
+    ],
+    activeVideoPadIdx: 0,
+    setActiveVideoPadIdx: (idx) => {
+        const pads = get().videoPads;
+        if (pads[idx] && pads[idx].url) {
+            set({ activeVideoPadIdx: idx, videoUrl: pads[idx].url });
+        } else {
+            set({ activeVideoPadIdx: idx });
+        }
+    },
+    setVideoPad: (idx, pad) => set((s) => {
+        const updated = [...s.videoPads];
+        updated[idx] = { id: idx + 1, ...pad };
+        return { videoPads: updated, videoUrl: s.activeVideoPadIdx === idx ? pad.url : s.videoUrl };
+    }),
     extractedFrames: [], setExtractedFrames: (frames) => set({ extractedFrames: frames }),
     extractionProgress: 0, setExtractionProgress: (p) => set({ extractionProgress: p }),
     extractionStatus: 'idle', setExtractionStatus: (s) => set({ extractionStatus: s }),
@@ -172,5 +212,73 @@ export const useStore = create<EditorState>((set, get) => {
     activeLightImageIdx: 0, setActiveLightImageIdx: (i) => set({ activeLightImageIdx: i }),
     activeAdapter: null, setActiveAdapter: (adapter) => set({ activeAdapter: adapter }),
     setSceneProgress: (p) => { get().activeAdapter?.setProgress(p); set({ scrollProgress: p }); },
+    // Undo / Redo
+    _past: [], _future: [],
+    pushHistory: () => set((s) => ({
+        _past: [...s._past.slice(-99), { scrollKeyframes: s.scrollKeyframes, paramKeyframes: s.paramKeyframes }],
+        _future: [],
+    })),
+    undo: () => set((s) => {
+        if (s._past.length === 0) return {};
+        const snapshot = s._past[s._past.length - 1];
+        return {
+            _past: s._past.slice(0, -1),
+            _future: [{ scrollKeyframes: s.scrollKeyframes, paramKeyframes: s.paramKeyframes }, ...s._future.slice(0, 99)],
+            scrollKeyframes: snapshot.scrollKeyframes,
+            paramKeyframes: snapshot.paramKeyframes,
+        };
+    }),
+    redo: () => set((s) => {
+        if (s._future.length === 0) return {};
+        const snapshot = s._future[0];
+        return {
+            _past: [...s._past.slice(-99), { scrollKeyframes: s.scrollKeyframes, paramKeyframes: s.paramKeyframes }],
+            _future: s._future.slice(1),
+            scrollKeyframes: snapshot.scrollKeyframes,
+            paramKeyframes: snapshot.paramKeyframes,
+        };
+    }),
+    // Copy / Paste
+    _clipboard: null,
+    copySelectedKeyframes: () => {
+        const { selectedKeyframes, scrollKeyframes, paramKeyframes } = get();
+        if (selectedKeyframes.length === 0) return;
+        const entries: ClipboardEntry[] = selectedKeyframes.flatMap(({ laneId, position }) => {
+            if (laneId === 'scrollPos') {
+                const kf = scrollKeyframes.find(k => Math.abs(k.time - position) < 0.005);
+                return kf ? [{ laneId, time: kf.time, value: kf.value, easing: kf.easing, handleOut: kf.handleOut, handleIn: kf.handleIn }] : [];
+            }
+            const kf = (paramKeyframes[laneId] ?? []).find(k => Math.abs(k.time - position) < 0.005);
+            return kf ? [{ laneId, time: kf.time, value: kf.value, easing: kf.easing, handleOut: kf.handleOut, handleIn: kf.handleIn }] : [];
+        });
+        if (entries.length > 0) set({ _clipboard: entries });
+    },
+    pasteKeyframes: (atTime: number) => {
+        const { _clipboard, scrollKeyframes, paramKeyframes } = get();
+        if (!_clipboard || _clipboard.length === 0) return;
+        get().pushHistory();
+        const minTime = Math.min(..._clipboard.map(e => e.time));
+        const offset = atTime - minTime;
+        let newScrollKfs = [...scrollKeyframes];
+        const newParamKfs: Record<string, ParamKf[]> = Object.fromEntries(
+            Object.entries(paramKeyframes).map(([k, v]) => [k, [...v]])
+        );
+        _clipboard.forEach(entry => {
+            const t = Math.max(0, Math.min(10, entry.time + offset));
+            if (entry.laneId === 'scrollPos') {
+                newScrollKfs = newScrollKfs.filter(k => Math.abs(k.time - t) > 0.016);
+                newScrollKfs.push({ time: t, value: entry.value, easing: entry.easing, handleOut: entry.handleOut, handleIn: entry.handleIn });
+            } else {
+                const existing = newParamKfs[entry.laneId] ?? [];
+                const filtered = existing.filter(k => Math.abs(k.time - t) > 0.016);
+                filtered.push({ time: t, value: entry.value, easing: entry.easing ?? 'linear', ...(entry.handleOut ? { handleOut: entry.handleOut } : {}), ...(entry.handleIn ? { handleIn: entry.handleIn } : {}) } as ParamKf);
+                newParamKfs[entry.laneId] = filtered.sort((a, b) => a.time - b.time);
+            }
+        });
+        set({
+            scrollKeyframes: newScrollKfs.sort((a, b) => a.time - b.time),
+            paramKeyframes: newParamKfs,
+        });
+    },
     };
 });

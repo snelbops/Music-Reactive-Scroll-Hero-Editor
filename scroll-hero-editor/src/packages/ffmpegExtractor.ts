@@ -36,7 +36,7 @@ export async function extractFrames(
     for (let i = 1; i <= 120; i++) {
         try {
             const data = await ffmpeg.readFile(`frame${String(i).padStart(4, '0')}.png`);
-            frames.push(new Blob([data as Uint8Array], { type: 'image/png' }));
+            frames.push(new Blob([new Uint8Array(data as any)], { type: 'image/png' }));
         } catch {
             break;
         }

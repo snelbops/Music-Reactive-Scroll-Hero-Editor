@@ -1,6 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import type React from 'react';
-import { Play, Pause, Square, Music, Circle, ZoomIn, ZoomOut, Video, MousePointer2, Repeat, Eraser, Pen, Mouse, SlidersHorizontal, UploadCloud } from 'lucide-react';
+import { Play, Pause, Square, Music, Circle, ZoomIn, ZoomOut, Video, MousePointer2, Repeat, Eraser, Pen, Mouse, SlidersHorizontal, UploadCloud, Magnet, Undo2, Redo2 } from 'lucide-react';
 import { onChange } from '@theatre/core';
 import { useStore } from '../store/useStore';
 import { useKickDrumData } from '../packages/useKickDrumData';
@@ -14,9 +14,9 @@ const VB_H = 40;
 
 const PARAM_LANES = [
     { id: 'rotationSpeed', label: 'Rotation Speed', color: '#14b8a6', selBg: 'bg-teal-500/10',  min: 0,   max: 2   },
-    { id: 'depth',         label: 'Particle Depth', color: '#22c55e', selBg: 'bg-green-500/10', min: 0,   max: 10  },
-    { id: 'size',          label: 'Particle Size',  color: '#22c55e', selBg: 'bg-green-500/10', min: 0.1, max: 5   },
     { id: 'cssOpacity',    label: 'CSS Opacity',    color: '#3b82f6', selBg: 'bg-blue-500/10',  min: 0,   max: 1   },
+    { id: 'depth',         label: 'Particle Depth (Add-on)', color: '#22c55e', selBg: 'bg-green-500/10', min: 0,   max: 10  },
+    { id: 'size',          label: 'Particle Size (Add-on)',  color: '#22c55e', selBg: 'bg-green-500/10', min: 0.1, max: 5   },
 ] as const;
 
 function buildParamPath(kfs: ParamKf[], min: number, max: number): string | null {
@@ -112,6 +112,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const [verticalZoom, setVerticalZoom] = useState(1);
     const [lanesWidth, setLanesWidth] = useState(0);
     const [activeTool, setActiveTool] = useState<'select' | 'pen' | 'eraser'>('select');
+    const [snapToBeat, setSnapToBeat] = useState(false);
+    const canUndo = useStore(s => s._past.length > 0);
+    const canRedo = useStore(s => s._future.length > 0);
     const draggingHandleRef = useRef<{ kfTime: number; side: 'in' | 'out' } | null>(null);
     const draggingParamHandleRef = useRef<{ laneId: string; kfTime: number; side: 'in' | 'out' } | null>(null);
     // Reactive time display — updated by onChange so it refreshes each frame during playback
@@ -151,30 +154,18 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         const el = lanesRef.current;
         if (!el) return;
         let accumH = 0;
-        let accumV = 0;
         const onWheel = (e: WheelEvent) => {
-            if (e.altKey) {
+            if (e.metaKey || e.ctrlKey || e.altKey) {
                 e.preventDefault();
                 accumH += e.deltaY;
-                const thresh = e.shiftKey ? 10 : 60;
+                const thresh = e.shiftKey ? 10 : 40;
                 if (Math.abs(accumH) >= thresh) {
                     const steps = Math.trunc(accumH / thresh);
                     accumH -= steps * thresh;
                     setTimelineZoom(prev => {
                         const i = ZOOM_LEVELS.indexOf(prev);
-                        // negative step means deltaY is positive (scroll down). 
-                        // scroll up (deltaY < 0) -> positive step -> zoom in!
                         return ZOOM_LEVELS[Math.max(0, Math.min(ZOOM_LEVELS.length - 1, i - steps))];
                     });
-                }
-            } else if (e.metaKey || e.ctrlKey) {
-                e.preventDefault();
-                accumV += e.deltaY;
-                const thresh = e.shiftKey ? 5 : 40;
-                if (Math.abs(accumV) >= thresh) {
-                    const steps = Math.trunc(accumV / thresh);
-                    accumV -= steps * thresh;
-                    setVerticalZoom(prev => Math.max(0.4, Math.min(4, +(prev - steps * 0.1).toFixed(2))));
                 }
             }
         };
@@ -193,12 +184,23 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if ((e.target as HTMLElement).tagName === 'INPUT') return;
-            if (e.key === 'v' || e.key === 'V') { setActiveTool('select'); return; }
-            if (e.key === 'p' || e.key === 'P') { setActiveTool('pen'); return; }
-            if (e.key === 'e' || e.key === 'E') { setActiveTool('eraser'); return; }
+            const meta = e.metaKey || e.ctrlKey;
+            // Undo / Redo
+            if (meta && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); useStore.getState().undo(); return; }
+            if (meta && e.shiftKey  && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); useStore.getState().redo(); return; }
+            if (meta && (e.key === 'y' || e.key === 'Y'))                 { e.preventDefault(); useStore.getState().redo(); return; }
+            // Copy / Paste
+            if (meta && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); useStore.getState().copySelectedKeyframes(); return; }
+            if (meta && (e.key === 'v' || e.key === 'V')) { e.preventDefault(); useStore.getState().pasteKeyframes(sheet.sequence.position); return; }
+            // Tools (no meta key)
+            if (!meta && (e.key === 'v' || e.key === 'V')) { setActiveTool('select'); return; }
+            if (!meta && (e.key === 'p' || e.key === 'P')) { setActiveTool('pen'); return; }
+            if (!meta && (e.key === 'e' || e.key === 'E')) { setActiveTool('eraser'); return; }
+            // Delete selected keyframes
             if (e.key !== 'Delete' && e.key !== 'Backspace') return;
             const kfs = useStore.getState().selectedKeyframes;
             if (kfs.length === 0) return;
+            useStore.getState().pushHistory();
             kfs.forEach(({ laneId, position }) => {
                 if (laneId === 'scrollPos') {
                     useStore.getState().setScrollKeyframes(
@@ -232,6 +234,11 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         const trackW = lanesWidth * timelineZoom - LABEL_W;
         return Math.max(0, Math.min(1, x / trackW));
     }, [lanesWidth, timelineZoom]);
+
+    const snapTimeToBeat = useCallback((t: number): number => {
+        if (!snapToBeat || beats.length === 0) return t;
+        return beats.reduce((closest, beat) => Math.abs(beat - t) < Math.abs(closest - t) ? beat : closest);
+    }, [snapToBeat, beats]);
 
     const seekTo = useCallback((progress: number) => {
         sheet.sequence.position = progress * SEQUENCE_DURATION;
@@ -315,6 +322,24 @@ export default function Timeline({ height = 280 }: { height?: number }) {
             <div className="h-9 border-b border-editor-border flex items-center px-4 justify-between bg-editor-panel shrink-0 select-none">
                 <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-2 text-[#808080]">
+                        <span className="border-r border-[#333] pr-2 mr-1 flex items-center gap-0.5">
+                            <button
+                                title="Undo (Cmd+Z)"
+                                onClick={() => useStore.getState().undo()}
+                                disabled={!canUndo}
+                                className="p-1 rounded transition-colors hover:text-[#d9d9d9] disabled:opacity-25 disabled:cursor-not-allowed"
+                            >
+                                <Undo2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                title="Redo (Cmd+Shift+Z)"
+                                onClick={() => useStore.getState().redo()}
+                                disabled={!canRedo}
+                                className="p-1 rounded transition-colors hover:text-[#d9d9d9] disabled:opacity-25 disabled:cursor-not-allowed"
+                            >
+                                <Redo2 className="w-3.5 h-3.5" />
+                            </button>
+                        </span>
                         <span className="border-r border-[#333] pr-2 mr-1">
                             {([
                                 { id: 'select' as const, Icon: MousePointer2, title: 'Select (V)' },
@@ -331,7 +356,13 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 </button>
                             ))}
                         </span>
-                        <button className="p-1 hover:text-[#d9d9d9] text-[#d9d9d9]"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg></button>
+                        <button
+                            title={snapToBeat ? 'Snap to Beat: ON' : 'Snap to Beat: OFF'}
+                            onClick={() => setSnapToBeat(v => !v)}
+                            className={`p-1 rounded transition-colors ${snapToBeat ? 'text-editor-accent-purple' : 'hover:text-[#d9d9d9]'}`}
+                        >
+                            <Magnet className="w-3.5 h-3.5" />
+                        </button>
                         <span className="border-l border-[#333] pl-2 ml-1 flex items-center gap-2">
                             <div className="flex items-center text-[#808080]">
                                 <button className="p-1 hover:text-[#d9d9d9] disabled:opacity-30" title="Zoom out" onClick={() => { const i = ZOOM_LEVELS.indexOf(timelineZoom); if (i > 0) setTimelineZoom(ZOOM_LEVELS[i-1]); }} disabled={timelineZoom === ZOOM_LEVELS[0]}><ZoomOut className="w-3 h-3" /></button>
@@ -542,8 +573,10 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             if (activeTool !== 'pen') return;
                             e.stopPropagation();
                             const rect = e.currentTarget.getBoundingClientRect();
-                            const time = Math.max(0, Math.min(SEQUENCE_DURATION, ((e.clientX - rect.left) / rect.width) * SEQUENCE_DURATION));
+                            const rawTime = Math.max(0, Math.min(SEQUENCE_DURATION, ((e.clientX - rect.left) / rect.width) * SEQUENCE_DURATION));
+                            const time = snapTimeToBeat(rawTime);
                             const value = Math.max(0, Math.min(1, 1 - (e.clientY - rect.top) / rect.height));
+                            useStore.getState().pushHistory();
                             useStore.getState().addScrollKeyframe(time, value);
                         }}
                     >
@@ -564,6 +597,14 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     strokeWidth="0.5"
                                 />
                             )}
+                            {snapToBeat && beats.map((bt, i) => (
+                                <line
+                                    key={i}
+                                    x1={(bt / SEQUENCE_DURATION) * VB_W} y1={0}
+                                    x2={(bt / SEQUENCE_DURATION) * VB_W} y2={scrollVbH}
+                                    stroke="rgba(168,85,247,0.25)" strokeWidth="0.8"
+                                />
+                            ))}
                             {scrollPolyline && (
                                 <polyline points={scrollPolyline} fill="none" stroke="rgba(59,130,246,0.2)" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
                             )}
@@ -668,6 +709,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             if (activeTool === 'eraser') {
+                                                useStore.getState().pushHistory();
                                                 useStore.getState().setScrollKeyframes(scrollKeyframes.filter(k => Math.abs(k.time - kf.time) > 0.005));
                                                 return;
                                             }
@@ -678,6 +720,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             if (activeTool === 'eraser') return;
                                             e.stopPropagation();
                                             (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                                            useStore.getState().pushHistory();
                                             draggingKfRef.current = { origTime: kf.time, value: kf.value };
                                         }}
                                         onPointerMove={(e) => {
@@ -760,8 +803,10 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     if (activeTool !== 'pen') return;
                                     e.stopPropagation();
                                     const rect = e.currentTarget.getBoundingClientRect();
-                                    const time = Math.max(0, Math.min(SEQUENCE_DURATION, ((e.clientX - rect.left) / rect.width) * SEQUENCE_DURATION));
+                                    const rawTime = Math.max(0, Math.min(SEQUENCE_DURATION, ((e.clientX - rect.left) / rect.width) * SEQUENCE_DURATION));
+                                    const time = snapTimeToBeat(rawTime);
                                     const value = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - (e.clientY - rect.top) / rect.height) * (lane.max - lane.min)));
+                                    useStore.getState().pushHistory();
                                     addParamKeyframe(lane.id, time, value);
                                 }}
                             >
@@ -854,6 +899,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             if (activeTool === 'eraser') {
+                                                useStore.getState().pushHistory();
                                                 useStore.getState().removeParamKeyframe(lane.id, kf.time);
                                                 setSelectedKeyframe(null);
                                                 return;
@@ -865,6 +911,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         onPointerDown={(e) => {
                                             e.stopPropagation();
                                             (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                                            useStore.getState().pushHistory();
                                             draggingParamKfRef.current = { laneId: lane.id, startTime: kf.time, origTime: kf.time, value: kf.value };
                                         }}
                                         onPointerMove={(e) => {

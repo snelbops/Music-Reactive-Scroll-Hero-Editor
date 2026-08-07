@@ -44,6 +44,8 @@ function solveT(x: number, x1: number, x2: number): number {
     return t;
 }
 
+export type ScrollKf = { time: number; value: number; easing?: string; handleOut?: { dt: number; dv: number }; handleIn?: { dt: number; dv: number } };
+
 /** Interpolate scroll keyframes. No keyframes = linear (t/duration). */
 export function interpolateScrollAt(
     keyframes: ScrollKf[],
