@@ -22,19 +22,20 @@ export default function ScrollyVideoPlayer() {
     }, [scrollProgress, videoPads]);
 
     return (
-        <div className="absolute inset-0 w-full h-full pointer-events-none overflow-hidden">
+        <div className="absolute inset-0 w-full h-full pointer-events-none overflow-hidden [&_video]:!object-contain [&_video]:!w-full [&_video]:!h-full">
             {videoPads.map((pad, idx) => {
                 if (!pad.url) return null;
                 const isActive = idx === activeVideoPadIdx;
                 return (
                     <div
                         key={`${idx}-${pad.url}`}
-                        className="absolute inset-0 w-full h-full"
+                        className="absolute inset-0 w-full h-full flex items-center justify-center"
                         style={{ display: isActive ? 'block' : 'none' }}
                     >
                         <ScrollyVideo
                             src={pad.url}
                             trackScroll={false}
+                            cover={false}
                             ref={(el: any) => { playerRefs.current[idx] = el; }}
                             transitionSpeed={10}
                         />

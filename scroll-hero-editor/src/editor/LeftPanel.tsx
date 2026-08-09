@@ -408,7 +408,6 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                         setVideoPad(idx, { name: file.name, url });
                                         setMp4Asset({ name: file.name, url });
                                         setActiveVideoPadIdx(idx);
-                                        handleExtract(file);
                                     };
 
                                     const handlePadDrop = (e: React.DragEvent) => {
@@ -419,7 +418,6 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                             setVideoPad(idx, { name: file.name, url });
                                             setMp4Asset({ name: file.name, url });
                                             setActiveVideoPadIdx(idx);
-                                            handleExtract(file);
                                         }
                                     };
 
