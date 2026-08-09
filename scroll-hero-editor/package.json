@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "render-video": "remotion render src/remotion/Root.tsx ScrollHero out/video.mp4",
+    "preview-remotion": "remotion preview src/remotion/Root.tsx"
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.10",
@@ -15,6 +17,8 @@
     "@ffmpeg/util": "^0.12.2",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
+    "@remotion/cli": "^4.0.507",
+    "@remotion/media-utils": "^4.0.507",
     "@theatre/core": "^0.7.2",
     "@theatre/r3f": "^0.7.2",
     "@theatre/studio": "^0.7.2",
@@ -23,6 +27,7 @@
     "lucide-react": "^0.577.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "remotion": "^4.0.507",
     "scrolly-video": "^0.0.24",
     "tailwind-merge": "^3.5.0",
     "three": "^0.183.2",
