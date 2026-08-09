@@ -136,6 +136,35 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const [audioTargetLane, setAudioTargetLane] = useState<string>('scrollPos');
     const [shapeIterations, setShapeIterations] = useState<number>(4);
     const [audioGain, setAudioGain] = useState<number>(75);
+    const [contextMenuTab, setContextMenuTab] = useState<'rhythm' | 'shapes' | 'presets'>('rhythm');
+    const [presetNameInput, setPresetNameInput] = useState<string>('');
+    const [customPresets, setCustomPresets] = useState<Array<{ id: string; name: string; mode: string; audioGain: number; shapeIterations: number }>>(() => {
+        try {
+            const raw = localStorage.getItem('scroll-hero-custom-rhythm-presets');
+            return raw ? JSON.parse(raw) : [
+                { id: 'p1', name: 'Subtle RMS (45%)', mode: 'envelope', audioGain: 45, shapeIterations: 4 },
+                { id: 'p2', name: 'Punchy Kick (120%)', mode: 'bounce', audioGain: 120, shapeIterations: 4 },
+                { id: 'p3', name: 'Stutter Cut (4-Cycle)', mode: 'stutter', audioGain: 75, shapeIterations: 4 },
+            ];
+        } catch (e) {
+            return [];
+        }
+    });
+
+    const saveCustomPreset = (mode: string) => {
+        const name = presetNameInput.trim() || `${mode.toUpperCase()} (${audioGain}%)`;
+        const newP = { id: `preset-${Date.now()}`, name, mode, audioGain, shapeIterations };
+        const updated = [newP, ...customPresets];
+        setCustomPresets(updated);
+        try { localStorage.setItem('scroll-hero-custom-rhythm-presets', JSON.stringify(updated)); } catch (e) {}
+        setPresetNameInput('');
+    };
+
+    const deleteCustomPreset = (id: string) => {
+        const updated = customPresets.filter(p => p.id !== id);
+        setCustomPresets(updated);
+        try { localStorage.setItem('scroll-hero-custom-rhythm-presets', JSON.stringify(updated)); } catch (e) {}
+    };
 
     const generateRhythmCurveForLane = (
         targetLane: string,
@@ -2104,7 +2133,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     </div>
                 </div>
             )}
-            {/* Right-Click Audio Track Context Menu */}
+            {/* Right-Click Non-Clipping Tabbed Context Menu with Save/Load Presets */}
             {audioMenu && (
                 <div
                     className="fixed inset-0 z-[150]"
@@ -2112,24 +2141,30 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     onContextMenu={(e) => { e.preventDefault(); setAudioMenu(null); }}
                 >
                     <div
-                        className="absolute bg-[#1c1c1e] border border-[#3a3a3c] rounded-lg shadow-2xl p-2.5 w-[310px] max-h-[82vh] overflow-y-auto thin-scrollbar font-sans text-editor-fg space-y-2 text-[11px]"
+                        className="absolute bg-[#1c1c1e] border border-[#3a3a3c] rounded-xl shadow-2xl p-3 w-[330px] max-h-[85vh] overflow-y-auto thin-scrollbar font-sans text-editor-fg space-y-2 text-[11px]"
                         style={{
-                            left: Math.max(10, Math.min(window.innerWidth - 325, audioMenu.x)),
-                            top: Math.max(10, Math.min(window.innerHeight - 520, audioMenu.y))
+                            left: Math.max(10, Math.min(window.innerWidth - 345, audioMenu.x)),
+                            top: audioMenu.y + 380 > window.innerHeight
+                                ? Math.max(10, audioMenu.y - 380)
+                                : Math.max(10, audioMenu.y)
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between border-b border-[#2c2c2e] pb-1.5 px-1 font-bold text-editor-accent-orange sticky top-0 bg-[#1c1c1e] z-10">
+                        {/* Header */}
+                        <div className="flex items-center justify-between border-b border-[#2c2c2e] pb-2 font-bold text-editor-accent-orange sticky top-0 bg-[#1c1c1e] z-10">
                             <div className="flex items-center gap-1.5">
                                 <Music className="w-3.5 h-3.5" />
-                                <span>Push Audio to Parameter</span>
+                                <span>Automation & Rhythm Generator</span>
                             </div>
                             <button className="text-gray-400 hover:text-white" onClick={() => setAudioMenu(null)}>✕</button>
                         </div>
 
                         {/* Target Parameter Selector */}
                         <div className="space-y-1">
-                            <span className="text-[9px] uppercase font-bold text-gray-400 px-1">Target Parameter:</span>
+                            <div className="flex justify-between items-center px-1">
+                                <span className="text-[9px] uppercase font-bold text-gray-400">Target Parameter:</span>
+                                <span className="text-[9px] font-mono text-cyan-400 font-bold uppercase">{audioTargetLane}</span>
+                            </div>
                             <div className="grid grid-cols-2 gap-1 font-mono text-[10px]">
                                 {[
                                     { id: 'scrollPos', label: 'Scroll POS', color: '#3b82f6' },
@@ -2152,109 +2187,214 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             </div>
                         </div>
 
-                        {/* Audio Peak Intensity / Gain Control */}
-                        <div className="space-y-1 bg-[#252527] p-2 rounded border border-[#3a3a3c]">
-                            <div className="flex items-center justify-between text-[10px]">
-                                <span className="font-bold text-gray-300">Peak Intensity:</span>
-                                <span className="font-mono text-editor-accent-orange font-bold">{audioGain}%</span>
-                            </div>
-                            <input
-                                type="range"
-                                min="20"
-                                max="150"
-                                step="5"
-                                value={audioGain}
-                                onChange={(e) => setAudioGain(parseInt(e.target.value))}
-                                className="w-full h-1 bg-[#3a3a3c] accent-editor-accent-orange rounded cursor-pointer"
-                            />
-                            <div className="flex justify-between text-[8px] text-gray-400 font-mono">
-                                <span>20% (Subtle)</span>
-                                <span>75% (Default)</span>
-                                <span>150% (Wild)</span>
-                            </div>
+                        {/* Top Category Tabs */}
+                        <div className="flex border-b border-[#2c2c2e] pt-1">
+                            <button
+                                onClick={() => setContextMenuTab('rhythm')}
+                                className={`flex-1 py-1.5 text-[10px] font-bold border-b-2 transition-colors ${
+                                    contextMenuTab === 'rhythm' ? 'border-editor-accent-orange text-editor-accent-orange' : 'border-transparent text-gray-400 hover:text-white'
+                                }`}
+                            >
+                                ⚡ Rhythm
+                            </button>
+                            <button
+                                onClick={() => setContextMenuTab('shapes')}
+                                className={`flex-1 py-1.5 text-[10px] font-bold border-b-2 transition-colors ${
+                                    contextMenuTab === 'shapes' ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-gray-400 hover:text-white'
+                                }`}
+                            >
+                                📐 Shapes
+                            </button>
+                            <button
+                                onClick={() => setContextMenuTab('presets')}
+                                className={`flex-1 py-1.5 text-[10px] font-bold border-b-2 transition-colors ${
+                                    contextMenuTab === 'presets' ? 'border-editor-accent-purple text-editor-accent-purple' : 'border-transparent text-gray-400 hover:text-white'
+                                }`}
+                            >
+                                💾 Presets & Gain
+                            </button>
                         </div>
 
-                        <div className="border-t border-[#2c2c2e] my-1" />
-
-                        {/* Rhythm Preset Push Options */}
-                        <div className="space-y-1">
-                            <span className="text-[9px] uppercase font-bold text-gray-400 px-1">Push Rhythm Preset:</span>
-                            <div className="space-y-1">
-                                <button
-                                    className="w-full text-left px-2 py-1.5 rounded hover:bg-[#2c2c2e] transition-colors flex flex-col group"
-                                    onClick={() => generateRhythmCurveForLane(audioTargetLane, 'envelope', true)}
-                                >
-                                    <span className="font-bold text-editor-accent-orange group-hover:text-white">🔊 Audio Volume Envelope (RMS)</span>
-                                    <span className="text-[9px] text-gray-400">Continuous volume contour. Silence = 0 level.</span>
-                                </button>
-                                <button
-                                    className="w-full text-left px-2 py-1.5 rounded hover:bg-[#2c2c2e] transition-colors flex flex-col group"
-                                    onClick={() => generateRhythmCurveForLane(audioTargetLane, 'bounce', true)}
-                                >
-                                    <span className="font-bold text-editor-accent-purple group-hover:text-white">🥁 Kick Transient Spikes</span>
-                                    <span className="text-[9px] text-gray-400">Pulses up on kick beats; rests flat in silence.</span>
-                                </button>
-                                <button
-                                    className="w-full text-left px-2 py-1.5 rounded hover:bg-[#2c2c2e] transition-colors flex flex-col group"
-                                    onClick={() => generateRhythmCurveForLane(audioTargetLane, 'stutter', true)}
-                                >
-                                    <span className="font-bold text-teal-400 group-hover:text-white">⚡ Quantized Step-Cuts</span>
-                                    <span className="text-[9px] text-gray-400">Stutter cuts on beat sub-divisions.</span>
-                                </button>
-                                <button
-                                    className="w-full text-left px-2 py-1.5 rounded hover:bg-[#2c2c2e] transition-colors flex flex-col group"
-                                    onClick={() => generateRhythmCurveForLane(audioTargetLane, 'ducking', true)}
-                                >
-                                    <span className="font-bold text-blue-400 group-hover:text-white">📉 Inverted Ducking Envelope</span>
-                                    <span className="text-[9px] text-gray-400">Ducks down on beat, returns to max in quiet parts.</span>
-                                </button>
+                        {/* TAB 1: RHYTHM PRESETS */}
+                        {contextMenuTab === 'rhythm' && (
+                            <div className="space-y-2 pt-1">
+                                <div className="space-y-1">
+                                    <button
+                                        className="w-full text-left p-2 rounded bg-[#252527] hover:bg-[#2c2c2e] border border-[#3a3a3c] transition-colors flex flex-col group"
+                                        onClick={() => {
+                                            generateRhythmCurveForLane(audioTargetLane, 'envelope', true);
+                                            setAudioMenu(null);
+                                        }}
+                                    >
+                                        <span className="font-bold text-editor-accent-orange group-hover:text-white">🔊 Audio Volume Envelope (RMS)</span>
+                                        <span className="text-[9px] text-gray-400">Continuous volume contour (Gain: {audioGain}%).</span>
+                                    </button>
+                                    <button
+                                        className="w-full text-left p-2 rounded bg-[#252527] hover:bg-[#2c2c2e] border border-[#3a3a3c] transition-colors flex flex-col group"
+                                        onClick={() => {
+                                            generateRhythmCurveForLane(audioTargetLane, 'bounce', true);
+                                            setAudioMenu(null);
+                                        }}
+                                    >
+                                        <span className="font-bold text-editor-accent-purple group-hover:text-white">🥁 Kick Transient Spikes</span>
+                                        <span className="text-[9px] text-gray-400">Pulses up on kick drum transients.</span>
+                                    </button>
+                                    <button
+                                        className="w-full text-left p-2 rounded bg-[#252527] hover:bg-[#2c2c2e] border border-[#3a3a3c] transition-colors flex flex-col group"
+                                        onClick={() => {
+                                            generateRhythmCurveForLane(audioTargetLane, 'stutter', true);
+                                            setAudioMenu(null);
+                                        }}
+                                    >
+                                        <span className="font-bold text-teal-400 group-hover:text-white">⚡ Quantized Step-Cuts</span>
+                                        <span className="text-[9px] text-gray-400">Rhythmic stutter cuts on beat subdivisions.</span>
+                                    </button>
+                                    <button
+                                        className="w-full text-left p-2 rounded bg-[#252527] hover:bg-[#2c2c2e] border border-[#3a3a3c] transition-colors flex flex-col group"
+                                        onClick={() => {
+                                            generateRhythmCurveForLane(audioTargetLane, 'ducking', true);
+                                            setAudioMenu(null);
+                                        }}
+                                    >
+                                        <span className="font-bold text-blue-400 group-hover:text-white">📉 Inverted Ducking Envelope</span>
+                                        <span className="text-[9px] text-gray-400">Ducks down on beat, returns to max in quiet parts.</span>
+                                    </button>
+                                </div>
                             </div>
-                        </div>
+                        )}
 
-                        {/* Ableton-Style Insert Automation Shapes */}
-                        <div className="border-t border-[#2c2c2e] my-1 pt-1.5 space-y-1.5">
-                            <div className="flex items-center justify-between px-1">
-                                <span className="text-[9px] uppercase font-bold text-cyan-400">Insert Shape:</span>
-                                <div className="flex items-center gap-1 font-mono text-[9px]">
-                                    <span className="text-gray-400">Cycles:</span>
-                                    {[1, 2, 4, 8, 16].map((num) => (
+                        {/* TAB 2: SHAPE INSERTS */}
+                        {contextMenuTab === 'shapes' && (
+                            <div className="space-y-2 pt-1">
+                                <div className="flex items-center justify-between px-1">
+                                    <span className="text-[9px] uppercase font-bold text-cyan-400">Cycle Count:</span>
+                                    <div className="flex items-center gap-1 font-mono text-[9px]">
+                                        {[1, 2, 4, 8, 16].map((num) => (
+                                            <button
+                                                key={num}
+                                                className={`px-1.5 py-0.5 rounded border transition-colors ${
+                                                    shapeIterations === num
+                                                        ? 'bg-cyan-500 text-black border-cyan-400 font-bold'
+                                                        : 'bg-[#252527] border-[#3a3a3c] text-gray-300 hover:bg-[#2e2e31]'
+                                                }`}
+                                                onClick={() => setShapeIterations(num)}
+                                            >
+                                                {num}x
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-4 gap-1 text-[10px] font-mono">
+                                    {[
+                                        { id: 'sine', label: 'Sine', icon: '🌊' },
+                                        { id: 'triangle', label: 'Triangle', icon: '📐' },
+                                        { id: 'rampUp', label: 'Saw Up', icon: '📈' },
+                                        { id: 'rampDown', label: 'Saw Down', icon: '📉' },
+                                        { id: 'square', label: 'Square', icon: '⏹️' },
+                                        { id: 'easeIn', label: 'Ease In', icon: '🪝' },
+                                        { id: 'easeOut', label: 'Ease Out', icon: '📉' },
+                                        { id: 'sCurve', label: 'S-Curve', icon: '🔀' },
+                                    ].map((shape) => (
                                         <button
-                                            key={num}
-                                            className={`px-1.5 py-0.5 rounded border transition-colors ${
-                                                shapeIterations === num
-                                                    ? 'bg-cyan-500 text-black border-cyan-400 font-bold'
-                                                    : 'bg-[#252527] border-[#3a3a3c] text-gray-300 hover:bg-[#2e2e31]'
-                                            }`}
-                                            onClick={() => setShapeIterations(num)}
+                                            key={shape.id}
+                                            className="flex flex-col items-center justify-center p-2 rounded bg-[#252527] hover:bg-cyan-950 hover:border-cyan-400 border border-[#3a3a3c] transition-all group"
+                                            onClick={() => {
+                                                generateShapeCurveForSelection(audioTargetLane, shape.id as any, shapeIterations);
+                                                setAudioMenu(null);
+                                            }}
+                                            title={`Insert ${shape.label} (${shapeIterations}x)`}
                                         >
-                                            {num}x
+                                            <span className="text-sm group-hover:scale-110 transition-transform">{shape.icon}</span>
+                                            <span className="text-[8px] text-gray-300 group-hover:text-cyan-300 font-sans mt-0.5 truncate w-full text-center">{shape.label}</span>
                                         </button>
                                     ))}
                                 </div>
                             </div>
-                            <div className="grid grid-cols-4 gap-1 text-[10px] font-mono">
-                                {[
-                                    { id: 'sine', label: 'Sine', icon: '🌊' },
-                                    { id: 'triangle', label: 'Triangle', icon: '📐' },
-                                    { id: 'rampUp', label: 'Saw Up', icon: '📈' },
-                                    { id: 'rampDown', label: 'Saw Down', icon: '📉' },
-                                    { id: 'square', label: 'Square', icon: '⏹️' },
-                                    { id: 'easeIn', label: 'Ease In', icon: '🪝' },
-                                    { id: 'easeOut', label: 'Ease Out', icon: '📉' },
-                                    { id: 'sCurve', label: 'S-Curve', icon: '🔀' },
-                                ].map((shape) => (
-                                    <button
-                                        key={shape.id}
-                                        className="flex flex-col items-center justify-center p-1.5 rounded bg-[#252527] hover:bg-cyan-950 hover:border-cyan-400 border border-[#3a3a3c] transition-all group"
-                                        onClick={() => generateShapeCurveForSelection(audioTargetLane, shape.id as any, shapeIterations)}
-                                        title={`Insert ${shape.label} (${shapeIterations}x)`}
-                                    >
-                                        <span className="text-sm group-hover:scale-110 transition-transform">{shape.icon}</span>
-                                        <span className="text-[8px] text-gray-300 group-hover:text-cyan-300 font-sans mt-0.5 truncate w-full text-center">{shape.label}</span>
-                                    </button>
-                                ))}
+                        )}
+
+                        {/* TAB 3: CUSTOM PRESETS & PEAK INTENSITY */}
+                        {contextMenuTab === 'presets' && (
+                            <div className="space-y-3 pt-1">
+                                {/* Audio Peak Intensity / Gain Control */}
+                                <div className="space-y-1 bg-[#252527] p-2.5 rounded-lg border border-[#3a3a3c]">
+                                    <div className="flex items-center justify-between text-[10px]">
+                                        <span className="font-bold text-gray-300">Peak Intensity:</span>
+                                        <span className="font-mono text-editor-accent-orange font-bold">{audioGain}%</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="20"
+                                        max="150"
+                                        step="5"
+                                        value={audioGain}
+                                        onChange={(e) => setAudioGain(parseInt(e.target.value))}
+                                        className="w-full h-1 bg-[#3a3a3c] accent-editor-accent-orange rounded cursor-pointer"
+                                    />
+                                    <div className="flex justify-between text-[8px] text-gray-400 font-mono">
+                                        <span>20% (Subtle)</span>
+                                        <span>75% (Default)</span>
+                                        <span>150% (Wild)</span>
+                                    </div>
+                                </div>
+
+                                {/* Save Current Settings as New Preset */}
+                                <div className="space-y-1 bg-[#252527] p-2.5 rounded-lg border border-[#3a3a3c]">
+                                    <span className="text-[9px] uppercase font-bold text-editor-accent-purple block">Save Current Setup as Preset:</span>
+                                    <div className="flex gap-1">
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. RMS 45% Subtle..."
+                                            value={presetNameInput}
+                                            onChange={(e) => setPresetNameInput(e.target.value)}
+                                            className="flex-1 bg-black/40 border border-[#3a3a3c] rounded px-2 py-1 text-[10px] text-white focus:outline-none focus:border-editor-accent-purple"
+                                        />
+                                        <button
+                                            onClick={() => saveCustomPreset('envelope')}
+                                            className="px-2 py-1 bg-editor-accent-purple hover:bg-purple-600 text-white font-bold rounded text-[10px] transition-colors shrink-0"
+                                        >
+                                            💾 Save
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Saved User Presets List */}
+                                <div className="space-y-1">
+                                    <span className="text-[9px] uppercase font-bold text-gray-400 px-1">Saved User Presets:</span>
+                                    <div className="space-y-1 max-h-[140px] overflow-y-auto thin-scrollbar">
+                                        {customPresets.map((preset) => (
+                                            <div
+                                                key={preset.id}
+                                                className="flex items-center justify-between p-2 rounded bg-[#252527] hover:bg-[#2c2c2e] border border-[#3a3a3c] text-[10px]"
+                                            >
+                                                <div className="flex flex-col truncate flex-1 mr-2">
+                                                    <span className="font-bold text-white truncate">{preset.name}</span>
+                                                    <span className="text-[8px] font-mono text-gray-400">Gain: {preset.audioGain}% · Mode: {preset.mode}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1 shrink-0">
+                                                    <button
+                                                        onClick={() => {
+                                                            setAudioGain(preset.audioGain);
+                                                            setShapeIterations(preset.shapeIterations);
+                                                            generateRhythmCurveForLane(audioTargetLane, preset.mode as any, true);
+                                                            setAudioMenu(null);
+                                                        }}
+                                                        className="px-2 py-0.5 bg-editor-accent-orange/20 hover:bg-editor-accent-orange text-editor-accent-orange hover:text-white font-bold rounded text-[9px] transition-colors"
+                                                    >
+                                                        ⚡ Apply
+                                                    </button>
+                                                    <button
+                                                        onClick={() => deleteCustomPreset(preset.id)}
+                                                        className="text-gray-500 hover:text-red-400 px-1 text-[9px]"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             )}
