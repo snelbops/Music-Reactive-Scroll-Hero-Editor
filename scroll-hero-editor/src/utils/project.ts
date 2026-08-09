@@ -1,5 +1,6 @@
 import { useStore } from '../store/useStore';
 import type { ParamKf } from './interpolate';
+import { saveMediaFile, loadMediaFile, getMediaDataUrl, dataUrlToBlob } from './mediaStore';
 
 export type ScrollKf = {
     time: number;
@@ -239,7 +240,7 @@ export function autoSaveWorkingProject(): void {
     } catch (e) {}
 }
 
-export function loadWorkingProject(): boolean {
+export async function loadWorkingProject(): Promise<boolean> {
     if (typeof window === 'undefined') return false;
     try {
         const raw = localStorage.getItem(LOCAL_STORAGE_KEY_CURRENT);
@@ -247,6 +248,19 @@ export function loadWorkingProject(): boolean {
         const data = JSON.parse(raw) as ProjectData;
         if (data && data.scrollKeyframes && data.scrollKeyframes.length > 0) {
             applyProjectDataToStore(data);
+
+            // Restore persistent audio and video files from IndexedDB
+            const audioUrl = await loadMediaFile('active-audio');
+            if (audioUrl) {
+                useStore.getState().setAudioUrl(audioUrl);
+            }
+            const videoUrl = await loadMediaFile('active-video');
+            if (videoUrl) {
+                const s = useStore.getState();
+                const name = s.mp4Asset?.name || 'Uploaded Video';
+                s.setMp4Asset({ name, url: videoUrl });
+                s.setVideoUrl(videoUrl);
+            }
             return true;
         }
     } catch (e) {}
@@ -289,8 +303,19 @@ export function saveProject(): void {
     saveProjectToFile();
 }
 
-export function saveProjectToFile(filename?: string): void {
+export async function saveProjectToFile(filename?: string): Promise<void> {
     const data = getProjectDataFromStore(filename ?? 'scroll-hero-project');
+
+    // Embed audio and video Data URLs for portable .shero export if available
+    const audioDataUrl = await getMediaDataUrl('active-audio');
+    if (audioDataUrl) {
+        (data as any).audioDataUrl = audioDataUrl;
+    }
+    const videoDataUrl = await getMediaDataUrl('active-video');
+    if (videoDataUrl) {
+        (data as any).videoDataUrl = videoDataUrl;
+    }
+
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -306,9 +331,23 @@ export async function loadProject(file: File): Promise<void> {
 
 export async function loadProjectFromFile(file: File): Promise<void> {
     const text = await file.text();
-    const data = JSON.parse(text) as ProjectData;
+    const data = JSON.parse(text) as ProjectData & { audioDataUrl?: string; videoDataUrl?: string };
     if (!data || !data.version) throw new Error('Invalid .shero project file');
     applyProjectDataToStore(data);
+
+    if (data.audioDataUrl) {
+        const audioBlob = dataUrlToBlob(data.audioDataUrl);
+        const url = await saveMediaFile('active-audio', audioBlob);
+        useStore.getState().setAudioUrl(url);
+    }
+    if (data.videoDataUrl) {
+        const videoBlob = dataUrlToBlob(data.videoDataUrl);
+        const url = await saveMediaFile('active-video', videoBlob);
+        const name = data.mp4Asset?.name || 'Embedded Video';
+        useStore.getState().setMp4Asset({ name, url });
+        useStore.getState().setVideoUrl(url);
+    }
+
     autoSaveWorkingProject();
 }
 

@@ -3,6 +3,7 @@ import type React from 'react';
 import { Play, Pause, Square, Music, Circle, ZoomIn, ZoomOut, Video, MousePointer2, Repeat, Eraser, Pen, Mouse, SlidersHorizontal, UploadCloud, Magnet, Undo2, Redo2 } from 'lucide-react';
 import { onChange } from '@theatre/core';
 import { useStore } from '../store/useStore';
+import { saveMediaFile } from '../utils/mediaStore';
 import { useKickDrumData } from '../packages/useKickDrumData';
 import { sheet, SEQUENCE_DURATION } from '../theatre/core';
 import { interpolateParamAt, type ParamKf } from '../utils/interpolate';
@@ -1259,9 +1260,12 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             type="file"
                             accept="audio/*"
                             className="hidden"
-                            onChange={(e) => {
+                            onChange={async (e) => {
                                 const f = e.target.files?.[0];
-                                if (f) useStore.getState().setAudioUrl(URL.createObjectURL(f));
+                                if (f) {
+                                    const url = await saveMediaFile('active-audio', f);
+                                    useStore.getState().setAudioUrl(url);
+                                }
                                 e.target.value = '';
                             }}
                         />

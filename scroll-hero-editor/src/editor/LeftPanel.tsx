@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { ChevronDown, ChevronRight, UploadCloud, Video, Film, Layers, SlidersHorizontal, ImageIcon, X } from 'lucide-react';
+import { saveMediaFile } from '../utils/mediaStore';
 
 const ControlSlider = ({ label, value, min, max, step = 0.01, onChange }: {
     label: string; value: number; min: number; max: number; step?: number;
@@ -49,12 +50,13 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
 
     const lightImgInputRef = useRef<HTMLInputElement>(null);
 
-    const handleLightImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleLightImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (!files) return;
-        Array.from(files).forEach(file => {
-            addLightImage({ name: file.name, url: URL.createObjectURL(file) });
-        });
+        for (const file of Array.from(files)) {
+            const url = await saveMediaFile(`light-img-${file.name}`, file);
+            addLightImage({ name: file.name, url });
+        }
         e.target.value = '';
     };
     const mp4Asset = useStore(s => s.mp4Asset);
@@ -68,10 +70,10 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
 
     const mp4InputRef = useRef<HTMLInputElement>(null);
 
-    const handleMp4Upload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleMp4Upload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        const url = URL.createObjectURL(file);
+        const url = await saveMediaFile('active-video', file);
         setMp4Asset({ name: file.name, url });
         setExtractedFrames([]);
         setExtractionStatus('idle');
@@ -312,7 +314,15 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                         {/* Hidden inputs */}
                         <input type="file" accept="video/mp4" className="hidden" ref={mp4InputRef} onChange={handleMp4Upload} />
                         <input type="file" accept="audio/*" className="hidden" id="audio-upload"
-                            onChange={(e) => { const f = e.target.files?.[0]; if (f) useStore.getState().setAudioUrl(URL.createObjectURL(f)); }} />
+                            onChange={async (e) => {
+                                const f = e.target.files?.[0];
+                                if (f) {
+                                    const url = await saveMediaFile('active-audio', f);
+                                    useStore.getState().setAudioUrl(url);
+                                }
+                                e.target.value = '';
+                            }}
+                        />
 
                         {/* Upload buttons */}
                         <div className="flex gap-2">
@@ -401,20 +411,20 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                     const isActive = activeVideoPadIdx === idx;
                                     const fileInputId = `pad-upload-${idx}`;
 
-                                    const handlePadFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+                                    const handlePadFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
                                         const file = e.target.files?.[0];
                                         if (!file) return;
-                                        const url = URL.createObjectURL(file);
+                                        const url = await saveMediaFile(`video-pad-${idx}`, file);
                                         setVideoPad(idx, { name: file.name, url });
                                         setMp4Asset({ name: file.name, url });
                                         setActiveVideoPadIdx(idx);
                                     };
 
-                                    const handlePadDrop = (e: React.DragEvent) => {
+                                    const handlePadDrop = async (e: React.DragEvent) => {
                                         e.preventDefault();
                                         const file = e.dataTransfer.files?.[0];
                                         if (file && (file.type.startsWith('video/') || file.name.endsWith('.mp4') || file.name.endsWith('.webm'))) {
-                                            const url = URL.createObjectURL(file);
+                                            const url = await saveMediaFile(`video-pad-${idx}`, file);
                                             setVideoPad(idx, { name: file.name, url });
                                             setMp4Asset({ name: file.name, url });
                                             setActiveVideoPadIdx(idx);
