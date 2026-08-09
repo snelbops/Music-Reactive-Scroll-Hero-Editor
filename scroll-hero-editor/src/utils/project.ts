@@ -24,6 +24,19 @@ export type ProjectData = {
     aspectRatio: string;
     orbitControls: { assemblyDuration: number; assemblyEase: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut'; pauseAfterAssembly: boolean };
     classicDarkControls: { random: number; depth: number; size: number; touchRadius: number };
+    rotationSpeed?: number;
+    particleDepth?: number;
+    particleSize?: number;
+    cssOpacity?: number;
+    videoUrl?: string | null;
+    audioUrl?: string | null;
+    mp4Asset?: { name: string; url: string } | null;
+    videoPads?: Array<{ id: number; name: string; url: string }>;
+    activeVideoPadIdx?: number;
+    lightImages?: { name: string; url: string }[];
+    activeLightImageIdx?: number;
+    recordedEvents?: Array<{ time: number; x: number; y: number; click: boolean }>;
+    padSwitchEvents?: Array<{ time: number; padIdx: number }>;
     playheadPosition?: number;
     timelineScrollLeft?: number;
     timelineZoom?: number;
@@ -152,6 +165,19 @@ export function getProjectDataFromStore(name = 'Untitled Project'): ProjectData 
         aspectRatio: s.aspectRatio,
         orbitControls: s.orbitControls,
         classicDarkControls: s.classicDarkControls,
+        rotationSpeed: s.rotationSpeed,
+        particleDepth: s.particleDepth,
+        particleSize: s.particleSize,
+        cssOpacity: s.cssOpacity,
+        videoUrl: s.videoUrl,
+        audioUrl: s.audioUrl,
+        mp4Asset: s.mp4Asset,
+        videoPads: s.videoPads,
+        activeVideoPadIdx: s.activeVideoPadIdx,
+        lightImages: s.lightImages,
+        activeLightImageIdx: s.activeLightImageIdx,
+        recordedEvents: s.recordedEvents,
+        padSwitchEvents: s.padSwitchEvents,
         playheadPosition: s.playheadPosition,
         timelineScrollLeft: s.timelineScrollLeft,
         timelineZoom: s.timelineZoom,
@@ -178,6 +204,23 @@ export function applyProjectDataToStore(data: Partial<ProjectData>): void {
     if (data.aspectRatio) s.setAspectRatio(data.aspectRatio as any);
     if (data.orbitControls) s.setOrbitControls(data.orbitControls as any);
     if (data.classicDarkControls) s.setClassicDarkControls(data.classicDarkControls);
+
+    if (typeof data.rotationSpeed === 'number') s.setRotationSpeed(data.rotationSpeed);
+    if (typeof data.particleDepth === 'number') s.setParticleDepth(data.particleDepth);
+    if (typeof data.particleSize === 'number') s.setParticleSize(data.particleSize);
+    if (typeof data.cssOpacity === 'number') s.setCssOpacity(data.cssOpacity);
+
+    if (data.videoUrl !== undefined) s.setVideoUrl(data.videoUrl);
+    if (data.audioUrl !== undefined) s.setAudioUrl(data.audioUrl);
+    if (data.mp4Asset !== undefined) s.setMp4Asset(data.mp4Asset);
+    if (data.videoPads) useStore.setState({ videoPads: data.videoPads });
+    if (typeof data.activeVideoPadIdx === 'number') s.setActiveVideoPadIdx(data.activeVideoPadIdx);
+    if (data.lightImages) useStore.setState({ lightImages: data.lightImages });
+    if (typeof data.activeLightImageIdx === 'number') s.setActiveLightImageIdx(data.activeLightImageIdx);
+
+    if (data.recordedEvents) useStore.setState({ recordedEvents: data.recordedEvents });
+    if (data.padSwitchEvents) useStore.setState({ padSwitchEvents: data.padSwitchEvents });
+
     if (typeof data.playheadPosition === 'number') s.setPlayheadPosition(data.playheadPosition);
     if (typeof data.timelineScrollLeft === 'number') s.setTimelineScrollLeft(data.timelineScrollLeft);
     if (typeof data.timelineZoom === 'number') s.setTimelineZoom(data.timelineZoom);
