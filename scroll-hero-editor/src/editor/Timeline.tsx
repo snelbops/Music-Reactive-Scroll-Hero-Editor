@@ -493,6 +493,20 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         >
                             <Magnet className="w-3.5 h-3.5" />
                         </button>
+                        <button
+                            title="Auto-Generate Rhythm Curve from Audio Beats"
+                            onClick={() => setShowRhythmModal(true)}
+                            className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-editor-accent-purple/20 hover:bg-editor-accent-purple text-editor-accent-purple hover:text-white font-mono text-[9px] font-bold transition-all border border-editor-accent-purple/30 ml-1 shrink-0"
+                        >
+                            <span>⚡ RHYTHM</span>
+                        </button>
+                        <button
+                            title="Smooth out bumps & jitter in current curve"
+                            onClick={() => smoothCurrentScrollCurve()}
+                            className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-editor-accent-blue/20 hover:bg-editor-accent-blue text-editor-accent-blue hover:text-white font-mono text-[9px] font-bold transition-all border border-editor-accent-blue/30 ml-1 shrink-0"
+                        >
+                            <span>✨ SMOOTH</span>
+                        </button>
                         <span className="border-l border-[#333] pl-2 ml-1 flex items-center gap-2">
                             <div className="flex items-center text-[#808080]">
                                 <button className="p-1 hover:text-[#d9d9d9] disabled:opacity-30" title="Zoom out" onClick={() => { const i = ZOOM_LEVELS.indexOf(timelineZoom); if (i > 0) setTimelineZoom(ZOOM_LEVELS[i-1]); }} disabled={timelineZoom === ZOOM_LEVELS[0]}><ZoomOut className="w-3 h-3" /></button>
