@@ -29,6 +29,8 @@ interface EditorState {
     aspectRatio: AspectRatio; setAspectRatio: (ratio: AspectRatio) => void;
     isFullscreen: boolean; setIsFullscreen: (v: boolean) => void;
     isLoop: boolean; setIsLoop: (v: boolean) => void;
+    sequenceDuration: number; setSequenceDuration: (d: number) => void;
+    loopStart: number; loopEnd: number; setLoopRange: (start: number, end: number) => void;
     recordStartPosition: number; setRecordStartPosition: (v: number) => void;
     mp4Asset: { name: string; url: string } | null; setMp4Asset: (asset: { name: string; url: string } | null) => void;
     removeMp4Asset: () => void;
@@ -104,6 +106,8 @@ export const useStore = create<EditorState>((set, get) => {
     aspectRatio: '16:9', setAspectRatio: (ratio) => set({ aspectRatio: ratio }),
     isFullscreen: false, setIsFullscreen: (v) => set({ isFullscreen: v }),
     isLoop: false, setIsLoop: (v) => set({ isLoop: v }),
+    sequenceDuration: 10, setSequenceDuration: (d) => set({ sequenceDuration: Math.max(1, d) }),
+    loopStart: 0, loopEnd: 10, setLoopRange: (start, end) => set({ loopStart: Math.max(0, start), loopEnd: Math.max(start + 0.5, end) }),
     recordStartPosition: 0, setRecordStartPosition: (v) => set({ recordStartPosition: v }),
     mp4Asset: { name: 'sample.mp4', url: '/sample.mp4' },
     setMp4Asset: (asset) => set({ mp4Asset: asset, videoUrl: asset ? asset.url : null }),

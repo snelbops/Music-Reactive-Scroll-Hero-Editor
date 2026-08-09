@@ -388,23 +388,64 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                 {useStore(s => s.videoPads).map((pad, idx) => {
                                     const activeVideoPadIdx = useStore(s => s.activeVideoPadIdx);
                                     const setActiveVideoPadIdx = useStore(s => s.setActiveVideoPadIdx);
+                                    const setVideoPad = useStore(s => s.setVideoPad);
                                     const isActive = activeVideoPadIdx === idx;
+                                    const fileInputId = `pad-upload-${idx}`;
+
+                                    const handlePadFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
+                                        const url = URL.createObjectURL(file);
+                                        setVideoPad(idx, { name: file.name, url });
+                                    };
+
+                                    const handlePadDrop = (e: React.DragEvent) => {
+                                        e.preventDefault();
+                                        const file = e.dataTransfer.files?.[0];
+                                        if (file && (file.type.startsWith('video/') || file.name.endsWith('.mp4') || file.name.endsWith('.webm'))) {
+                                            const url = URL.createObjectURL(file);
+                                            setVideoPad(idx, { name: file.name, url });
+                                            setActiveVideoPadIdx(idx);
+                                        }
+                                    };
+
                                     return (
-                                        <button
+                                        <div
                                             key={pad.id}
                                             onClick={() => setActiveVideoPadIdx(idx)}
-                                            className={`p-2 rounded border flex flex-col justify-between text-left transition-all ${
+                                            onDragOver={(e) => e.preventDefault()}
+                                            onDrop={handlePadDrop}
+                                            className={`p-2 rounded border flex flex-col justify-between text-left cursor-pointer transition-all relative group/pad ${
                                                 isActive
                                                     ? 'bg-editor-accent-purple/20 border-editor-accent-purple shadow-[0_0_10px_rgba(168,85,247,0.3)] text-editor-fg'
                                                     : 'bg-editor-surface border-editor-border text-editor-muted hover:bg-editor-surface-hover'
                                             }`}
                                         >
+                                            <input
+                                                type="file"
+                                                id={fileInputId}
+                                                accept="video/*"
+                                                className="hidden"
+                                                onChange={handlePadFileUpload}
+                                            />
                                             <div className="flex justify-between items-center w-full mb-1">
                                                 <span className="text-[9px] font-bold font-mono px-1 rounded bg-black/40 text-editor-accent-purple">PAD {pad.id}</span>
-                                                <span className="text-[8px] opacity-60">Key {pad.id}</span>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        document.getElementById(fileInputId)?.click();
+                                                    }}
+                                                    title="Assign Video File"
+                                                    className="text-[10px] text-editor-muted hover:text-white bg-black/40 hover:bg-editor-accent-purple/40 px-1 rounded transition-colors"
+                                                >
+                                                    +
+                                                </button>
                                             </div>
-                                            <div className="text-[9px] font-medium truncate w-full">{pad.name || 'Empty'}</div>
-                                        </button>
+                                            <div className="text-[9px] font-medium truncate w-full flex items-center gap-1">
+                                                <Video className="w-2.5 h-2.5 shrink-0 opacity-60" />
+                                                <span className="truncate">{pad.name || 'Drop Video / +'}</span>
+                                            </div>
+                                        </div>
                                     );
                                 })}
                             </div>

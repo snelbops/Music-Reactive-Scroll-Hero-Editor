@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { sceneParamsObj, cssOpacityObj, sheet, SEQUENCE_DURATION } from './core';
+import { sceneParamsObj, cssOpacityObj, sheet } from './core';
 import { interpolateScrollAt, interpolateParamAt, type ParamKf } from '../utils/interpolate';
 
 /**
@@ -14,6 +14,10 @@ import { interpolateScrollAt, interpolateParamAt, type ParamKf } from '../utils/
 export default function TheatreSync() {
     const isPlaying = useStore((state) => state.isPlaying);
     const isLoop = useStore((s) => s.isLoop);
+    const isRecording = useStore((s) => s.isRecording);
+    const sequenceDuration = useStore((s) => s.sequenceDuration);
+    const loopStart = useStore((s) => s.loopStart);
+    const loopEnd = useStore((s) => s.loopEnd);
 
     // Scene parameter lanes → Zustand (drives GithubTestParticleField props)
     useEffect(() => {
@@ -34,47 +38,65 @@ export default function TheatreSync() {
     // RAF play loop — advances sequence position and drives scroll via custom keyframes
     useEffect(() => {
         if (!isPlaying) return;
-        // If we're at the end, restart from beginning
-        if (sheet.sequence.position >= SEQUENCE_DURATION) {
-            sheet.sequence.position = 0;
+
+        const effectiveEnd = isLoop ? (loopEnd || sequenceDuration) : sequenceDuration;
+        const effectiveStart = isLoop ? loopStart : 0;
+
+        // If we're at or beyond end, restart from beginning / loopStart
+        if (sheet.sequence.position >= effectiveEnd) {
+            sheet.sequence.position = effectiveStart;
         }
+
         let lastTime: number | null = null;
         let rafId: number;
+
         const tick = (now: number) => {
             if (lastTime !== null) {
                 const delta = now - lastTime;
                 const nextPos = sheet.sequence.position + delta / 1000;
-                if (nextPos >= SEQUENCE_DURATION) {
+                const currentDuration = useStore.getState().sequenceDuration;
+                const recordingActive = useStore.getState().isRecording;
+
+                // Dynamic duration extension during recording
+                if (recordingActive && nextPos >= currentDuration - 1) {
+                    useStore.getState().setSequenceDuration(Math.ceil(nextPos + 5));
+                }
+
+                const maxPos = isLoop ? (useStore.getState().loopEnd || currentDuration) : currentDuration;
+
+                if (nextPos >= maxPos && !recordingActive) {
                     if (isLoop) {
-                        sheet.sequence.position = 0;
+                        const restartPos = useStore.getState().loopStart || 0;
+                        sheet.sequence.position = restartPos;
                         const kfs = useStore.getState().scrollKeyframes;
-                        useStore.getState().setSceneProgress(interpolateScrollAt(kfs, 0, SEQUENCE_DURATION));
-                        // Param lane interpolation at loop restart
+                        useStore.getState().setSceneProgress(interpolateScrollAt(kfs, restartPos, currentDuration));
+                        
                         const pkfs0 = useStore.getState().paramKeyframes;
-                        const rSpeed0 = interpolateParamAt((pkfs0['rotationSpeed'] ?? []) as ParamKf[], 0);
+                        const rSpeed0 = interpolateParamAt((pkfs0['rotationSpeed'] ?? []) as ParamKf[], restartPos);
                         if (rSpeed0 !== null) useStore.getState().setRotationSpeed(rSpeed0);
-                        const depth0 = interpolateParamAt((pkfs0['depth'] ?? []) as ParamKf[], 0);
+                        const depth0 = interpolateParamAt((pkfs0['depth'] ?? []) as ParamKf[], restartPos);
                         if (depth0 !== null) useStore.getState().setParticleDepth(depth0);
-                        const size0 = interpolateParamAt((pkfs0['size'] ?? []) as ParamKf[], 0);
+                        const size0 = interpolateParamAt((pkfs0['size'] ?? []) as ParamKf[], restartPos);
                         if (size0 !== null) useStore.getState().setParticleSize(size0);
-                        const opacity0 = interpolateParamAt((pkfs0['cssOpacity'] ?? []) as ParamKf[], 0);
+                        const opacity0 = interpolateParamAt((pkfs0['cssOpacity'] ?? []) as ParamKf[], restartPos);
                         if (opacity0 !== null) useStore.getState().setCssOpacity(opacity0);
                         lastTime = now;
                         rafId = requestAnimationFrame(tick);
                     } else {
-                        sheet.sequence.position = SEQUENCE_DURATION;
+                        sheet.sequence.position = currentDuration;
                         const kfs = useStore.getState().scrollKeyframes;
-                        useStore.getState().setSceneProgress(interpolateScrollAt(kfs, SEQUENCE_DURATION, SEQUENCE_DURATION));
+                        useStore.getState().setSceneProgress(interpolateScrollAt(kfs, currentDuration, currentDuration));
                         useStore.getState().setIsPlaying(false);
                         useStore.getState().setIsRecording(false);
                     }
                     return;
                 }
+
                 sheet.sequence.position = nextPos;
                 // Don't override scroll while user is actively dragging the scrub handle
                 if (!useStore.getState().isScrubbing) {
                     const kfs = useStore.getState().scrollKeyframes;
-                    useStore.getState().setSceneProgress(interpolateScrollAt(kfs, nextPos, SEQUENCE_DURATION));
+                    useStore.getState().setSceneProgress(interpolateScrollAt(kfs, nextPos, currentDuration));
                 }
                 // Param lane interpolation
                 const pkfs = useStore.getState().paramKeyframes;
@@ -92,7 +114,7 @@ export default function TheatreSync() {
         };
         rafId = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(rafId);
-    }, [isPlaying, isLoop]);
+    }, [isPlaying, isLoop, isRecording, sequenceDuration, loopStart, loopEnd]);
 
     return null;
 }

@@ -8,7 +8,7 @@ import { sheet, SEQUENCE_DURATION } from '../theatre/core';
 import { interpolateParamAt, type ParamKf } from '../utils/interpolate';
 
 const LABEL_W = 120;
-const ZOOM_LEVELS = [1, 2, 4, 8];
+const ZOOM_LEVELS = [0.25, 0.5, 1, 2, 4, 8];
 const VB_W = 1000;
 const VB_H = 40;
 
@@ -437,15 +437,61 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         </button>
                     </div>
                 </div>
-                <div className="flex items-center text-[#d9d9d9] font-mono text-[11px] font-medium tracking-widest pl-4 pr-2">
-                    {new Date(seqTime * 1000).toISOString().slice(11, 23).replace('.', ':')}
+                <div className="flex items-center gap-3 pl-4 pr-2">
+                    <div className="flex items-center gap-1 text-[10px] text-[#808080]">
+                        <span>LEN:</span>
+                        <input
+                            type="number"
+                            min="1"
+                            max="300"
+                            value={useStore(s => s.sequenceDuration)}
+                            onChange={(e) => useStore.getState().setSequenceDuration(parseFloat(e.target.value) || 10)}
+                            className="w-10 bg-[#222] border border-[#333] rounded px-1 text-center font-mono text-[10px] text-editor-accent-purple focus:outline-none focus:border-editor-accent-purple"
+                        />
+                        <span>s</span>
+                    </div>
+                    <div className="flex items-center text-[#d9d9d9] font-mono text-[11px] font-medium tracking-widest">
+                        {new Date(seqTime * 1000).toISOString().slice(11, 23).replace('.', ':')}
+                    </div>
                 </div>
             </div>
             <div ref={lanesRef} className="flex-1 overflow-y-auto overflow-x-auto thin-scrollbar relative select-none cursor-col-resize" onMouseDown={handleLanesMouseDown}>
                 <div className="absolute top-0 bottom-0 w-[1px] bg-red-500 z-50 pointer-events-none shadow-[0_0_8px_rgba(239,68,68,0.8)]" style={{ left: `${playheadLeft}px` }}>
                     <div className="w-3 h-3 bg-red-500 absolute -top-1 -left-[5.5px] rotate-45" />
                 </div>
-                <div style={{ width: timelineZoom > 1 ? `${timelineZoom * 100}%` : '100%', minHeight: '100%' }}>
+                <div style={{ width: timelineZoom !== 1 ? `${timelineZoom * 100}%` : '100%', minHeight: '100%' }}>
+                
+                {/* Ableton-Style Loop Region Header */}
+                <div className="h-5 border-b border-editor-border bg-black/60 flex items-center relative text-[9px] font-mono select-none">
+                    <div className="w-[120px] shrink-0 px-2 flex items-center gap-1 border-r border-editor-border bg-editor-panel text-editor-muted">
+                        <Repeat className="w-2.5 h-2.5 text-editor-accent-purple" />
+                        <span className="uppercase text-[8px] tracking-wider">Loop Region</span>
+                    </div>
+                    <div className="flex-1 relative h-full bg-[#111]">
+                        {(() => {
+                            const seqDur = useStore(s => s.sequenceDuration);
+                            const lStart = useStore(s => s.loopStart);
+                            const lEnd = useStore(s => s.loopEnd) || seqDur;
+                            const leftPct = (lStart / seqDur) * 100;
+                            const widthPct = Math.max(2, ((lEnd - lStart) / seqDur) * 100);
+
+                            return (
+                                <div
+                                    className={`absolute top-1 bottom-1 rounded border transition-colors ${
+                                        useStore(s => s.isLoop)
+                                            ? 'bg-editor-accent-purple/30 border-editor-accent-purple text-editor-accent-purple'
+                                            : 'bg-white/10 border-white/20 text-gray-400'
+                                    }`}
+                                    style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
+                                >
+                                    <div className="px-1 text-[8px] truncate pointer-events-none font-bold">
+                                        {lStart.toFixed(1)}s - {lEnd.toFixed(1)}s
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </div>
+                </div>
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('audio') }}>
                     <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-editor-border bg-editor-panel text-editor-fg gap-2 sticky left-0 z-30 overflow-hidden">
                         <Music className="w-2.5 h-2.5 text-editor-accent-blue" />
