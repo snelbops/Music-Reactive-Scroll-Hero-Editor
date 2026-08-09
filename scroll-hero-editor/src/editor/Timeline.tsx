@@ -169,6 +169,38 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         setShowRhythmModal(false);
     };
 
+    const smoothCurrentScrollCurve = () => {
+        const kfs = useStore.getState().scrollKeyframes;
+        if (kfs.length < 3) return;
+        useStore.getState().pushHistory();
+
+        // 1. Moving average pass over keyframes
+        const smoothed = kfs.map((kf, i) => {
+            if (i === 0 || i === kfs.length - 1) return kf;
+            const prev = kfs[i - 1].value;
+            const curr = kf.value;
+            const next = kfs[i + 1].value;
+            const val = +(prev * 0.25 + curr * 0.5 + next * 0.25).toFixed(3);
+            return { ...kf, value: val };
+        });
+
+        // 2. Thin keyframes within 0.05s of each other that have minimal value variation
+        const thinned: typeof kfs = [];
+        smoothed.forEach((kf) => {
+            const last = thinned[thinned.length - 1];
+            if (!last || Math.abs(kf.time - last.time) >= 0.06 || Math.abs(kf.value - last.value) >= 0.04) {
+                thinned.push(kf);
+            }
+        });
+
+        // 3. Re-add end point if missing
+        if (thinned[thinned.length - 1]?.time !== kfs[kfs.length - 1].time) {
+            thinned.push(kfs[kfs.length - 1]);
+        }
+
+        useStore.getState().setScrollKeyframes(thinned.sort((a, b) => a.time - b.time));
+    };
+
     const handleLoopDrag = (type: 'start' | 'end' | 'bar', e: React.PointerEvent<HTMLDivElement>) => {
         e.stopPropagation();
         e.preventDefault();
@@ -767,6 +799,13 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 <span className="text-[10px] uppercase font-normal text-[#d9d9d9] truncate">Scroll POS</span>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
+                                {scrollKeyframes.length > 2 && (
+                                    <button
+                                        className="text-[8px] bg-editor-accent-blue/20 hover:bg-editor-accent-blue text-editor-accent-blue hover:text-white px-1 py-0.5 rounded transition-colors font-mono font-bold"
+                                        title="Smooth out bumps & jitter in current curve"
+                                        onClick={(e) => { e.stopPropagation(); smoothCurrentScrollCurve(); }}
+                                    >✨SMOOTH</button>
+                                )}
                                 <button
                                     className="text-[8px] bg-editor-accent-purple/20 hover:bg-editor-accent-purple text-editor-accent-purple hover:text-white px-1 py-0.5 rounded transition-colors font-mono font-bold"
                                     title="Auto-Generate Rhythm Curve from Audio Beats"
@@ -793,12 +832,25 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             target.setPointerCapture(e.pointerId);
                             useStore.getState().pushHistory();
 
+                            let lastTime: number | null = null;
+                            let lastValue: number | null = null;
+                            let strokePoints: { time: number; value: number }[] = [];
+
                             const addPoint = (clientX: number, clientY: number) => {
                                 const rect = target.getBoundingClientRect();
                                 const rawTime = Math.max(0, Math.min(SEQUENCE_DURATION, ((clientX - rect.left) / rect.width) * SEQUENCE_DURATION));
                                 const time = snapTimeToBeat(rawTime);
-                                const value = Math.max(0, Math.min(1, 1 - (clientY - rect.top) / rect.height));
-                                useStore.getState().addScrollKeyframe(time, value);
+                                const rawVal = Math.max(0, Math.min(1, 1 - (clientY - rect.top) / rect.height));
+
+                                // Exponential Moving Average (EMA) Low-Pass Filter: 70% previous + 30% current (filters out hand jitter micro-spikes)
+                                const value = lastValue === null ? rawVal : +(lastValue * 0.70 + rawVal * 0.30).toFixed(3);
+
+                                if (lastTime === null || Math.abs(time - lastTime) >= 0.04 || Math.abs(value - (lastValue ?? 0)) >= 0.02) {
+                                    lastTime = time;
+                                    lastValue = value;
+                                    strokePoints.push({ time, value });
+                                    useStore.getState().addScrollKeyframe(time, value);
+                                }
                             };
 
                             addPoint(e.clientX, e.clientY);
@@ -810,6 +862,27 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             const onUp = () => {
                                 target.removeEventListener('pointermove', onMove as any);
                                 target.removeEventListener('pointerup', onUp as any);
+
+                                // Post-stroke smoothing pass over strokePoints
+                                if (strokePoints.length > 4) {
+                                    const allKfs = useStore.getState().scrollKeyframes;
+                                    const strokeTimes = new Set(strokePoints.map(p => p.time));
+
+                                    const smoothedStroke = strokePoints.map((pt, i) => {
+                                        if (i === 0 || i === strokePoints.length - 1) return pt;
+                                        const prev = strokePoints[i - 1].value;
+                                        const curr = pt.value;
+                                        const next = strokePoints[i + 1].value;
+                                        return { time: pt.time, value: +(prev * 0.25 + curr * 0.5 + next * 0.25).toFixed(3) };
+                                    });
+
+                                    const merged = allKfs
+                                        .filter(kf => !strokeTimes.has(kf.time))
+                                        .concat(smoothedStroke)
+                                        .sort((a, b) => a.time - b.time);
+
+                                    useStore.getState().setScrollKeyframes(merged);
+                                }
                             };
 
                             target.addEventListener('pointermove', onMove as any);
