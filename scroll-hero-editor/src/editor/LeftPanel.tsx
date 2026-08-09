@@ -87,13 +87,14 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
             const frames = await extractFrames(source, (p) => setExtractionProgress(p));
             setExtractedFrames(frames);
             setExtractionStatus('done');
+            setActivePreset('frames');
         } catch (err) {
             console.error('ffmpeg extraction failed:', err);
             setExtractionStatus('error');
         }
     };
 
-    // Auto-extract sample.mp4 on first load and setup 1-4 drumpad key shortcuts
+    // Auto-extract sample.mp4 on first load and setup numpad drumpad key shortcuts (7, 8, 4, 5)
     useEffect(() => {
         if (extractionStatus === 'idle' && extractedFrames.length === 0) {
             handleExtract('/sample.mp4');
@@ -101,9 +102,12 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
 
         const handleKeyDown = (e: KeyboardEvent) => {
             if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
-            if (['1', '2', '3', '4'].includes(e.key)) {
-                const padIdx = parseInt(e.key, 10) - 1;
-                useStore.getState().setActiveVideoPadIdx(padIdx);
+            const keyToPadIdx: Record<string, number> = {
+                '7': 0, '8': 1, '4': 2, '5': 3,
+                '1': 0, '2': 1, '3': 2, '6': 3
+            };
+            if (e.key in keyToPadIdx) {
+                useStore.getState().setActiveVideoPadIdx(keyToPadIdx[e.key]);
             }
         };
 
@@ -382,7 +386,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                         <div className="mt-3 space-y-1">
                             <div className="flex justify-between items-center text-[9px] text-editor-muted uppercase tracking-widest px-1">
                                 <span>Video Drumpad</span>
-                                <span className="text-editor-accent-purple font-mono">Pads [1-4]</span>
+                                <span className="text-editor-accent-purple font-mono">Pads [7,8,4,5]</span>
                             </div>
                             <div className="grid grid-cols-2 gap-1.5">
                                 {useStore(s => s.videoPads).map((pad, idx) => {

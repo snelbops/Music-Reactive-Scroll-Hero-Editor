@@ -113,24 +113,26 @@ export const useStore = create<EditorState>((set, get) => {
     setMp4Asset: (asset) => set({ mp4Asset: asset, videoUrl: asset ? asset.url : null }),
     removeMp4Asset: () => set({ mp4Asset: null, videoUrl: null, extractedFrames: [], extractionStatus: 'idle' }),
     videoPads: [
-        { id: 1, name: 'Golden Gate MP4', url: 'https://scrollyvideo.js.org/goldengate.mp4' },
-        { id: 2, name: 'Sample Video MP4', url: '/sample.mp4' },
-        { id: 3, name: 'Empty Pad 3', url: '' },
+        { id: 7, name: 'Golden Gate MP4', url: 'https://scrollyvideo.js.org/goldengate.mp4' },
+        { id: 8, name: 'Sample Video MP4', url: '/sample.mp4' },
         { id: 4, name: 'Empty Pad 4', url: '' },
+        { id: 5, name: 'Empty Pad 5', url: '' },
     ],
     activeVideoPadIdx: 0,
     setActiveVideoPadIdx: (idx) => {
         const pads = get().videoPads;
         if (pads[idx] && pads[idx].url) {
-            set({ activeVideoPadIdx: idx, videoUrl: pads[idx].url });
+            set({ activeVideoPadIdx: idx, videoUrl: pads[idx].url, activePreset: 'frames' });
         } else {
             set({ activeVideoPadIdx: idx });
         }
     },
     setVideoPad: (idx, pad) => set((s) => {
         const updated = [...s.videoPads];
-        updated[idx] = { id: idx + 1, ...pad };
-        return { videoPads: updated, videoUrl: s.activeVideoPadIdx === idx ? pad.url : s.videoUrl };
+        const padKeyMap = [7, 8, 4, 5];
+        const padId = padKeyMap[idx] ?? (idx + 1);
+        updated[idx] = { id: padId, ...pad };
+        return { videoPads: updated, videoUrl: s.activeVideoPadIdx === idx ? pad.url : s.videoUrl, activePreset: 'frames' };
     }),
     extractedFrames: [], setExtractedFrames: (frames) => set({ extractedFrames: frames }),
     extractionProgress: 0, setExtractionProgress: (p) => set({ extractionProgress: p }),
