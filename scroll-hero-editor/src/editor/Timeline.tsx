@@ -683,9 +683,18 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 </div>
                 {(isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('audio') }}>
-                    <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-editor-border bg-editor-panel text-editor-fg gap-2 sticky left-0 z-30 overflow-hidden">
-                        <Music className="w-2.5 h-2.5 text-editor-accent-blue" />
-                        <span className="text-[10px] uppercase font-normal text-[#d9d9d9] truncate">Audio Wave</span>
+                    <div className="w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border bg-editor-panel text-editor-fg sticky left-0 z-30 overflow-hidden">
+                        <div className="flex items-center gap-1.5 overflow-hidden">
+                            <Music className="w-2.5 h-2.5 text-editor-accent-blue shrink-0" />
+                            <span className="text-[10px] uppercase font-normal text-[#d9d9d9] truncate">Audio Wave</span>
+                        </div>
+                        {audioUrl && (
+                            <button
+                                className="text-[9px] text-[#808080] hover:text-red-400 transition-colors shrink-0 font-bold ml-1"
+                                title="Remove audio track"
+                                onClick={(e) => { e.stopPropagation(); useStore.getState().setAudioUrl(null); }}
+                            >✕</button>
+                        )}
                     </div>
                     <div className="flex-1 relative overflow-hidden flex items-center">
                         <input type="file" accept="audio/*" className="hidden" id="timeline-audio-upload"
@@ -723,12 +732,19 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 )}
                 {extractedFrames.length > 0 && (isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('videoFrames') }}>
-                    <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-editor-border sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors overflow-hidden ${activePreset === 'frames' ? 'bg-[#2a2a2a] ring-1 ring-inset ring-[#444]' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}>
-                        <div className="flex items-center gap-1 w-full">
-                            <Video className="w-2.5 h-2.5 shrink-0 text-editor-accent-blue" />
-                            <span className="text-[10px] uppercase font-normal text-[#d9d9d9] truncate">Video Frames</span>
+                    <div className={`w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border sticky left-0 z-30 cursor-pointer transition-colors overflow-hidden ${activePreset === 'frames' ? 'bg-[#2a2a2a] ring-1 ring-inset ring-[#444]' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}>
+                        <div className="flex flex-col justify-center gap-0.5 overflow-hidden">
+                            <div className="flex items-center gap-1 w-full">
+                                <Video className="w-2.5 h-2.5 shrink-0 text-editor-accent-blue" />
+                                <span className="text-[10px] uppercase font-normal text-[#d9d9d9] truncate">Video Frames</span>
+                            </div>
+                            <span className="text-[9px] font-mono text-[#808080] truncate pl-[14px]">{extractedFrames.length} frames</span>
                         </div>
-                        <span className="text-[9px] font-mono text-[#808080] truncate pl-[14px]">{extractedFrames.length} frames</span>
+                        <button
+                            className="text-[9px] text-[#808080] hover:text-red-400 transition-colors shrink-0 font-bold ml-1"
+                            title="Clear extracted video frames"
+                            onClick={(e) => { e.stopPropagation(); useStore.getState().setExtractedFrames([]); }}
+                        >✕</button>
                     </div>
                     <div className="flex-1 relative overflow-hidden flex items-center bg-editor-accent-blue/[0.03]">
                         <div className="absolute inset-y-2 left-0 bg-editor-accent-blue/20 rounded-r" style={{ width: '100%' }} />
@@ -743,9 +759,18 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 )}
                 {(isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('mouseX') }}>
-                    <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-editor-border bg-editor-panel text-editor-fg gap-2 sticky left-0 z-30 overflow-hidden">
-                        <MousePointer2 className="w-2.5 h-2.5 text-editor-accent-blue shrink-0" />
-                        <span className="text-[10px] uppercase font-normal text-[#d9d9d9] truncate">Mouse X</span>
+                    <div className="w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border bg-editor-panel text-editor-fg sticky left-0 z-30 overflow-hidden">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                            <MousePointer2 className="w-2.5 h-2.5 text-editor-accent-blue shrink-0" />
+                            <span className="text-[10px] uppercase font-normal text-[#d9d9d9] truncate">Mouse X</span>
+                        </div>
+                        {recordedEvents.length > 0 && (
+                            <button
+                                className="text-[9px] text-[#808080] hover:text-red-400 transition-colors shrink-0 font-bold ml-1"
+                                title="Clear recorded Mouse X automation"
+                                onClick={(e) => { e.stopPropagation(); useStore.getState().clearRecordedEvents(); }}
+                            >✕</button>
+                        )}
                     </div>
                     <div className="flex-1 relative overflow-hidden">
                         {recordedEvents.length === 0 ? (
@@ -766,9 +791,18 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 )}
                 {(isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('mouseY') }}>
-                    <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-editor-border bg-editor-panel text-editor-fg gap-2 sticky left-0 z-30 overflow-hidden">
-                        <MousePointer2 className="w-2.5 h-2.5 text-editor-accent-blue shrink-0" />
-                        <span className="text-[10px] uppercase font-normal text-[#d9d9d9] truncate">Mouse Y</span>
+                    <div className="w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border bg-editor-panel text-editor-fg sticky left-0 z-30 overflow-hidden">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                            <MousePointer2 className="w-2.5 h-2.5 text-editor-accent-blue shrink-0" />
+                            <span className="text-[10px] uppercase font-normal text-[#d9d9d9] truncate">Mouse Y</span>
+                        </div>
+                        {recordedEvents.length > 0 && (
+                            <button
+                                className="text-[9px] text-[#808080] hover:text-red-400 transition-colors shrink-0 font-bold ml-1"
+                                title="Clear recorded Mouse Y automation"
+                                onClick={(e) => { e.stopPropagation(); useStore.getState().clearRecordedEvents(); }}
+                            >✕</button>
+                        )}
                     </div>
                     <div className="flex-1 relative overflow-hidden">
                         {recordedEvents.length === 0 ? (
@@ -826,10 +860,33 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         className="flex-1 relative overflow-hidden bg-[#3b82f6]/[0.03]"
                         style={{ cursor: activeTool === 'pen' ? 'crosshair' : activeTool === 'eraser' ? 'cell' : undefined }}
                         onPointerDown={(e) => {
-                            if (activeTool !== 'pen') return;
+                            if (activeTool !== 'pen' && activeTool !== 'eraser') return;
                             e.stopPropagation();
                             const target = e.currentTarget;
                             target.setPointerCapture(e.pointerId);
+
+                            if (activeTool === 'eraser') {
+                                const eraseAt = (clientX: number, clientY: number) => {
+                                    const rect = target.getBoundingClientRect();
+                                    const clickTime = Math.max(0, Math.min(SEQUENCE_DURATION, ((clientX - rect.left) / rect.width) * SEQUENCE_DURATION));
+                                    const clickVal = Math.max(0, Math.min(1, 1 - (clientY - rect.top) / rect.height));
+
+                                    const kfs = useStore.getState().scrollKeyframes;
+                                    const filtered = kfs.filter(k => !(Math.abs(k.time - clickTime) < 0.40 && Math.abs(k.value - clickVal) < 0.30));
+                                    if (filtered.length !== kfs.length) {
+                                        useStore.getState().setScrollKeyframes(filtered);
+                                    }
+                                };
+                                useStore.getState().pushHistory();
+                                eraseAt(e.clientX, e.clientY);
+
+                                const onMove = (ev: PointerEvent) => { if (ev.buttons & 1) eraseAt(ev.clientX, ev.clientY); };
+                                const onUp = () => { target.removeEventListener('pointermove', onMove as any); target.removeEventListener('pointerup', onUp as any); };
+                                target.addEventListener('pointermove', onMove as any);
+                                target.addEventListener('pointerup', onUp as any);
+                                return;
+                            }
+
                             useStore.getState().pushHistory();
 
                             let lastTime: number | null = null;
@@ -1110,15 +1167,54 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     const existing = interpolateParamAt(kfs, t);
                                     addParamKeyframe(lane.id, t, existing ?? currentVal);
                                 }}
-                                onMouseDown={(e) => {
-                                    if (activeTool !== 'pen') return;
+                                onPointerDown={(e) => {
+                                    if (activeTool !== 'pen' && activeTool !== 'eraser') return;
                                     e.stopPropagation();
-                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const target = e.currentTarget;
+                                    target.setPointerCapture(e.pointerId);
+
+                                    if (activeTool === 'eraser') {
+                                        const eraseAt = (clientX: number, clientY: number) => {
+                                            const rect = target.getBoundingClientRect();
+                                            const clickTime = Math.max(0, Math.min(SEQUENCE_DURATION, ((clientX - rect.left) / rect.width) * SEQUENCE_DURATION));
+                                            const clickVal = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - (clientY - rect.top) / rect.height) * (lane.max - lane.min)));
+
+                                            const currentKfs = (useStore.getState().paramKeyframes[lane.id] ?? []) as ParamKf[];
+                                            const range = lane.max - lane.min;
+                                            const filtered = currentKfs.filter(k => !(Math.abs(k.time - clickTime) < 0.40 && Math.abs(k.value - clickVal) < range * 0.30));
+                                            if (filtered.length !== currentKfs.length) {
+                                                useStore.getState().setParamKeyframes(lane.id, filtered);
+                                            }
+                                        };
+                                        useStore.getState().pushHistory();
+                                        eraseAt(e.clientX, e.clientY);
+
+                                        const onMove = (ev: PointerEvent) => { if (ev.buttons & 1) eraseAt(ev.clientX, ev.clientY); };
+                                        const onUp = () => { target.removeEventListener('pointermove', onMove as any); target.removeEventListener('pointerup', onUp as any); };
+                                        target.addEventListener('pointermove', onMove as any);
+                                        target.addEventListener('pointerup', onUp as any);
+                                        return;
+                                    }
+
+                                    useStore.getState().pushHistory();
+                                    const rect = target.getBoundingClientRect();
                                     const rawTime = Math.max(0, Math.min(SEQUENCE_DURATION, ((e.clientX - rect.left) / rect.width) * SEQUENCE_DURATION));
                                     const time = snapTimeToBeat(rawTime);
                                     const value = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - (e.clientY - rect.top) / rect.height) * (lane.max - lane.min)));
-                                    useStore.getState().pushHistory();
                                     addParamKeyframe(lane.id, time, value);
+
+                                    const onMove = (ev: PointerEvent) => {
+                                        if (ev.buttons & 1) {
+                                            const r = target.getBoundingClientRect();
+                                            const rt = Math.max(0, Math.min(SEQUENCE_DURATION, ((ev.clientX - r.left) / r.width) * SEQUENCE_DURATION));
+                                            const t = snapTimeToBeat(rt);
+                                            const v = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - (ev.clientY - r.top) / r.height) * (lane.max - lane.min)));
+                                            addParamKeyframe(lane.id, t, v);
+                                        }
+                                    };
+                                    const onUp = () => { target.removeEventListener('pointermove', onMove as any); target.removeEventListener('pointerup', onUp as any); };
+                                    target.addEventListener('pointermove', onMove as any);
+                                    target.addEventListener('pointerup', onUp as any);
                                 }}
                             >
                                 <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
