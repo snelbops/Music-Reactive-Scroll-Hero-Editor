@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import { sceneParamsObj, cssOpacityObj, sheet } from './core';
 import { interpolateScrollAt, interpolateParamAt, type ParamKf } from '../utils/interpolate';
@@ -7,9 +7,10 @@ import { interpolateScrollAt, interpolateParamAt, type ParamKf } from '../utils/
  * TheatreSync — logic-only component mounted at the app root.
  *
  * - RAF loop advances sheet.sequence.position (the clock) during playback
- * - Interpolates scrollKeyframes at current time → setSceneProgress (custom system)
- * - sceneParamsObj / cssOpacityObj still wired through Theatre.js
- * - Loop support: when isLoop is true, restarts sequence from 0 at end
+ * - Synchronizes live audio playback with timeline position
+ * - Interpolates scrollKeyframes at current time → setSceneProgress
+ * - Scene params / CSS opacity wired through Theatre.js
+ * - Loop support: when isLoop is true, restarts sequence from loopStart
  */
 export default function TheatreSync() {
     const isPlaying = useStore((state) => state.isPlaying);
@@ -18,6 +19,38 @@ export default function TheatreSync() {
     const sequenceDuration = useStore((s) => s.sequenceDuration);
     const loopStart = useStore((s) => s.loopStart);
     const loopEnd = useStore((s) => s.loopEnd);
+    const audioUrl = useStore((s) => s.audioUrl);
+
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    // Maintain HTML5 Audio element instance
+    useEffect(() => {
+        if (!audioRef.current) {
+            audioRef.current = new Audio();
+        }
+        const audio = audioRef.current;
+        if (audioUrl) {
+            audio.src = audioUrl;
+            audio.load();
+        } else {
+            audio.pause();
+            audio.removeAttribute('src');
+        }
+    }, [audioUrl]);
+
+    // Handle Play / Pause / Seek sync
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (!audio || !audioUrl) return;
+
+        if (isPlaying) {
+            audio.currentTime = sheet.sequence.position;
+            audio.play().catch((err) => console.warn('Audio playback error:', err));
+        } else {
+            audio.pause();
+            audio.currentTime = sheet.sequence.position;
+        }
+    }, [isPlaying, audioUrl]);
 
     // Scene parameter lanes → Zustand (drives GithubTestParticleField props)
     useEffect(() => {
@@ -35,7 +68,7 @@ export default function TheatreSync() {
         });
     }, []);
 
-    // RAF play loop — advances sequence position and drives scroll via custom keyframes
+    // RAF play loop — advances sequence position, drives scroll & syncs audio
     useEffect(() => {
         if (!isPlaying) return;
 
@@ -47,6 +80,9 @@ export default function TheatreSync() {
         // If starting playback outside loop range, snap to loopStart
         if (loopActive && !recordingActive && (sheet.sequence.position >= lEnd || sheet.sequence.position < lStart)) {
             sheet.sequence.position = lStart;
+            if (audioRef.current && audioUrl) {
+                audioRef.current.currentTime = lStart;
+            }
         }
 
         let lastTime: number | null = null;
@@ -62,6 +98,13 @@ export default function TheatreSync() {
                 const startL = useStore.getState().loopStart || 0;
                 const endL = useStore.getState().loopEnd || currentDuration;
 
+                // Sync audio drift if greater than 0.06s
+                if (audioRef.current && audioUrl && !audioRef.current.paused) {
+                    if (Math.abs(audioRef.current.currentTime - nextPos) > 0.06) {
+                        audioRef.current.currentTime = nextPos;
+                    }
+                }
+
                 // Dynamic duration extension during recording
                 if (isRec && nextPos >= currentDuration - 1) {
                     useStore.getState().setSequenceDuration(Math.ceil(nextPos + 5));
@@ -69,6 +112,9 @@ export default function TheatreSync() {
 
                 if (isLp && !isRec && (nextPos >= endL || nextPos < startL)) {
                     sheet.sequence.position = startL;
+                    if (audioRef.current && audioUrl) {
+                        audioRef.current.currentTime = startL;
+                    }
                     const kfs = useStore.getState().scrollKeyframes;
                     useStore.getState().setSceneProgress(interpolateScrollAt(kfs, startL, currentDuration));
 
@@ -89,6 +135,10 @@ export default function TheatreSync() {
 
                 if (!isLp && nextPos >= currentDuration && !isRec) {
                     sheet.sequence.position = currentDuration;
+                    if (audioRef.current && audioUrl) {
+                        audioRef.current.pause();
+                        audioRef.current.currentTime = currentDuration;
+                    }
                     const kfs = useStore.getState().scrollKeyframes;
                     useStore.getState().setSceneProgress(interpolateScrollAt(kfs, currentDuration, currentDuration));
                     useStore.getState().setIsPlaying(false);
@@ -126,7 +176,7 @@ export default function TheatreSync() {
         };
         rafId = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(rafId);
-    }, [isPlaying, isLoop, isRecording, sequenceDuration, loopStart, loopEnd]);
+    }, [isPlaying, isLoop, isRecording, sequenceDuration, loopStart, loopEnd, audioUrl]);
 
     return null;
 }
