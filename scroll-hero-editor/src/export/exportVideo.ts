@@ -74,13 +74,6 @@ export class VideoExporter {
             compositeCanvas.height = targetHeight;
             const ctx = compositeCanvas.getContext('2d', { alpha: false })!;
 
-            // Last valid video frame canvas buffer to prevent any black frame drops
-            const videoCacheCanvas = document.createElement('canvas');
-            videoCacheCanvas.width = targetWidth;
-            videoCacheCanvas.height = targetHeight;
-            const videoCacheCtx = videoCacheCanvas.getContext('2d', { alpha: false })!;
-            let hasValidVideoFrame = false;
-
             // Stream setup
             const compositeStream = compositeCanvas.captureStream(fps);
             let finalStream = compositeStream;
@@ -183,15 +176,13 @@ export class VideoExporter {
                 audioEl.play().catch((e) => console.warn('Audio export play error:', e));
             }
 
-            // Real-Time High-Precision Wall-Clock RAF loop for 100% Synchronized Audio & Video
-            const startWallTime = performance.now();
+            // OFFLINE FRAME-BY-FRAME SAMPLER (Waiting for seeked & requestVideoFrameCallback per frame)
+            const totalFrames = Math.ceil(seqDur * fps);
 
-            const renderFrame = () => {
-                if (this.isCancelled) return;
+            for (let i = 0; i < totalFrames; i++) {
+                if (this.isCancelled) break;
 
-                const now = performance.now();
-                const t = Math.min(seqDur, (now - startWallTime) / 1000);
-
+                const t = (i / totalFrames) * seqDur;
                 sheet.sequence.position = t;
 
                 // 1. Evaluate scroll keyframes at time t
@@ -219,11 +210,8 @@ export class VideoExporter {
                     }
                 }
 
-                // 4. Smooth background video playback sync
+                // 4. Seek background video and WAIT for GPU hardware decode frame callback
                 if (videoEl && videoEl.duration > 0) {
-                    if (videoEl.paused) {
-                        videoEl.play().catch(() => {});
-                    }
                     const syncMode = useStore.getState().videoSyncMode;
                     const ratio = useStore.getState().videoSpeedRatio;
                     let videoTargetTime = 0;
@@ -234,50 +222,61 @@ export class VideoExporter {
                     } else {
                         videoTargetTime = prog * seqDur * ratio;
                     }
-                    if (!videoEl.seeking && Math.abs(videoEl.currentTime - videoTargetTime) > 0.25) {
+                    videoTargetTime = Math.max(0, Math.min(videoEl.duration - 0.01, videoTargetTime));
+
+                    if (Math.abs(videoEl.currentTime - videoTargetTime) > 0.001) {
                         videoEl.currentTime = videoTargetTime;
+
+                        await new Promise<void>((resolve) => {
+                            let isDone = false;
+                            const done = () => {
+                                if (!isDone) {
+                                    isDone = true;
+                                    videoEl.removeEventListener('seeked', done);
+                                    requestAnimationFrame(() => resolve());
+                                }
+                            };
+
+                            if ('requestVideoFrameCallback' in videoEl) {
+                                (videoEl as any).requestVideoFrameCallback(done);
+                            }
+                            videoEl.addEventListener('seeked', done, { once: true });
+                            setTimeout(done, 80);
+                        });
                     }
+                } else {
+                    await new Promise(r => requestAnimationFrame(r));
                 }
 
-                // 5. Keep Audio currentTime synced
-                if (audioEl && !audioEl.paused && Math.abs(audioEl.currentTime - t) > 0.1) {
-                    audioEl.currentTime = t;
-                }
-
-                // 6. Draw Composite Canvas Frame
+                // 5. Draw Composite Canvas Frame (Video + Three.js Canvas overlay)
                 ctx.fillStyle = '#0a0a0f';
                 ctx.fillRect(0, 0, targetWidth, targetHeight);
 
-                // Draw video background with fallback buffer to prevent any black frame flashes
-                if (videoEl && videoEl.readyState >= 2 && !videoEl.seeking) {
+                if (videoEl && videoEl.readyState >= 2) {
                     try {
                         ctx.drawImage(videoEl, 0, 0, targetWidth, targetHeight);
-                        videoCacheCtx.drawImage(videoEl, 0, 0, targetWidth, targetHeight);
-                        hasValidVideoFrame = true;
                     } catch (e) {}
-                } else if (hasValidVideoFrame) {
-                    ctx.drawImage(videoCacheCanvas, 0, 0, targetWidth, targetHeight);
                 }
 
-                // Draw Three.js / Canvas overlay if enabled
                 if (shouldIncludeParticles && threeCanvas && threeCanvas.width > 0) {
                     try {
                         ctx.drawImage(threeCanvas, 0, 0, targetWidth, targetHeight);
                     } catch (e) {}
                 }
 
-                options.onProgress?.(t / seqDur, t);
-
-                if (t < seqDur - 0.01) {
-                    this.animFrameId = requestAnimationFrame(renderFrame);
-                } else {
-                    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-                        this.mediaRecorder.stop();
-                    }
+                // Explicit request frame on track if supported
+                const track = compositeStream.getVideoTracks()[0] as any;
+                if (track && typeof track.requestFrame === 'function') {
+                    track.requestFrame();
                 }
-            };
 
-            this.animFrameId = requestAnimationFrame(renderFrame);
+                options.onProgress?.((i + 1) / totalFrames, t);
+            }
+
+            // Finish recording when all frames rendered
+            if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+                this.mediaRecorder.stop();
+            }
 
         } catch (err: any) {
             options.onError?.(err);
@@ -286,10 +285,6 @@ export class VideoExporter {
 
     cancelExport() {
         this.isCancelled = true;
-        if (this.animFrameId) {
-            cancelAnimationFrame(this.animFrameId);
-            this.animFrameId = null;
-        }
         if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
             this.mediaRecorder.stop();
         }
