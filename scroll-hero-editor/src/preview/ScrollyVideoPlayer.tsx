@@ -16,7 +16,7 @@ export default function ScrollyVideoPlayer() {
             const player = playerRefs.current[idx];
             if (player && typeof player.setVideoPercentage === 'function') {
                 try {
-                    player.setVideoPercentage(scrollProgress, { jump: true });
+                    player.setVideoPercentage(scrollProgress);
                 } catch (err) {}
             }
         });
@@ -35,6 +35,7 @@ export default function ScrollyVideoPlayer() {
                     >
                         <ScrollyVideo
                             src={pad.url}
+                            videoPercentage={scrollProgress}
                             trackScroll={false}
                             cover={false}
                             full={false}
@@ -42,7 +43,7 @@ export default function ScrollyVideoPlayer() {
                                 if (scrollyInstance) {
                                     playerRefs.current[idx] = scrollyInstance;
                                     try {
-                                        scrollyInstance.setVideoPercentage(useStore.getState().scrollProgress, { jump: true });
+                                        scrollyInstance.setVideoPercentage(useStore.getState().scrollProgress);
                                     } catch (e) {}
                                 }
                             }}
