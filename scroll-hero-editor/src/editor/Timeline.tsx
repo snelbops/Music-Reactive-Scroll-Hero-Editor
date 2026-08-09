@@ -131,6 +131,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
     const [audioMenu, setAudioMenu] = useState<{ visible: boolean; x: number; y: number; clickTime: number } | null>(null);
     const [audioTargetLane, setAudioTargetLane] = useState<string>('scrollPos');
+    const [shapeIterations, setShapeIterations] = useState<number>(4);
 
     const generateRhythmCurveForLane = (
         targetLane: string,
@@ -163,8 +164,13 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         const cfg = laneConfigs[targetLane] ?? { min: 0, max: 1 };
         const range = cfg.max - cfg.min;
 
-        const rangeBeats = (beats.length > 0 ? beats : Array.from({ length: Math.floor(seqDur / 0.5) }, (_, i) => i * 0.5))
-            .filter(bt => bt >= lStart && bt <= lEnd);
+        const rawBeats = beats.filter(bt => bt >= lStart && bt <= lEnd);
+        const rangeBeats = rawBeats.length >= 2
+            ? rawBeats
+            : Array.from(
+                { length: Math.max(2, Math.floor((lEnd - lStart) / 0.25)) },
+                (_, i) => +(lStart + i * 0.25).toFixed(2)
+            );
 
         const newSectionKfs: { time: number; value: number; easing?: string }[] = [];
 
@@ -248,6 +254,104 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
         setAudioMenu(null);
         setShowRhythmModal(false);
+    };
+
+    const generateShapeCurveForSelection = (
+        targetLane: string,
+        shapeType: 'sine' | 'triangle' | 'rampUp' | 'rampDown' | 'square' | 'easeIn' | 'easeOut' | 'sCurve',
+        iterations: number = 4
+    ) => {
+        useStore.getState().pushHistory();
+        const seqDur = useStore.getState().sequenceDuration;
+        const timeSel = useStore.getState().timeSelection;
+        const isLoopActive = useStore.getState().isLoop;
+
+        let lStart = 0;
+        let lEnd = seqDur;
+
+        if (timeSel) {
+            lStart = timeSel.start;
+            lEnd = timeSel.end;
+        } else if (isLoopActive) {
+            lStart = useStore.getState().loopStart || 0;
+            lEnd = useStore.getState().loopEnd || seqDur;
+        }
+
+        const dur = Math.max(0.1, lEnd - lStart);
+        const laneConfigs: Record<string, { min: number; max: number }> = {
+            scrollPos: { min: 0, max: 1 },
+            rotationSpeed: { min: 0, max: 0.05 },
+            depth: { min: 5, max: 60 },
+            size: { min: 0.1, max: 3 },
+            cssOpacity: { min: 0, max: 1 },
+        };
+        const cfg = laneConfigs[targetLane] ?? { min: 0, max: 1 };
+        const range = cfg.max - cfg.min;
+
+        const numSteps = Math.max(16, iterations * 16);
+        const newSectionKfs: { time: number; value: number; easing?: string }[] = [];
+
+        for (let i = 0; i <= numSteps; i++) {
+            const progress = i / numSteps;
+            const t = lStart + progress * dur;
+            const cycleProgress = (progress * iterations) % 1;
+
+            let normVal = 0;
+
+            switch (shapeType) {
+                case 'sine':
+                    normVal = (Math.sin(cycleProgress * 2 * Math.PI - Math.PI / 2) + 1) / 2;
+                    break;
+                case 'triangle':
+                    normVal = 1 - Math.abs((cycleProgress - 0.5) * 2);
+                    break;
+                case 'rampUp':
+                    normVal = cycleProgress;
+                    break;
+                case 'rampDown':
+                    normVal = 1 - cycleProgress;
+                    break;
+                case 'square':
+                    normVal = cycleProgress < 0.5 ? 1 : 0;
+                    break;
+                case 'easeIn':
+                    normVal = Math.pow(cycleProgress, 3);
+                    break;
+                case 'easeOut':
+                    normVal = 1 - Math.pow(1 - cycleProgress, 3);
+                    break;
+                case 'sCurve':
+                    normVal = cycleProgress < 0.5
+                        ? 4 * Math.pow(cycleProgress, 3)
+                        : 1 - Math.pow(-2 * cycleProgress + 2, 3) / 2;
+                    break;
+                default:
+                    normVal = cycleProgress;
+            }
+
+            const val = cfg.min + normVal * range;
+            const easingStr = shapeType === 'square' ? 'step' : 'linear';
+            newSectionKfs.push({ time: +t.toFixed(3), value: +val.toFixed(3), easing: easingStr });
+        }
+
+        if (targetLane === 'scrollPos') {
+            const existing = useStore.getState().scrollKeyframes;
+            const outside = existing.filter(k => k.time < lStart || k.time > lEnd);
+            const merged = [...outside, ...newSectionKfs].sort((a, b) => a.time - b.time);
+            useStore.getState().setScrollKeyframes(merged);
+        } else {
+            const existing = (useStore.getState().paramKeyframes[targetLane] ?? []) as ParamKf[];
+            const outside = existing.filter(k => k.time < lStart || k.time > lEnd);
+            const paramKfs: ParamKf[] = newSectionKfs.map(k => ({
+                time: k.time,
+                value: k.value,
+                easing: k.easing || 'linear'
+            }));
+            const merged = [...outside, ...paramKfs].sort((a, b) => a.time - b.time);
+            useStore.getState().setParamKeyframes(targetLane, merged);
+        }
+
+        setAudioMenu(null);
     };
 
     const generateRhythmCurve = (mode: 'bounce' | 'stutter' | 'wave' | 'ramp' | 'jumps') => {
@@ -1788,6 +1892,51 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     <span className="font-bold text-blue-400 group-hover:text-white">📉 Inverted Ducking Envelope</span>
                                     <span className="text-[9px] text-gray-400">Ducks down on beat, returns to max in quiet parts.</span>
                                 </button>
+                            </div>
+                        </div>
+
+                        {/* Ableton-Style Insert Automation Shapes */}
+                        <div className="border-t border-[#2c2c2e] my-1 pt-1.5 space-y-1.5">
+                            <div className="flex items-center justify-between px-1">
+                                <span className="text-[9px] uppercase font-bold text-cyan-400">Insert Shape:</span>
+                                <div className="flex items-center gap-1 font-mono text-[9px]">
+                                    <span className="text-gray-400">Cycles:</span>
+                                    {[1, 2, 4, 8, 16].map((num) => (
+                                        <button
+                                            key={num}
+                                            className={`px-1.5 py-0.5 rounded border transition-colors ${
+                                                shapeIterations === num
+                                                    ? 'bg-cyan-500 text-black border-cyan-400 font-bold'
+                                                    : 'bg-[#252527] border-[#3a3a3c] text-gray-300 hover:bg-[#2e2e31]'
+                                            }`}
+                                            onClick={() => setShapeIterations(num)}
+                                        >
+                                            {num}x
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-4 gap-1 text-[10px] font-mono">
+                                {[
+                                    { id: 'sine', label: 'Sine', icon: '🌊' },
+                                    { id: 'triangle', label: 'Triangle', icon: '📐' },
+                                    { id: 'rampUp', label: 'Saw Up', icon: '📈' },
+                                    { id: 'rampDown', label: 'Saw Down', icon: '📉' },
+                                    { id: 'square', label: 'Square', icon: '⏹️' },
+                                    { id: 'easeIn', label: 'Ease In', icon: '🪝' },
+                                    { id: 'easeOut', label: 'Ease Out', icon: '📉' },
+                                    { id: 'sCurve', label: 'S-Curve', icon: '🔀' },
+                                ].map((shape) => (
+                                    <button
+                                        key={shape.id}
+                                        className="flex flex-col items-center justify-center p-1.5 rounded bg-[#252527] hover:bg-cyan-950 hover:border-cyan-400 border border-[#3a3a3c] transition-all group"
+                                        onClick={() => generateShapeCurveForSelection(audioTargetLane, shape.id as any, shapeIterations)}
+                                        title={`Insert ${shape.label} (${shapeIterations}x)`}
+                                    >
+                                        <span className="text-sm group-hover:scale-110 transition-transform">{shape.icon}</span>
+                                        <span className="text-[8px] text-gray-300 group-hover:text-cyan-300 font-sans mt-0.5 truncate w-full text-center">{shape.label}</span>
+                                    </button>
+                                ))}
                             </div>
                         </div>
                     </div>
