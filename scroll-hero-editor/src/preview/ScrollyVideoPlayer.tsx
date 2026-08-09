@@ -1,60 +1,46 @@
 import { useRef, useEffect } from 'react';
-import ScrollyVideo from 'scrolly-video/dist/ScrollyVideo.esm.jsx';
 import { useStore } from '../store/useStore';
 
 export default function ScrollyVideoPlayer() {
     const scrollProgress = useStore((state) => state.scrollProgress);
     const videoPads = useStore((state) => state.videoPads);
     const activeVideoPadIdx = useStore((state) => state.activeVideoPadIdx);
-    const playerRefs = useRef<Record<number, any>>({});
+    const videoUrl = useStore((state) => state.videoUrl);
+    const videoRef = useRef<HTMLVideoElement>(null);
 
-    // Use ref to manually set percentage so we can pass { jump: true }
-    // which bypasses slow smooth playback and forces an instant frame scrub across all active video pads.
+    const activePad = videoPads[activeVideoPadIdx];
+    const currentUrl = activePad?.url || videoUrl || '/sample.mp4';
+
+    // Direct synchronous HTML5 video currentTime seeking — zero WebGL memory overhead, no Context Lost crashes
     useEffect(() => {
-        videoPads.forEach((pad, idx) => {
-            if (!pad.url) return;
-            const player = playerRefs.current[idx];
-            if (player && typeof player.setVideoPercentage === 'function') {
-                try {
-                    player.setVideoPercentage(scrollProgress);
-                } catch (err) {}
-            }
-        });
-    }, [scrollProgress, videoPads]);
+        const v = videoRef.current;
+        if (v && v.duration && !isNaN(v.duration) && v.duration > 0) {
+            v.currentTime = Math.max(0, Math.min(v.duration - 0.01, scrollProgress * v.duration));
+        }
+    }, [scrollProgress]);
+
+    if (!currentUrl) return null;
 
     return (
-        <div className="absolute inset-0 w-full h-full pointer-events-none overflow-hidden [&_video]:!object-contain [&_video]:!w-full [&_video]:!h-full [&_div]:!w-full [&_div]:!h-full [&_div]:!max-w-full [&_div]:!max-h-full [&_div]:!position-static [&_div]:!transform-none">
-            {videoPads.map((pad, idx) => {
-                if (!pad.url) return null;
-                const isActive = idx === activeVideoPadIdx;
-                return (
-                    <div
-                        key={`${idx}-${pad.url}`}
-                        className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden"
-                        style={{ display: isActive ? 'block' : 'none' }}
-                    >
-                        <ScrollyVideo
-                            src={pad.url}
-                            videoPercentage={scrollProgress}
-                            trackScroll={false}
-                            cover={false}
-                            full={false}
-                            onReady={(scrollyInstance: any) => {
-                                if (scrollyInstance) {
-                                    playerRefs.current[idx] = scrollyInstance;
-                                    try {
-                                        scrollyInstance.setVideoPercentage(useStore.getState().scrollProgress);
-                                    } catch (e) {}
-                                }
-                            }}
-                            ref={(el: any) => {
-                                if (el) playerRefs.current[idx] = el;
-                            }}
-                            transitionSpeed={10}
-                        />
-                    </div>
-                );
-            })}
+        <div className="absolute inset-0 w-full h-full pointer-events-none overflow-hidden flex items-center justify-center bg-black">
+            <video
+                ref={videoRef}
+                key={currentUrl}
+                src={currentUrl}
+                preload="auto"
+                muted
+                playsInline
+                className="w-full h-full object-contain pointer-events-none"
+                onLoadedMetadata={() => {
+                    const v = videoRef.current;
+                    if (v && v.duration) {
+                        v.currentTime = Math.max(0, Math.min(v.duration - 0.01, useStore.getState().scrollProgress * v.duration));
+                    }
+                }}
+                onSeeked={() => {
+                    // Ensures frame is cleanly rendered without lag
+                }}
+            />
         </div>
     );
 }

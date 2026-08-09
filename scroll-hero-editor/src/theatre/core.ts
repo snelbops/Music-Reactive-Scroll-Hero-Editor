@@ -45,4 +45,11 @@ export const cssOpacityObj = sheet.object('CSS Opacity', {
     opacity: types.number(1, { range: [0, 1] }),
 });
 
-// studio.initialize() intentionally disabled — overlay not needed while Theatre.js is dormant
+import studio from '@theatre/studio';
+
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
+    try {
+        studio.initialize();
+        studio.ui.hide();
+    } catch (e) {}
+}
