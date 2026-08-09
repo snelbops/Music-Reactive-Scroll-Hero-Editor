@@ -7,6 +7,7 @@ export type VideoExportOptions = {
     format: 'webm' | 'mp4';
     mode: 'realtime' | 'offline';
     aspectRatio?: string;
+    includeParticles?: boolean;
     onProgress?: (progress: number, currentTime: number) => void;
     onComplete?: () => void;
     onError?: (err: Error) => void;
@@ -25,6 +26,7 @@ export class VideoExporter {
         const seqDur = useStore.getState().sequenceDuration;
         const fps = options.fps || 60;
         const selectedRatio = options.aspectRatio || useStore.getState().aspectRatio || '16:9';
+        const shouldIncludeParticles = options.includeParticles !== false;
 
         // Locate viewport container elements
         const container = document.querySelector('div[data-purpose="viewport-container"]') as HTMLElement | null;
@@ -54,7 +56,7 @@ export class VideoExporter {
             targetHeight = videoEl.videoHeight;
         } else if (container) {
             const rect = container.getBoundingClientRect();
-            if (rect.height > 0 && rect.width > 0) {
+            if (rect.height > 0 && rect.height > 0) {
                 const scale = 1080 / rect.height;
                 targetHeight = 1080;
                 targetWidth = Math.round(rect.width * scale);
@@ -257,8 +259,8 @@ export class VideoExporter {
                     ctx.drawImage(videoCacheCanvas, 0, 0, targetWidth, targetHeight);
                 }
 
-                // Draw Three.js / Canvas overlay (preserveDrawingBuffer: true prevents black frames)
-                if (threeCanvas && threeCanvas.width > 0) {
+                // Draw Three.js / Canvas overlay if enabled
+                if (shouldIncludeParticles && threeCanvas && threeCanvas.width > 0) {
                     try {
                         ctx.drawImage(threeCanvas, 0, 0, targetWidth, targetHeight);
                     } catch (e) {}

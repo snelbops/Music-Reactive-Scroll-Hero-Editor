@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Film, Download, StopCircle, Smartphone, Monitor, Square, Video, Scaling } from 'lucide-react';
+import { X, Film, Download, StopCircle, Smartphone, Monitor, Square, Video, Scaling, Sparkles } from 'lucide-react';
 import { videoExporter } from '../export/exportVideo';
 import { useStore } from '../store/useStore';
 
@@ -9,8 +9,10 @@ interface VideoExportModalProps {
 
 export default function VideoExportModal({ onClose }: VideoExportModalProps) {
     const activeRatio = useStore(s => s.aspectRatio);
+    const activePreset = useStore(s => s.activePreset);
 
     const [exportRatio, setExportRatio] = useState<string>(activeRatio || '16:9');
+    const [includeParticles, setIncludeParticles] = useState<boolean>(activePreset !== 'video');
     const [fps, setFps] = useState<30 | 60>(60);
     const [format, setFormat] = useState<'webm' | 'mp4'>('mp4');
     const [isExporting, setIsExporting] = useState(false);
@@ -25,13 +27,14 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
         setIsExporting(true);
         setProgress(0);
         setCurrentTime(0);
-        setStatusMessage('Starting 100% frame-accurate offline video render…');
+        setStatusMessage('Starting synchronized video render…');
 
         videoExporter.startExport({
             fps,
             format,
-            mode: 'offline',
+            mode: 'realtime',
             aspectRatio: exportRatio,
+            includeParticles,
             onProgress: (p, time) => {
                 setProgress(p);
                 setCurrentTime(time);
@@ -155,6 +158,25 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                         </div>
                     </div>
 
+                    {/* Particle Layer Toggle */}
+                    <div className="p-2.5 rounded-lg bg-[#252527] border border-[#3a3a3c] flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-purple-400" />
+                            <span className="text-gray-300 font-semibold">Include 3D Particle Overlay:</span>
+                        </div>
+                        <button
+                            onClick={() => setIncludeParticles(!includeParticles)}
+                            disabled={isExporting}
+                            className={`px-3 py-1 rounded text-xs font-bold transition-colors ${
+                                includeParticles
+                                    ? 'bg-purple-600 text-white'
+                                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                            }`}
+                        >
+                            {includeParticles ? '✨ Particles ON' : '🚫 Clean Video'}
+                        </button>
+                    </div>
+
                     {/* Format Selection */}
                     <div className="space-y-1.5">
                         <label className="text-gray-300 font-semibold block">Video File Container:</label>
@@ -227,13 +249,13 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                     {isExporting && (
                         <div className="space-y-2 p-3 rounded-lg bg-black/40 border border-cyan-500/30">
                             <div className="flex justify-between text-[11px] font-mono">
-                                <span className="text-cyan-400 font-bold">⚡ Step-by-Step Frame Rendering…</span>
+                                <span className="text-cyan-400 font-bold">⚡ Rendering Video Sequence…</span>
                                 <span className="text-white font-bold">{currentTime.toFixed(1)}s / {sequenceDuration.toFixed(1)}s ({Math.round(progress * 100)}%)</span>
                             </div>
                             <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
                                 <div className="h-full bg-gradient-to-r from-cyan-500 to-purple-500 transition-all duration-75" style={{ width: `${progress * 100}%` }} />
                             </div>
-                            <p className="text-[10px] text-gray-400 text-center font-mono">Rendering every frame offline for 100% accuracy & 0 dropped frames</p>
+                            <p className="text-[10px] text-gray-400 text-center font-mono">100% synchronized wall-clock video rendering</p>
                         </div>
                     )}
 
@@ -258,7 +280,7 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                             onClick={handleStartExport}
                             className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-lg shadow-lg transition-all flex items-center gap-1.5"
                         >
-                            <Download className="w-3.5 h-3.5" /> Start Offline Render
+                            <Download className="w-3.5 h-3.5" /> Start Video Render
                         </button>
                     ) : (
                         <button
