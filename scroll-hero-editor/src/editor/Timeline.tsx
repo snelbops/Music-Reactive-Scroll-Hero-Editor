@@ -135,9 +135,19 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     ) => {
         useStore.getState().pushHistory();
         const seqDur = useStore.getState().sequenceDuration;
+        const timeSel = useStore.getState().timeSelection;
         const isLoopActive = useStore.getState().isLoop;
-        const lStart = onlyLoopRegion && isLoopActive ? (useStore.getState().loopStart || 0) : 0;
-        const lEnd = onlyLoopRegion && isLoopActive ? (useStore.getState().loopEnd || seqDur) : seqDur;
+
+        let lStart = 0;
+        let lEnd = seqDur;
+
+        if (timeSel) {
+            lStart = timeSel.start;
+            lEnd = timeSel.end;
+        } else if (onlyLoopRegion && isLoopActive) {
+            lStart = useStore.getState().loopStart || 0;
+            lEnd = useStore.getState().loopEnd || seqDur;
+        }
 
         const laneConfigs: Record<string, { min: number; max: number }> = {
             scrollPos: { min: 0, max: 1 },
@@ -152,13 +162,10 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         const rangeBeats = (beats.length > 0 ? beats : Array.from({ length: Math.floor(seqDur / 0.5) }, (_, i) => i * 0.5))
             .filter(bt => bt >= lStart && bt <= lEnd);
 
-        const generatedKfs: { time: number; value: number; easing?: string }[] = [];
+        const newSectionKfs: { time: number; value: number; easing?: string }[] = [];
 
-        // Base rest values outside selection (Silence level)
-        if (lStart > 0) {
-            generatedKfs.push({ time: 0, value: cfg.min });
-            generatedKfs.push({ time: +lStart.toFixed(2), value: cfg.min });
-        }
+        // Boundary anchor at start of selection
+        newSectionKfs.push({ time: +lStart.toFixed(2), value: cfg.min });
 
         if (mode === 'envelope' && waveform.length > 0) {
             const step = seqDur / waveform.length;
@@ -166,37 +173,37 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 const t = idx * step;
                 if (t >= lStart && t <= lEnd) {
                     const normVal = cfg.min + val * range;
-                    generatedKfs.push({ time: +t.toFixed(2), value: +normVal.toFixed(3) });
+                    newSectionKfs.push({ time: +t.toFixed(2), value: +normVal.toFixed(3) });
                 }
             });
         } else if (mode === 'bounce') {
             rangeBeats.forEach((bt) => {
-                if (bt - 0.08 >= lStart) generatedKfs.push({ time: +(bt - 0.08).toFixed(2), value: cfg.min });
-                generatedKfs.push({ time: +bt.toFixed(2), value: cfg.max });
-                if (bt + 0.08 <= lEnd) generatedKfs.push({ time: +(bt + 0.08).toFixed(2), value: cfg.min });
+                if (bt - 0.08 >= lStart) newSectionKfs.push({ time: +(bt - 0.08).toFixed(2), value: cfg.min });
+                newSectionKfs.push({ time: +bt.toFixed(2), value: cfg.max });
+                if (bt + 0.08 <= lEnd) newSectionKfs.push({ time: +(bt + 0.08).toFixed(2), value: cfg.min });
             });
         } else if (mode === 'stutter') {
             rangeBeats.forEach((bt, idx) => {
                 const val = cfg.min + (idx / Math.max(1, rangeBeats.length - 1)) * range;
-                generatedKfs.push({ time: +bt.toFixed(2), value: +val.toFixed(3), easing: 'step' });
+                newSectionKfs.push({ time: +bt.toFixed(2), value: +val.toFixed(3), easing: 'step' });
             });
         } else if (mode === 'wave') {
             rangeBeats.forEach((bt, idx) => {
                 const normVal = cfg.min + ((Math.sin((idx * Math.PI) / 2) + 1) / 2) * range;
-                generatedKfs.push({ time: +bt.toFixed(2), value: +normVal.toFixed(3) });
+                newSectionKfs.push({ time: +bt.toFixed(2), value: +normVal.toFixed(3) });
             });
         } else if (mode === 'ramp') {
             const barSize = 4;
             rangeBeats.forEach((bt, idx) => {
                 const barProgress = (idx % barSize) / (barSize - 1);
                 const val = cfg.min + barProgress * range;
-                generatedKfs.push({ time: +bt.toFixed(2), value: +val.toFixed(3) });
+                newSectionKfs.push({ time: +bt.toFixed(2), value: +val.toFixed(3) });
             });
         } else if (mode === 'ducking') {
             rangeBeats.forEach((bt) => {
-                if (bt - 0.08 >= lStart) generatedKfs.push({ time: +(bt - 0.08).toFixed(2), value: cfg.max });
-                generatedKfs.push({ time: +bt.toFixed(2), value: cfg.min });
-                if (bt + 0.08 <= lEnd) generatedKfs.push({ time: +(bt + 0.08).toFixed(2), value: cfg.max });
+                if (bt - 0.08 >= lStart) newSectionKfs.push({ time: +(bt - 0.08).toFixed(2), value: cfg.max });
+                newSectionKfs.push({ time: +bt.toFixed(2), value: cfg.min });
+                if (bt + 0.08 <= lEnd) newSectionKfs.push({ time: +(bt + 0.08).toFixed(2), value: cfg.max });
             });
         } else if (mode === 'flutter') {
             rangeBeats.forEach((bt) => {
@@ -204,33 +211,35 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     const t = bt + sub * 0.12;
                     if (t <= lEnd) {
                         const val = sub % 2 === 0 ? cfg.max : cfg.min;
-                        generatedKfs.push({ time: +t.toFixed(2), value: +val.toFixed(3) });
+                        newSectionKfs.push({ time: +t.toFixed(2), value: +val.toFixed(3) });
                     }
                 }
             });
         } else if (mode === 'jumps') {
             rangeBeats.forEach((bt) => {
                 const val = cfg.min + (0.1 + Math.random() * 0.8) * range;
-                generatedKfs.push({ time: +bt.toFixed(2), value: +val.toFixed(3), easing: 'step' });
+                newSectionKfs.push({ time: +bt.toFixed(2), value: +val.toFixed(3), easing: 'step' });
             });
         }
 
-        if (lEnd < seqDur) {
-            generatedKfs.push({ time: +lEnd.toFixed(2), value: cfg.min });
-            generatedKfs.push({ time: +seqDur.toFixed(2), value: cfg.min });
-        }
-
-        const sorted = generatedKfs.sort((a, b) => a.time - b.time);
+        // Boundary anchor at end of selection
+        newSectionKfs.push({ time: +lEnd.toFixed(2), value: cfg.min });
 
         if (targetLane === 'scrollPos') {
-            useStore.getState().setScrollKeyframes(sorted);
+            const existing = useStore.getState().scrollKeyframes;
+            const outside = existing.filter(k => k.time < lStart || k.time > lEnd);
+            const merged = [...outside, ...newSectionKfs].sort((a, b) => a.time - b.time);
+            useStore.getState().setScrollKeyframes(merged);
         } else {
-            const paramKfs: ParamKf[] = sorted.map(k => ({
+            const existing = (useStore.getState().paramKeyframes[targetLane] ?? []) as ParamKf[];
+            const outside = existing.filter(k => k.time < lStart || k.time > lEnd);
+            const paramKfs: ParamKf[] = newSectionKfs.map(k => ({
                 time: k.time,
                 value: k.value,
                 easing: k.easing || 'linear'
             }));
-            useStore.getState().setParamKeyframes(targetLane, paramKfs);
+            const merged = [...outside, ...paramKfs].sort((a, b) => a.time - b.time);
+            useStore.getState().setParamKeyframes(targetLane, merged);
         }
 
         setAudioMenu(null);
@@ -271,6 +280,43 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         }
 
         useStore.getState().setScrollKeyframes(thinned.sort((a, b) => a.time - b.time));
+    };
+
+    const handleTrackPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (e.button !== 0) return;
+        const target = e.currentTarget;
+        const rect = target.getBoundingClientRect();
+        const startTime = Math.max(0, Math.min(SEQUENCE_DURATION, ((e.clientX - rect.left) / rect.width) * SEQUENCE_DURATION));
+
+        if (!e.shiftKey && activeTool !== 'select') {
+            useStore.getState().setTimeSelection(null);
+            return;
+        }
+
+        e.stopPropagation();
+        target.setPointerCapture(e.pointerId);
+
+        const onMove = (ev: PointerEvent) => {
+            if (ev.buttons & 1) {
+                const r = target.getBoundingClientRect();
+                const currTime = Math.max(0, Math.min(SEQUENCE_DURATION, ((ev.clientX - r.left) / r.width) * SEQUENCE_DURATION));
+                const start = +Math.min(startTime, currTime).toFixed(2);
+                const end = +Math.max(startTime, currTime).toFixed(2);
+                if (end - start > 0.05) {
+                    useStore.getState().setTimeSelection({ start, end });
+                    useStore.getState().setLoopRange(start, end);
+                    useStore.getState().setIsLoop(true);
+                }
+            }
+        };
+
+        const onUp = () => {
+            target.removeEventListener('pointermove', onMove as any);
+            target.removeEventListener('pointerup', onUp as any);
+        };
+
+        target.addEventListener('pointermove', onMove as any);
+        target.addEventListener('pointerup', onUp as any);
     };
 
     const handleSegmentDrag = (
@@ -826,6 +872,24 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         })()}
                     </div>
                 </div>
+                {/* Visual Time Selection Box Overlay */}
+                {(() => {
+                    const timeSel = useStore(s => s.timeSelection);
+                    if (!timeSel) return null;
+                    const seqDur = useStore(s => s.sequenceDuration);
+
+                    return (
+                        <div
+                            className="absolute top-5 bottom-0 bg-cyan-500/15 border-x-2 border-cyan-400 z-40 pointer-events-none flex flex-col justify-between shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                            style={{ left: `calc(120px + (100% - 120px) * ${timeSel.start / seqDur})`, width: `calc((100% - 120px) * ${(timeSel.end - timeSel.start) / seqDur})` }}
+                        >
+                            <div className="bg-cyan-500 text-black font-mono font-bold text-[8px] px-1.5 py-0.5 self-start rounded-b flex items-center gap-1 shadow">
+                                <span>SELECTION: {timeSel.start.toFixed(1)}s - {timeSel.end.toFixed(1)}s</span>
+                                <span className="text-[7px] text-cyan-950 font-normal">(Right-click to push automation)</span>
+                            </div>
+                        </div>
+                    );
+                })()}
                 {(isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('audio') }}>
                     <div className="w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border bg-editor-panel text-editor-fg sticky left-0 z-30 overflow-hidden">
@@ -843,6 +907,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     </div>
                     <div
                         className="flex-1 relative overflow-hidden flex items-center cursor-context-menu"
+                        onPointerDown={(e) => handleTrackPointerDown(e)}
                         onContextMenu={(e) => {
                             e.preventDefault();
                             const rect = e.currentTarget.getBoundingClientRect();

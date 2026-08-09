@@ -66,6 +66,8 @@ interface EditorState {
     applyParamKeyframesAt: (time: number) => void;
     selectedLane: string | null; setSelectedLane: (id: string | null) => void;
     selectedKeyframes: { laneId: string; position: number; value: number }[];
+    timeSelection: { start: number; end: number } | null;
+    setTimeSelection: (sel: { start: number; end: number } | null) => void;
     setSelectedKeyframe: (kf: { laneId: string; position: number; value: number } | null) => void;
     setSelectedKeyframes: (kfs: { laneId: string; position: number; value: number }[]) => void;
     toggleSelectedKeyframe: (kf: { laneId: string; position: number; value: number }) => void;
@@ -205,6 +207,8 @@ export const useStore = create<EditorState>((set, get) => {
     },
     selectedLane: null, setSelectedLane: (id) => set({ selectedLane: id, selectedKeyframes: [] }),
     selectedKeyframes: [],
+    timeSelection: null,
+    setTimeSelection: (sel) => set({ timeSelection: sel }),
     setSelectedKeyframe: (kf) => set({ selectedKeyframes: kf ? [kf] : [], selectedLane: kf?.laneId ?? null }),
     setSelectedKeyframes: (kfs) => set({ selectedKeyframes: kfs, selectedLane: kfs.at(-1)?.laneId ?? null }),
     toggleSelectedKeyframe: (kf) => set((s) => {
