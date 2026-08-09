@@ -79,6 +79,10 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const clearRecordedEvents = useStore(state => state.clearRecordedEvents);
     const isLoop = useStore(state => state.isLoop);
     const setIsLoop = useStore(state => state.setIsLoop);
+    const sequenceDuration = useStore(s => s.sequenceDuration);
+    const loopStart = useStore(s => s.loopStart);
+    const loopEnd = useStore(s => s.loopEnd);
+    const timeSelection = useStore(s => s.timeSelection);
     const setSceneProgress = useStore(state => state.setSceneProgress);
     const recordCountdown = useStore(state => state.recordCountdown);
     const setRecordCountdown = useStore(state => state.setRecordCountdown);
@@ -444,7 +448,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const draggingKfRef = useRef<{ origTime: number; value: number } | null>(null);
     const draggingParamKfRef = useRef<{ laneId: string; startTime: number; origTime: number; value: number } | null>(null);
 
-    const { beats, waveform, isReady } = useKickDrumData(useStore(s => s.audioUrl));
+    const { beats, waveform, isReady } = useKickDrumData(audioUrl);
 
     // Measure lanes width for playhead math
     useEffect(() => {
@@ -809,7 +813,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             type="number"
                             min="1"
                             max="300"
-                            value={useStore(s => s.sequenceDuration)}
+                            value={sequenceDuration}
                             onChange={(e) => useStore.getState().setSequenceDuration(parseFloat(e.target.value) || 10)}
                             className="w-10 bg-[#222] border border-[#333] rounded px-1 text-center font-mono text-[10px] text-editor-accent-purple focus:outline-none focus:border-editor-accent-purple"
                         />
@@ -834,16 +838,15 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     </div>
                     <div className="flex-1 relative h-full bg-[#111] cursor-pointer" ref={loopTrackRef} onClick={handleLoopTrackClick}>
                         {(() => {
-                            const seqDur = useStore(s => s.sequenceDuration);
-                            const lStart = useStore(s => s.loopStart);
-                            const lEnd = useStore(s => s.loopEnd) || seqDur;
-                            const leftPct = (lStart / seqDur) * 100;
-                            const widthPct = Math.max(2, ((lEnd - lStart) / seqDur) * 100);
+                            const lStart = loopStart;
+                            const lEnd = loopEnd || sequenceDuration;
+                            const leftPct = (lStart / sequenceDuration) * 100;
+                            const widthPct = Math.max(2, ((lEnd - lStart) / sequenceDuration) * 100);
 
                             return (
                                 <div
                                     className={`absolute top-0.5 bottom-0.5 rounded border transition-colors flex items-center justify-between group/loopbar ${
-                                        useStore(s => s.isLoop)
+                                        isLoop
                                             ? 'bg-editor-accent-purple/30 border-editor-accent-purple text-editor-accent-purple'
                                             : 'bg-white/10 border-white/20 text-gray-400'
                                     }`}
@@ -873,23 +876,17 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     </div>
                 </div>
                 {/* Visual Time Selection Box Overlay */}
-                {(() => {
-                    const timeSel = useStore(s => s.timeSelection);
-                    if (!timeSel) return null;
-                    const seqDur = useStore(s => s.sequenceDuration);
-
-                    return (
-                        <div
-                            className="absolute top-5 bottom-0 bg-cyan-500/15 border-x-2 border-cyan-400 z-40 pointer-events-none flex flex-col justify-between shadow-[0_0_15px_rgba(6,182,212,0.2)]"
-                            style={{ left: `calc(120px + (100% - 120px) * ${timeSel.start / seqDur})`, width: `calc((100% - 120px) * ${(timeSel.end - timeSel.start) / seqDur})` }}
-                        >
-                            <div className="bg-cyan-500 text-black font-mono font-bold text-[8px] px-1.5 py-0.5 self-start rounded-b flex items-center gap-1 shadow">
-                                <span>SELECTION: {timeSel.start.toFixed(1)}s - {timeSel.end.toFixed(1)}s</span>
-                                <span className="text-[7px] text-cyan-950 font-normal">(Right-click to push automation)</span>
-                            </div>
+                {timeSelection && (
+                    <div
+                        className="absolute top-5 bottom-0 bg-cyan-500/15 border-x-2 border-cyan-400 z-40 pointer-events-none flex flex-col justify-between shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                        style={{ left: `calc(120px + (100% - 120px) * ${timeSelection.start / sequenceDuration})`, width: `calc((100% - 120px) * ${(timeSelection.end - timeSelection.start) / sequenceDuration})` }}
+                    >
+                        <div className="bg-cyan-500 text-black font-mono font-bold text-[8px] px-1.5 py-0.5 self-start rounded-b flex items-center gap-1 shadow">
+                            <span>SELECTION: {timeSelection.start.toFixed(1)}s - {timeSelection.end.toFixed(1)}s</span>
+                            <span className="text-[7px] text-cyan-950 font-normal">(Right-click to push automation)</span>
                         </div>
-                    );
-                })()}
+                    </div>
+                )}
                 {(isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('audio') }}>
                     <div className="w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border bg-editor-panel text-editor-fg sticky left-0 z-30 overflow-hidden">
