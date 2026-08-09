@@ -325,11 +325,7 @@ export default function Viewport() {
                         </Canvas>
                     )}
 
-                    {/* Progress Overlay — replaces old DEBUG label */}
-                    <div className="absolute top-4 left-4 z-50 bg-black/70 text-white font-mono text-sm px-3 py-1.5 rounded pointer-events-none">
-                        <span className="text-editor-accent-purple">{scrollProgress.toFixed(3)}</span>
-                        <span className="text-[9px] text-gray-500 ml-1">PROGRESS</span>
-                    </div>
+
 
                     {/* Ghost Trail Canvas */}
                     <GhostTrailCanvas />

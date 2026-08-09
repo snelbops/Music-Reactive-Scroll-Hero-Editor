@@ -397,6 +397,9 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                         if (!file) return;
                                         const url = URL.createObjectURL(file);
                                         setVideoPad(idx, { name: file.name, url });
+                                        setMp4Asset({ name: file.name, url });
+                                        setActiveVideoPadIdx(idx);
+                                        handleExtract(file);
                                     };
 
                                     const handlePadDrop = (e: React.DragEvent) => {
@@ -405,7 +408,9 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                         if (file && (file.type.startsWith('video/') || file.name.endsWith('.mp4') || file.name.endsWith('.webm'))) {
                                             const url = URL.createObjectURL(file);
                                             setVideoPad(idx, { name: file.name, url });
+                                            setMp4Asset({ name: file.name, url });
                                             setActiveVideoPadIdx(idx);
+                                            handleExtract(file);
                                         }
                                     };
 
