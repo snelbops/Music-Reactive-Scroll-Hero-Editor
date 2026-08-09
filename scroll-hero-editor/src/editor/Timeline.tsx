@@ -113,6 +113,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const [lanesWidth, setLanesWidth] = useState(0);
     const [activeTool, setActiveTool] = useState<'select' | 'pen' | 'eraser'>('select');
     const [snapToBeat, setSnapToBeat] = useState(false);
+    const [isolatedLane, setIsolatedLane] = useState<'all' | 'scrollPos' | 'rotationSpeed' | 'cssOpacity' | 'depth' | 'size'>('all');
+    const loopTrackRef = useRef<HTMLDivElement>(null);
     const canUndo = useStore(s => s._past.length > 0);
     const canRedo = useStore(s => s._future.length > 0);
     const draggingHandleRef = useRef<{ kfTime: number; side: 'in' | 'out' } | null>(null);
@@ -121,6 +123,57 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const [seqTime, setSeqTime] = useState(() => sheet.sequence.position);
     const [laneHeights, setLaneHeights] = useState<Record<string, number>>({});
     const laneH = (id: string, def = 40) => laneHeights[id] ?? Math.round(def * verticalZoom);
+
+    const handleLoopDrag = (type: 'start' | 'end' | 'bar', e: React.PointerEvent<HTMLDivElement>) => {
+        e.stopPropagation();
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+
+        const trackRect = loopTrackRef.current?.getBoundingClientRect();
+        if (!trackRect) return;
+
+        const seqDur = useStore.getState().sequenceDuration;
+        const startL = useStore.getState().loopStart;
+        const endL = useStore.getState().loopEnd || seqDur;
+        const clickX = e.clientX;
+
+        const onPointerMove = (moveEv: PointerEvent) => {
+            const deltaX = moveEv.clientX - clickX;
+            const deltaTime = (deltaX / trackRect.width) * seqDur;
+            const currentPos = Math.max(0, Math.min(seqDur, ((moveEv.clientX - trackRect.left) / trackRect.width) * seqDur));
+
+            if (type === 'start') {
+                const newStart = Math.max(0, Math.min(endL - 0.5, currentPos));
+                useStore.getState().setLoopRange(newStart, endL);
+            } else if (type === 'end') {
+                const newEnd = Math.max(startL + 0.5, Math.min(seqDur, currentPos));
+                useStore.getState().setLoopRange(startL, newEnd);
+            } else if (type === 'bar') {
+                const dur = endL - startL;
+                const newStart = Math.max(0, Math.min(seqDur - dur, startL + deltaTime));
+                useStore.getState().setLoopRange(newStart, newStart + dur);
+            }
+        };
+
+        const onPointerUp = () => {
+            document.removeEventListener('pointermove', onPointerMove);
+            document.removeEventListener('pointerup', onPointerUp);
+        };
+
+        document.addEventListener('pointermove', onPointerMove);
+        document.addEventListener('pointerup', onPointerUp);
+    };
+
+    const handleLoopTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        const trackRect = loopTrackRef.current?.getBoundingClientRect();
+        if (!trackRect) return;
+        const seqDur = useStore.getState().sequenceDuration;
+        const clickTime = Math.max(0, Math.min(seqDur, ((e.clientX - trackRect.left) / trackRect.width) * seqDur));
+        const currentDur = (useStore.getState().loopEnd || seqDur) - useStore.getState().loopStart;
+        const halfDur = currentDur > 0 ? currentDur / 2 : 2.5;
+        const newStart = Math.max(0, Math.min(seqDur - (halfDur * 2), clickTime - halfDur));
+        useStore.getState().setLoopRange(newStart, newStart + (halfDur * 2));
+    };
     const makeLaneDrag = (id: string, def = 40) => (e: React.PointerEvent<HTMLDivElement>) => {
         e.stopPropagation();
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -409,12 +462,20 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         </span>
                     </div>
                 </div>
-                <div className="absolute left-[70%] -translate-x-1/2 flex items-center space-x-10">
-                    <div className="flex items-center space-x-4 text-[#808080]">
-                        <button className="p-1 hover:text-[#d9d9d9] transition-colors"><svg className="w-3.5 h-3.5 rotate-180" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+                <div className="absolute left-[60%] -translate-x-1/2 flex items-center space-x-6">
+                    <div className="flex items-center space-x-2 text-[#808080]">
+                        <button
+                            className="p-1 hover:text-[#d9d9d9] transition-colors"
+                            onClick={() => seekTo(0)}
+                            title="Rewind to 0:00 (Click)"
+                        >
+                            <svg className="w-3.5 h-3.5 rotate-180" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                        </button>
                         <button
                             className="p-1 hover:text-[#d9d9d9] transition-colors"
                             onClick={() => { setIsPlaying(false); if (isRecording) setIsRecording(false); }}
+                            onDoubleClick={() => { setIsPlaying(false); if (isRecording) setIsRecording(false); seekTo(0); }}
+                            title="Stop (Double-click to rewind to 0:00)"
                         >
                             <Square className="w-3.5 h-3.5 fill-current" />
                         </button>
@@ -424,16 +485,52 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         <button
                             className={`p-1 rounded transition-colors ${isLoop ? 'text-[#d9d9d9]' : 'text-[#808080] hover:text-[#d9d9d9]'}`}
                             onClick={() => setIsLoop(!isLoop)}
-                            title="Loop"
+                            title="Toggle Loop Region"
                         >
                             <Repeat className="w-3.5 h-3.5" />
                         </button>
                         <button
-                            className={`p-1 rounded transition-colors ml-4 border ${isRecording ? 'text-red-500 fill-red-500 border-red-500/40 bg-red-500/10' : 'hover:text-[#d9d9d9] border-transparent'}`}
+                            className={`p-1 rounded transition-colors ml-2 border ${isRecording ? 'text-red-500 fill-red-500 border-red-500/40 bg-red-500/10' : 'hover:text-[#d9d9d9] border-transparent'}`}
                             onClick={toggleRecording}
                             title={isRecording ? 'Stop Recording' : 'Arm Recording'}
                         >
                             <Circle className="w-3 h-3 fill-current inline-block" /> <span className="text-[9px] ml-1">{isRecording ? 'REC' : 'ARM'}</span>
+                        </button>
+                    </div>
+
+                    {/* Parameter Isolation Solo Selector */}
+                    <div className="flex items-center gap-1 bg-[#181818] border border-[#2e2e2e] rounded px-1.5 py-0.5 text-[9px] font-mono">
+                        <SlidersHorizontal className="w-3 h-3 text-editor-accent-purple shrink-0" />
+                        <span className="text-[#808080] text-[8px] uppercase font-bold mr-1">Solo:</span>
+                        <button
+                            className={`px-1.5 py-0.5 rounded transition-colors ${isolatedLane === 'all' ? 'bg-editor-accent-purple text-white font-bold' : 'text-gray-400 hover:text-white'}`}
+                            onClick={() => setIsolatedLane('all')}
+                        >
+                            ALL
+                        </button>
+                        <button
+                            className={`px-1.5 py-0.5 rounded transition-colors ${isolatedLane === 'scrollPos' ? 'bg-editor-accent-purple text-white font-bold' : 'text-gray-400 hover:text-white'}`}
+                            onClick={() => setIsolatedLane('scrollPos')}
+                        >
+                            SCROLL
+                        </button>
+                        <button
+                            className={`px-1.5 py-0.5 rounded transition-colors ${isolatedLane === 'rotationSpeed' ? 'bg-teal-500 text-white font-bold' : 'text-gray-400 hover:text-white'}`}
+                            onClick={() => setIsolatedLane('rotationSpeed')}
+                        >
+                            ROTATION
+                        </button>
+                        <button
+                            className={`px-1.5 py-0.5 rounded transition-colors ${isolatedLane === 'cssOpacity' ? 'bg-blue-500 text-white font-bold' : 'text-gray-400 hover:text-white'}`}
+                            onClick={() => setIsolatedLane('cssOpacity')}
+                        >
+                            OPACITY
+                        </button>
+                        <button
+                            className={`px-1.5 py-0.5 rounded transition-colors ${isolatedLane === 'depth' || isolatedLane === 'size' ? 'bg-green-500 text-white font-bold' : 'text-gray-400 hover:text-white'}`}
+                            onClick={() => setIsolatedLane('depth')}
+                        >
+                            PARTICLES
                         </button>
                     </div>
                 </div>
@@ -461,13 +558,13 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 </div>
                 <div style={{ width: timelineZoom !== 1 ? `${timelineZoom * 100}%` : '100%', minHeight: '100%' }}>
                 
-                {/* Ableton-Style Loop Region Header */}
+                {/* Resizable & Draggable Ableton-Style Loop Region Header */}
                 <div className="h-5 border-b border-editor-border bg-black/60 flex items-center relative text-[9px] font-mono select-none">
                     <div className="w-[120px] shrink-0 px-2 flex items-center gap-1 border-r border-editor-border bg-editor-panel text-editor-muted">
                         <Repeat className="w-2.5 h-2.5 text-editor-accent-purple" />
                         <span className="uppercase text-[8px] tracking-wider">Loop Region</span>
                     </div>
-                    <div className="flex-1 relative h-full bg-[#111]">
+                    <div className="flex-1 relative h-full bg-[#111] cursor-pointer" ref={loopTrackRef} onClick={handleLoopTrackClick}>
                         {(() => {
                             const seqDur = useStore(s => s.sequenceDuration);
                             const lStart = useStore(s => s.loopStart);
@@ -477,21 +574,37 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
                             return (
                                 <div
-                                    className={`absolute top-1 bottom-1 rounded border transition-colors ${
+                                    className={`absolute top-0.5 bottom-0.5 rounded border transition-colors flex items-center justify-between group/loopbar ${
                                         useStore(s => s.isLoop)
                                             ? 'bg-editor-accent-purple/30 border-editor-accent-purple text-editor-accent-purple'
                                             : 'bg-white/10 border-white/20 text-gray-400'
                                     }`}
                                     style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
+                                    onPointerDown={(e) => handleLoopDrag('bar', e)}
                                 >
-                                    <div className="px-1 text-[8px] truncate pointer-events-none font-bold">
+                                    <div
+                                        className="w-2.5 h-full bg-editor-accent-purple hover:bg-white rounded-l flex items-center justify-center text-[7px] text-black font-bold select-none cursor-ew-resize shrink-0 z-10"
+                                        onPointerDown={(e) => handleLoopDrag('start', e)}
+                                        title="Drag to resize Loop Start"
+                                    >
+                                        L
+                                    </div>
+                                    <div className="px-1 text-[8px] truncate pointer-events-none font-bold text-center flex-1">
                                         {lStart.toFixed(1)}s - {lEnd.toFixed(1)}s
+                                    </div>
+                                    <div
+                                        className="w-2.5 h-full bg-editor-accent-purple hover:bg-white rounded-r flex items-center justify-center text-[7px] text-black font-bold select-none cursor-ew-resize shrink-0 z-10"
+                                        onPointerDown={(e) => handleLoopDrag('end', e)}
+                                        title="Drag to resize Loop End"
+                                    >
+                                        R
                                     </div>
                                 </div>
                             );
                         })()}
                     </div>
                 </div>
+                {(isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('audio') }}>
                     <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-editor-border bg-editor-panel text-editor-fg gap-2 sticky left-0 z-30 overflow-hidden">
                         <Music className="w-2.5 h-2.5 text-editor-accent-blue" />
@@ -530,7 +643,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     </div>
                     <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-blue/40 z-40" onPointerDown={makeLaneDrag('audio')} />
                 </div>
-                {extractedFrames.length > 0 && (
+                )}
+                {extractedFrames.length > 0 && (isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('videoFrames') }}>
                     <div className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-editor-border sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors overflow-hidden ${activePreset === 'frames' ? 'bg-[#2a2a2a] ring-1 ring-inset ring-[#444]' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}>
                         <div className="flex items-center gap-1 w-full">
@@ -550,6 +664,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-blue/40 z-40" onPointerDown={makeLaneDrag('videoFrames')} />
                 </div>
                 )}
+                {(isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('mouseX') }}>
                     <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-editor-border bg-editor-panel text-editor-fg gap-2 sticky left-0 z-30 overflow-hidden">
                         <MousePointer2 className="w-2.5 h-2.5 text-editor-accent-blue shrink-0" />
@@ -571,6 +686,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     </div>
                     <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-blue/40 z-40" onPointerDown={makeLaneDrag('mouseX')} />
                 </div>
+                )}
+                {(isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('mouseY') }}>
                     <div className="w-[120px] shrink-0 flex items-center px-3 border-r border-editor-border bg-editor-panel text-editor-fg gap-2 sticky left-0 z-30 overflow-hidden">
                         <MousePointer2 className="w-2.5 h-2.5 text-editor-accent-blue shrink-0" />
@@ -592,7 +709,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     </div>
                     <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-blue/40 z-40" onPointerDown={makeLaneDrag('mouseY')} />
                 </div>
-                <div className="flex border-b border-editor-border group relative" style={{ height: scrollVbH }}>
+                )}
+                {(isolatedLane === 'all' || isolatedLane === 'scrollPos') && (
+                <div className="flex border-b border-editor-border group relative" style={{ height: isolatedLane === 'scrollPos' ? 220 : scrollVbH }}>
                     <div
                         className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-editor-border sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors overflow-hidden ${isRecording ? 'ring-1 ring-inset ring-red-500/60 bg-red-500/10' : selectedLane === 'scrollPos' ? 'bg-[#2a2a2a]' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}
                         onClick={() => setSelectedLane('scrollPos')}
@@ -803,15 +922,17 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     </div>
                     <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-[#3b82f6]/40 z-40" onPointerDown={makeLaneDrag('scrollPos', 48)} />
                 </div>
-                {PARAM_LANES.map(lane => {
+                )}
+                {PARAM_LANES.filter(lane => isolatedLane === 'all' || isolatedLane === lane.id || (isolatedLane === 'depth' && (lane.id === 'depth' || lane.id === 'size'))).map(lane => {
                     const kfs = (paramKeyframes[lane.id] ?? []) as ParamKf[];
                     const currentVal = paramCurrentValues[lane.id];
                     const normalY = (v: number) => (1 - (v - lane.min) / (lane.max - lane.min)) * VB_H;
                     const curvePath = buildParamPath(kfs, lane.min, lane.max);
                     const fillPath = buildParamFillPath(kfs, lane.min, lane.max);
                     const isSelected = selectedLane === lane.id;
+                    const currentLaneHeight = isolatedLane === lane.id ? 220 : laneH(lane.id);
                     return (
-                        <div key={lane.id} className="flex border-b border-editor-border group relative" style={{ height: laneH(lane.id) }}>
+                        <div key={lane.id} className="flex border-b border-editor-border group relative" style={{ height: currentLaneHeight }}>
                             <div
                                 className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-editor-border sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors overflow-hidden ${isSelected ? 'bg-[#2a2a2a]' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}
                                 onClick={() => setSelectedLane(lane.id)}
