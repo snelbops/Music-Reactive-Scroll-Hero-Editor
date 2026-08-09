@@ -72,6 +72,13 @@ export class VideoExporter {
             compositeCanvas.height = targetHeight;
             const ctx = compositeCanvas.getContext('2d', { alpha: false })!;
 
+            // Last valid video frame canvas buffer to prevent any black frame drops
+            const videoCacheCanvas = document.createElement('canvas');
+            videoCacheCanvas.width = targetWidth;
+            videoCacheCanvas.height = targetHeight;
+            const videoCacheCtx = videoCacheCanvas.getContext('2d', { alpha: false })!;
+            let hasValidVideoFrame = false;
+
             // Stream setup
             const compositeStream = compositeCanvas.captureStream(fps);
             let finalStream = compositeStream;
@@ -210,8 +217,11 @@ export class VideoExporter {
                     }
                 }
 
-                // 4. Seek background video if active
+                // 4. Smooth background video playback sync
                 if (videoEl && videoEl.duration > 0) {
+                    if (videoEl.paused) {
+                        videoEl.play().catch(() => {});
+                    }
                     const syncMode = useStore.getState().videoSyncMode;
                     const ratio = useStore.getState().videoSpeedRatio;
                     let videoTargetTime = 0;
@@ -222,26 +232,32 @@ export class VideoExporter {
                     } else {
                         videoTargetTime = prog * seqDur * ratio;
                     }
-                    if (Math.abs(videoEl.currentTime - videoTargetTime) > 0.04) {
+                    if (!videoEl.seeking && Math.abs(videoEl.currentTime - videoTargetTime) > 0.25) {
                         videoEl.currentTime = videoTargetTime;
                     }
                 }
 
                 // 5. Keep Audio currentTime synced
-                if (audioEl && !audioEl.paused && Math.abs(audioEl.currentTime - t) > 0.05) {
+                if (audioEl && !audioEl.paused && Math.abs(audioEl.currentTime - t) > 0.1) {
                     audioEl.currentTime = t;
                 }
 
-                // 6. Draw Composite Canvas Frame (Video + Three.js Canvas overlay)
+                // 6. Draw Composite Canvas Frame
                 ctx.fillStyle = '#0a0a0f';
                 ctx.fillRect(0, 0, targetWidth, targetHeight);
 
-                if (videoEl && videoEl.readyState >= 2) {
+                // Draw video background with fallback buffer to prevent any black frame flashes
+                if (videoEl && videoEl.readyState >= 2 && !videoEl.seeking) {
                     try {
                         ctx.drawImage(videoEl, 0, 0, targetWidth, targetHeight);
+                        videoCacheCtx.drawImage(videoEl, 0, 0, targetWidth, targetHeight);
+                        hasValidVideoFrame = true;
                     } catch (e) {}
+                } else if (hasValidVideoFrame) {
+                    ctx.drawImage(videoCacheCanvas, 0, 0, targetWidth, targetHeight);
                 }
 
+                // Draw Three.js / Canvas overlay (preserveDrawingBuffer: true prevents black frames)
                 if (threeCanvas && threeCanvas.width > 0) {
                     try {
                         ctx.drawImage(threeCanvas, 0, 0, targetWidth, targetHeight);

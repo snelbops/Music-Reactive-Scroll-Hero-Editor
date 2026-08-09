@@ -185,6 +185,7 @@ export default function Viewport() {
                     {/* Orbit: R3F Canvas — dark particles */}
                     {activePreset === 'orbit' && (
                         <Canvas
+                            gl={{ preserveDrawingBuffer: true }}
                             camera={{ position: [0, 0, 5], fov: 50 }}
                             style={{ width: '100%', height: '100%', background: 'transparent', display: 'block' }}
                         >
@@ -205,6 +206,7 @@ export default function Viewport() {
                     {/* Light: R3F Canvas — white bg, dark particles */}
                     {activePreset === 'light' && (
                         <Canvas
+                            gl={{ preserveDrawingBuffer: true }}
                             camera={{ position: [0, 0, 5], fov: 50 }}
                             style={{ width: '100%', height: '100%', background: 'white', display: 'block' }}
                         >
@@ -225,6 +227,7 @@ export default function Viewport() {
                     {/* Frames: R3F Canvas with FrameSequenceScene */}
                     {activePreset === 'frames' && (
                         <Canvas
+                            gl={{ preserveDrawingBuffer: true }}
                             orthographic
                             camera={{ near: 0.1, far: 10, position: [0, 0, 1] }}
                             style={{ width: '100%', height: '100%', background: '#000', display: 'block' }}
@@ -249,6 +252,7 @@ export default function Viewport() {
                     {/* Classic Light: Three.js version — white bg, dark particles */}
                     {activePreset === 'classic-light' && (
                         <Canvas
+                            gl={{ preserveDrawingBuffer: true }}
                             camera={{ position: [0, 0, 5], fov: 50 }}
                             style={{ width: '100%', height: '100%', background: 'white', display: 'block' }}
                         >
