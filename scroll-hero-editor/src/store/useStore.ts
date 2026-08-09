@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { SceneAdapter } from '../preview/SceneAdapter';
 import { interpolateParamAt, type ParamKf } from '../utils/interpolate';
 
-type PresetId = 'orbit' | 'light' | 'classic-dark' | 'classic-dark-copy' | 'classic-light' | 'classic-inverted' | 'light-images' | 'frames';
+type PresetId = 'orbit' | 'light' | 'classic-dark' | 'classic-dark-copy' | 'classic-light' | 'classic-inverted' | 'light-images' | 'frames' | 'video';
 type AspectRatio = '16:9' | '9:16' | '1:1' | 'free';
 
 type ScrollKf = { time: number; value: number; easing?: string; handleOut?: { dt: number; dv: number }; handleIn?: { dt: number; dv: number } };

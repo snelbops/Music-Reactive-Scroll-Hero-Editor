@@ -102,12 +102,17 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
 
         const handleKeyDown = (e: KeyboardEvent) => {
             if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
-            const keyToPadIdx: Record<string, number> = {
-                '7': 0, '8': 1, '4': 2, '5': 3,
-                '1': 0, '2': 1, '3': 2, '6': 3
-            };
-            if (e.key in keyToPadIdx) {
-                useStore.getState().setActiveVideoPadIdx(keyToPadIdx[e.key]);
+            const code = e.code;
+            const key = e.key;
+
+            if (code === 'Numpad7' || code === 'Digit7' || key === '7') {
+                useStore.getState().setActiveVideoPadIdx(0);
+            } else if (code === 'Numpad8' || code === 'Digit8' || key === '8') {
+                useStore.getState().setActiveVideoPadIdx(1);
+            } else if (code === 'Numpad4' || code === 'Digit4' || key === '4') {
+                useStore.getState().setActiveVideoPadIdx(2);
+            } else if (code === 'Numpad5' || code === 'Digit5' || key === '5') {
+                useStore.getState().setActiveVideoPadIdx(3);
             }
         };
 

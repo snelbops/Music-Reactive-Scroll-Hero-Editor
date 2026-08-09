@@ -5,6 +5,7 @@ import { GithubTestParticleField } from '../presets/ParticleLab';
 import GhostTrailCanvas from './GhostTrailCanvas';
 import RecordMode from './RecordMode';
 import FrameSequenceScene from './FrameSequenceScene';
+import ScrollyVideoPlayer from './ScrollyVideoPlayer';
 import { useStore } from '../store/useStore';
 import { OrbitAdapter, ClassicAdapter, FrameSequenceAdapter } from './SceneAdapter';
 import { sheet, SEQUENCE_DURATION } from '../theatre/core';
@@ -166,8 +167,8 @@ export default function Viewport() {
                 </button>
             </div>}
 
-            {/* Preview Area */}
-            <div ref={previewRef} className="flex-1 flex items-center justify-center overflow-hidden bg-editor-surface relative">
+            {/* Preview Area — Flex layout with video stage and external performance scroll track */}
+            <div ref={previewRef} className="flex-1 flex items-center justify-center gap-4 px-6 overflow-hidden bg-editor-surface relative">
                 {/* Letterbox Stage */}
                 <div
                     className={`relative overflow-hidden ${isRecording ? 'ring-2 ring-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.15)]' : ''}`}
@@ -229,6 +230,9 @@ export default function Viewport() {
                             <FrameSequenceScene frames={extractedFrames} progress={scrollProgress} />
                         </Canvas>
                     )}
+
+                    {/* Video: ScrollyVideo component seeking directly in video */}
+                    {activePreset === 'video' && <ScrollyVideoPlayer />}
 
                     {/* Classic Dark: original iframe — exactly as it was in the package copy */}
                     {activePreset === 'classic-dark' && (
@@ -353,22 +357,25 @@ export default function Viewport() {
                     )}
                 </div>
 
-                {/* Scroll Progress Bar — right side, outside the letterbox stage */}
+                {/* External Scroll Performance Track — strictly outside the video stage for clean screencasting */}
                 <div
                     ref={trackRef}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 h-64 w-1 bg-white/5 rounded-full z-30 cursor-ns-resize"
+                    className="h-64 w-4 bg-editor-panel border border-editor-border rounded-full z-30 cursor-ns-resize relative select-none shrink-0 flex flex-col items-center justify-start group/track shadow-md"
                     onPointerDown={onPointerDown}
                     onPointerMove={onPointerMove}
                     onPointerUp={onPointerUp}
+                    title="External Performance Scroll Track (Drag to scroll live without UI overlay)"
                 >
                     <div
-                        className="absolute top-0 w-full bg-editor-accent-purple shadow-[0_0_10px_rgba(168,85,247,0.5)] rounded-full"
+                        className="w-full bg-editor-accent-purple/60 group-hover/track:bg-editor-accent-purple rounded-full transition-colors"
                         style={{ height: `${scrollProgress * 100}%` }}
                     ></div>
                     <div
-                        className="absolute -left-2 w-5 h-2 bg-white rounded-sm shadow-xl"
-                        style={{ top: `calc(${scrollProgress * 100}% - 4px)` }}
-                    ></div>
+                        className="absolute w-6 h-3 bg-white rounded shadow-lg border border-gray-300 pointer-events-none transition-transform group-hover/track:scale-110 flex items-center justify-center"
+                        style={{ top: `calc(${scrollProgress * 100}% - 6px)` }}
+                    >
+                        <div className="w-2 h-[2px] bg-black/40 rounded-full" />
+                    </div>
                 </div>
             </div>
         </main>
