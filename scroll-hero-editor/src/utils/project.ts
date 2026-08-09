@@ -24,6 +24,11 @@ export type ProjectData = {
     aspectRatio: string;
     orbitControls: { assemblyDuration: number; assemblyEase: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut'; pauseAfterAssembly: boolean };
     classicDarkControls: { random: number; depth: number; size: number; touchRadius: number };
+    playheadPosition?: number;
+    timelineScrollLeft?: number;
+    timelineZoom?: number;
+    verticalZoom?: number;
+    selectedLane?: string;
 };
 
 const LOCAL_STORAGE_KEY_CURRENT = 'scroll-hero-current-project';
@@ -147,6 +152,11 @@ export function getProjectDataFromStore(name = 'Untitled Project'): ProjectData 
         aspectRatio: s.aspectRatio,
         orbitControls: s.orbitControls,
         classicDarkControls: s.classicDarkControls,
+        playheadPosition: s.playheadPosition,
+        timelineScrollLeft: s.timelineScrollLeft,
+        timelineZoom: s.timelineZoom,
+        verticalZoom: s.verticalZoom,
+        selectedLane: s.selectedLane ?? undefined,
     };
 }
 
@@ -168,6 +178,11 @@ export function applyProjectDataToStore(data: Partial<ProjectData>): void {
     if (data.aspectRatio) s.setAspectRatio(data.aspectRatio as any);
     if (data.orbitControls) s.setOrbitControls(data.orbitControls as any);
     if (data.classicDarkControls) s.setClassicDarkControls(data.classicDarkControls);
+    if (typeof data.playheadPosition === 'number') s.setPlayheadPosition(data.playheadPosition);
+    if (typeof data.timelineScrollLeft === 'number') s.setTimelineScrollLeft(data.timelineScrollLeft);
+    if (typeof data.timelineZoom === 'number') s.setTimelineZoom(data.timelineZoom);
+    if (typeof data.verticalZoom === 'number') s.setVerticalZoom(data.verticalZoom);
+    if (typeof data.selectedLane === 'string') s.setSelectedLane(data.selectedLane);
 
     useStore.setState({ _past: [], _future: [] });
 }

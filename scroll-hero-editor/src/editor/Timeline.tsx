@@ -111,8 +111,10 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const setParamKeyframes = useStore(s => s.setParamKeyframes);
     const updateParamKeyframeHandle = useStore(s => s.updateParamKeyframeHandle);
 
-    const [timelineZoom, setTimelineZoom] = useState(1);
-    const [verticalZoom, setVerticalZoom] = useState(1);
+    const timelineZoom = useStore(s => s.timelineZoom);
+    const setTimelineZoom = useStore(s => s.setTimelineZoom);
+    const verticalZoom = useStore(s => s.verticalZoom);
+    const setVerticalZoom = useStore(s => s.setVerticalZoom);
     const [lanesWidth, setLanesWidth] = useState(0);
     const [activeTool, setActiveTool] = useState<'select' | 'pen' | 'eraser'>('select');
     const [snapToBeat, setSnapToBeat] = useState(false);
@@ -745,25 +747,49 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         zoomAnchorRef.current = { mouseXInContainer, ratio };
                     }
 
-                    setTimelineZoom(prev => {
-                        const i = ZOOM_LEVELS.indexOf(prev);
-                        return ZOOM_LEVELS[Math.max(0, Math.min(ZOOM_LEVELS.length - 1, i - steps))];
-                    });
+                    const i = ZOOM_LEVELS.indexOf(timelineZoom);
+                    const nextZoom = ZOOM_LEVELS[Math.max(0, Math.min(ZOOM_LEVELS.length - 1, i - steps))];
+                    setTimelineZoom(nextZoom);
                 }
             } else if (e.altKey) {
                 e.preventDefault();
                 const delta = e.deltaY > 0 ? -0.1 : 0.1;
-                setVerticalZoom(prev => Math.max(0.4, Math.min(4, +(prev + delta).toFixed(2))));
+                setVerticalZoom(Math.max(0.4, Math.min(4, +(verticalZoom + delta).toFixed(2))));
             }
         };
         el.addEventListener('wheel', onWheel, { passive: false });
         return () => el.removeEventListener('wheel', onWheel);
     }, []);
 
+    // Restore playhead position and timeline scroll position on mount
+    useEffect(() => {
+        const savedPos = useStore.getState().playheadPosition;
+        if (typeof savedPos === 'number' && savedPos > 0) {
+            sheet.sequence.position = savedPos;
+            useStore.getState().applyParamKeyframesAt(savedPos);
+        }
+        const savedScroll = useStore.getState().timelineScrollLeft;
+        if (typeof savedScroll === 'number' && lanesRef.current && savedScroll > 0) {
+            lanesRef.current.scrollLeft = savedScroll;
+        }
+    }, []);
+
+    // Scroll position listener — keep store updated for auto-save
+    useEffect(() => {
+        const el = lanesRef.current;
+        if (!el) return;
+        const onScroll = () => {
+            useStore.getState().setTimelineScrollLeft(el.scrollLeft);
+        };
+        el.addEventListener('scroll', onScroll, { passive: true });
+        return () => el.removeEventListener('scroll', onScroll);
+    }, []);
+
     // Reactive TIME display — onChange fires whenever Theatre.js position changes (play, scrub, loop)
     useEffect(() => {
         const unsub = onChange(sheet.sequence.pointer.position, (pos) => {
             setSeqTime(pos);
+            useStore.getState().setPlayheadPosition(pos);
         });
         return unsub;
     }, []);

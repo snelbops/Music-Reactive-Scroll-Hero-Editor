@@ -37,6 +37,10 @@ interface EditorState {
     isLoop: boolean; setIsLoop: (v: boolean) => void;
     sequenceDuration: number; setSequenceDuration: (d: number) => void;
     loopStart: number; loopEnd: number; setLoopRange: (start: number, end: number) => void;
+    playheadPosition: number; setPlayheadPosition: (pos: number) => void;
+    timelineScrollLeft: number; setTimelineScrollLeft: (s: number) => void;
+    timelineZoom: number; setTimelineZoom: (z: number) => void;
+    verticalZoom: number; setVerticalZoom: (z: number) => void;
     recordStartPosition: number; setRecordStartPosition: (v: number) => void;
     mp4Asset: { name: string; url: string } | null; setMp4Asset: (asset: { name: string; url: string } | null) => void;
     removeMp4Asset: () => void;
@@ -121,6 +125,10 @@ export const useStore = create<EditorState>((set, get) => {
     isLoop: false, setIsLoop: (v) => set({ isLoop: v }),
     sequenceDuration: 10, setSequenceDuration: (d) => set({ sequenceDuration: Math.max(1, d) }),
     loopStart: 0, loopEnd: 10, setLoopRange: (start, end) => set({ loopStart: Math.max(0, start), loopEnd: Math.max(start + 0.5, end) }),
+    playheadPosition: 0, setPlayheadPosition: (pos) => set({ playheadPosition: Math.max(0, pos) }),
+    timelineScrollLeft: 0, setTimelineScrollLeft: (s) => set({ timelineScrollLeft: Math.max(0, s) }),
+    timelineZoom: 1, setTimelineZoom: (z) => set({ timelineZoom: z }),
+    verticalZoom: 1, setVerticalZoom: (z) => set({ verticalZoom: z }),
     recordStartPosition: 0, setRecordStartPosition: (v) => set({ recordStartPosition: v }),
     mp4Asset: { name: 'sample.mp4', url: '/sample.mp4' },
     setMp4Asset: (asset) => set({ mp4Asset: asset, videoUrl: asset ? asset.url : null }),
