@@ -14,6 +14,7 @@ const RATIO_VALUES: Record<string, number | null> = {
     '16:9': 16 / 9,
     '9:16': 9 / 16,
     '1:1': 1,
+    'native': null,
     'free': null,
 };
 
@@ -148,7 +149,7 @@ export default function Viewport() {
                     <div className="h-4 w-[1px] bg-editor-border"></div>
                     <div className="flex items-center gap-2">
                         <span className="text-gray-500">Ratio</span>
-                        {(['16:9', '9:16', '1:1', 'free'] as const).map((r) => (
+                        {(['16:9', '9:16', '1:1', 'native', 'free'] as const).map((r) => (
                             <button
                                 key={r}
                                 onClick={() => setAspectRatio(r)}

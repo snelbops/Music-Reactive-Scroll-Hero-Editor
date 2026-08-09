@@ -3,7 +3,7 @@ import type { SceneAdapter } from '../preview/SceneAdapter';
 import { interpolateParamAt, type ParamKf } from '../utils/interpolate';
 
 type PresetId = 'orbit' | 'light' | 'classic-dark' | 'classic-dark-copy' | 'classic-light' | 'classic-inverted' | 'light-images' | 'frames' | 'video';
-type AspectRatio = '16:9' | '9:16' | '1:1' | 'free';
+type AspectRatio = '16:9' | '9:16' | '1:1' | 'native' | 'free';
 
 type ScrollKf = { time: number; value: number; easing?: string; handleOut?: { dt: number; dv: number }; handleIn?: { dt: number; dv: number } };
 type HistorySnapshot = { scrollKeyframes: ScrollKf[]; paramKeyframes: Record<string, ParamKf[]> };
@@ -16,6 +16,11 @@ export interface RecordedEvent {
     click: boolean;
 }
 
+export interface PadSwitchEvent {
+    time: number;
+    padIdx: number;
+}
+
 interface EditorState {
     isDarkMode: boolean; setIsDarkMode: (dark: boolean) => void;
     isPlaying: boolean; setIsPlaying: (playing: boolean) => void;
@@ -24,6 +29,7 @@ interface EditorState {
     isRecording: boolean; setIsRecording: (rec: boolean) => void;
     recordCountdown: number | null; setRecordCountdown: (n: number | null) => void;
     recordedEvents: RecordedEvent[]; pushRecordedEvent: (ev: RecordedEvent) => void; clearRecordedEvents: () => void;
+    padSwitchEvents: PadSwitchEvent[]; addPadSwitchEvent: (time: number, padIdx: number) => void; clearPadSwitchEvents: () => void;
     scrollProgress: number; setScrollProgress: (progress: number) => void;
     activePreset: PresetId; setActivePreset: (preset: PresetId) => void;
     aspectRatio: AspectRatio; setAspectRatio: (ratio: AspectRatio) => void;
@@ -101,8 +107,13 @@ export const useStore = create<EditorState>((set, get) => {
     isRecording: false, setIsRecording: (rec) => set({ isRecording: rec }),
     recordCountdown: null, setRecordCountdown: (n) => set({ recordCountdown: n }),
     recordedEvents: [], pushRecordedEvent: (ev) => set((s) => ({ recordedEvents: [...s.recordedEvents, ev] })), clearRecordedEvents: () => set({ recordedEvents: [] }),
+    padSwitchEvents: [],
+    addPadSwitchEvent: (time, padIdx) => set((s) => ({
+        padSwitchEvents: [...s.padSwitchEvents.filter(e => Math.abs(e.time - time) > 0.1), { time, padIdx }].sort((a, b) => a.time - b.time)
+    })),
+    clearPadSwitchEvents: () => set({ padSwitchEvents: [] }),
     scrollProgress: 0, setScrollProgress: (progress) => set({ scrollProgress: progress }),
-    activePreset: 'orbit', setActivePreset: (preset) => set({ activePreset: preset }),
+    activePreset: 'video', setActivePreset: (preset) => set({ activePreset: preset }),
     aspectRatio: '16:9', setAspectRatio: (ratio) => set({ aspectRatio: ratio }),
     isFullscreen: false, setIsFullscreen: (v) => set({ isFullscreen: v }),
     isLoop: false, setIsLoop: (v) => set({ isLoop: v }),
@@ -121,11 +132,8 @@ export const useStore = create<EditorState>((set, get) => {
     activeVideoPadIdx: 0,
     setActiveVideoPadIdx: (idx) => {
         const pads = get().videoPads;
-        if (pads[idx] && pads[idx].url) {
-            set({ activeVideoPadIdx: idx, videoUrl: pads[idx].url, activePreset: 'frames' });
-        } else {
-            set({ activeVideoPadIdx: idx });
-        }
+        const targetUrl = pads[idx]?.url || get().videoUrl;
+        set({ activeVideoPadIdx: idx, videoUrl: targetUrl, activePreset: 'video' });
     },
     setVideoPad: (idx, pad) => set((s) => {
         const updated = [...s.videoPads];

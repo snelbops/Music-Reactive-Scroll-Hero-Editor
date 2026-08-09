@@ -93,6 +93,14 @@ export default function TheatreSync() {
                 }
 
                 sheet.sequence.position = nextPos;
+                // Auto-switch video pads during playback if multi-clip pad events were recorded
+                const padEvents = useStore.getState().padSwitchEvents;
+                if (padEvents.length > 0) {
+                    const activeEv = padEvents.filter(e => e.time <= nextPos).pop();
+                    if (activeEv && activeEv.padIdx !== useStore.getState().activeVideoPadIdx) {
+                        useStore.getState().setActiveVideoPadIdx(activeEv.padIdx);
+                    }
+                }
                 // Don't override scroll while user is actively dragging the scrub handle
                 if (!useStore.getState().isScrubbing) {
                     const kfs = useStore.getState().scrollKeyframes;
