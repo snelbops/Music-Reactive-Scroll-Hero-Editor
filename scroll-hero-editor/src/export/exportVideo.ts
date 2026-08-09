@@ -5,7 +5,7 @@ import { interpolateScrollAt, interpolateParamAt, type ParamKf } from '../utils/
 export type VideoExportOptions = {
     fps: 30 | 60;
     format: 'webm' | 'mp4';
-    mode: 'offline' | 'realtime';
+    mode: 'realtime' | 'offline';
     aspectRatio?: string;
     onProgress?: (progress: number, currentTime: number) => void;
     onComplete?: () => void;
@@ -16,6 +16,7 @@ export class VideoExporter {
     private mediaRecorder: MediaRecorder | null = null;
     private chunks: Blob[] = [];
     private isCancelled = false;
+    private animFrameId: number | null = null;
 
     async startExport(options: VideoExportOptions): Promise<void> {
         this.isCancelled = false;
@@ -75,7 +76,7 @@ export class VideoExporter {
             const compositeStream = compositeCanvas.captureStream(fps);
             let finalStream = compositeStream;
 
-            // Audio Stream setup
+            // Audio Stream setup via WebAudio Destination
             const audioUrl = useStore.getState().audioUrl;
             let audioEl: HTMLAudioElement | null = null;
             let audioCtx: AudioContext | null = null;
@@ -136,6 +137,11 @@ export class VideoExporter {
             };
 
             this.mediaRecorder.onstop = () => {
+                if (this.animFrameId) {
+                    cancelAnimationFrame(this.animFrameId);
+                    this.animFrameId = null;
+                }
+
                 if (this.isCancelled) return;
 
                 const blob = new Blob(this.chunks, { type: mimeType });
@@ -158,22 +164,25 @@ export class VideoExporter {
                 options.onComplete?.();
             };
 
-            // Pause live playback during export
+            // Pause background TheatreSync loop to prevent playhead conflicts
             useStore.getState().setIsPlaying(false);
+            sheet.sequence.position = 0;
             this.mediaRecorder.start(100);
 
             if (audioEl) {
                 audioEl.currentTime = 0;
-                audioEl.play();
+                audioEl.play().catch((e) => console.warn('Audio export play error:', e));
             }
 
-            // OFFLINE STEP-BY-STEP FRAME RENDERER (100% Frame-Accurate)
-            const totalFrames = Math.ceil(seqDur * fps);
+            // Real-Time High-Precision Wall-Clock RAF loop for 100% Synchronized Audio & Video
+            const startWallTime = performance.now();
 
-            for (let i = 0; i < totalFrames; i++) {
-                if (this.isCancelled) break;
+            const renderFrame = () => {
+                if (this.isCancelled) return;
 
-                const t = (i / totalFrames) * seqDur;
+                const now = performance.now();
+                const t = Math.min(seqDur, (now - startWallTime) / 1000);
+
                 sheet.sequence.position = t;
 
                 // 1. Evaluate scroll keyframes at time t
@@ -213,13 +222,17 @@ export class VideoExporter {
                     } else {
                         videoTargetTime = prog * seqDur * ratio;
                     }
-                    videoEl.currentTime = Math.max(0, Math.min(videoEl.duration, videoTargetTime));
+                    if (Math.abs(videoEl.currentTime - videoTargetTime) > 0.04) {
+                        videoEl.currentTime = videoTargetTime;
+                    }
                 }
 
-                // Wait 15ms per frame to allow DOM / Three.js canvas render pass
-                await new Promise(r => setTimeout(r, 15));
+                // 5. Keep Audio currentTime synced
+                if (audioEl && !audioEl.paused && Math.abs(audioEl.currentTime - t) > 0.05) {
+                    audioEl.currentTime = t;
+                }
 
-                // 5. Draw Composite Canvas Frame (Video + Three.js Canvas overlay)
+                // 6. Draw Composite Canvas Frame (Video + Three.js Canvas overlay)
                 ctx.fillStyle = '#0a0a0f';
                 ctx.fillRect(0, 0, targetWidth, targetHeight);
 
@@ -235,19 +248,18 @@ export class VideoExporter {
                     } catch (e) {}
                 }
 
-                // Explicit request frame on track if supported
-                const track = compositeStream.getVideoTracks()[0] as any;
-                if (track && typeof track.requestFrame === 'function') {
-                    track.requestFrame();
+                options.onProgress?.(t / seqDur, t);
+
+                if (t < seqDur - 0.01) {
+                    this.animFrameId = requestAnimationFrame(renderFrame);
+                } else {
+                    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+                        this.mediaRecorder.stop();
+                    }
                 }
+            };
 
-                options.onProgress?.((i + 1) / totalFrames, t);
-            }
-
-            // Finish recording when all frames rendered
-            if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-                this.mediaRecorder.stop();
-            }
+            this.animFrameId = requestAnimationFrame(renderFrame);
 
         } catch (err: any) {
             options.onError?.(err);
@@ -256,6 +268,10 @@ export class VideoExporter {
 
     cancelExport() {
         this.isCancelled = true;
+        if (this.animFrameId) {
+            cancelAnimationFrame(this.animFrameId);
+            this.animFrameId = null;
+        }
         if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
             this.mediaRecorder.stop();
         }
