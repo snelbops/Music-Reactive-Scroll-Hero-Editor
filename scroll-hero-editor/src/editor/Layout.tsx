@@ -7,9 +7,10 @@ import Inspector from './Inspector';
 import Timeline from './Timeline';
 import Viewport from '../preview/Viewport';
 import HelpPanel from './HelpPanel';
+import ProjectModal from './ProjectModal';
 import { useStore } from '../store/useStore';
 import { exportParticleHeroHtml, exportFrameSequenceHeroHtml, exportCurvesJson, exportLoopRegionJson } from '../export/exportHtml';
-import { saveProject, loadProject } from '../utils/project';
+import { saveProject, loadProject, loadWorkingProject, autoSaveWorkingProject } from '../utils/project';
 
 export default function Layout() {
     const isDarkMode = useStore(state => state.isDarkMode);
@@ -29,6 +30,7 @@ export default function Layout() {
     const [isExportingLoop, setIsExportingLoop] = useState(false);
     const [showExportLoopModal, setShowExportLoopModal] = useState(false);
     const [showHelp, setShowHelp] = useState(false);
+    const [showProjectModal, setShowProjectModal] = useState(false);
     const loadInputRef = useRef<HTMLInputElement>(null);
     const [timelineH, setTimelineH] = useState(280);
     const [leftW, setLeftW] = useState(220);
@@ -94,6 +96,16 @@ export default function Layout() {
     };
 
     useEffect(() => {
+        // Restore last working project session from localStorage on initial load
+        loadWorkingProject();
+        // Auto-save session to localStorage on store mutations
+        const unsub = useStore.subscribe(() => {
+            autoSaveWorkingProject();
+        });
+        return unsub;
+    }, []);
+
+    useEffect(() => {
         // Apply dark class to root element
         document.documentElement.classList.toggle('dark', isDarkMode);
     }, [isDarkMode]);
@@ -147,10 +159,17 @@ export default function Layout() {
             <header className="h-8 border-b border-editor-border bg-editor-panel text-editor-muted flex items-center px-4 justify-between text-[11px] font-medium tracking-wide shrink-0 font-sans select-none">
                 <span className="text-editor-fg font-semibold tracking-tight">Scroll Hero Editor</span>
 
-                <div className="flex items-center space-x-6">
-                    <span className="cursor-pointer hover:text-editor-fg transition-colors" onClick={() => saveProject()}>Save</span>
-                    <span className="cursor-pointer hover:text-editor-fg transition-colors" onClick={() => loadInputRef.current?.click()}>
-                        {isLoadError ? 'Load failed' : 'Load'}
+                <div className="flex items-center space-x-5">
+                    <button
+                        onClick={() => setShowProjectModal(true)}
+                        className="px-2 py-0.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 font-semibold rounded text-[11px] border border-cyan-500/30 transition-all flex items-center gap-1"
+                        title="Manage saved projects, load templates, or import/export files"
+                    >
+                        📁 Projects
+                    </button>
+                    <span className="cursor-pointer hover:text-editor-fg transition-colors" onClick={() => saveProject()} title="Quick export .shero file">Save File</span>
+                    <span className="cursor-pointer hover:text-editor-fg transition-colors" onClick={() => loadInputRef.current?.click()} title="Quick load .shero file">
+                        {isLoadError ? 'Load failed' : 'Load File'}
                     </span>
                     <span className="text-editor-border">|</span>
                     <span className="cursor-pointer hover:text-editor-fg transition-colors" onClick={handleExportJson}>Export JSON</span>
@@ -280,6 +299,9 @@ export default function Layout() {
 
             {/* ── Help Panel ────────────────────────────────────────────────── */}
             {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
+
+            {/* ── Project Manager Modal ──────────────────────────────────────── */}
+            {showProjectModal && <ProjectModal onClose={() => setShowProjectModal(false)} />}
 
         </div>
     );
