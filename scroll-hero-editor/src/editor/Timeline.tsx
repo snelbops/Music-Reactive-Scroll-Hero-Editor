@@ -114,6 +114,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const [activeTool, setActiveTool] = useState<'select' | 'pen' | 'eraser'>('select');
     const [snapToBeat, setSnapToBeat] = useState(false);
     const [isolatedLane, setIsolatedLane] = useState<'all' | 'scrollPos' | 'rotationSpeed' | 'cssOpacity' | 'depth' | 'size'>('all');
+    const [showRhythmModal, setShowRhythmModal] = useState(false);
     const loopTrackRef = useRef<HTMLDivElement>(null);
     const canUndo = useStore(s => s._past.length > 0);
     const canRedo = useStore(s => s._future.length > 0);
@@ -123,6 +124,50 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const [seqTime, setSeqTime] = useState(() => sheet.sequence.position);
     const [laneHeights, setLaneHeights] = useState<Record<string, number>>({});
     const laneH = (id: string, def = 40) => laneHeights[id] ?? Math.round(def * verticalZoom);
+
+    const generateRhythmCurve = (mode: 'bounce' | 'stutter' | 'wave' | 'ramp' | 'jumps') => {
+        useStore.getState().pushHistory();
+        const seqDur = useStore.getState().sequenceDuration;
+        const beatPoints = beats.length > 0 ? beats : Array.from({ length: Math.floor(seqDur / 0.5) }, (_, i) => i * 0.5);
+        const newKfs: { time: number; value: number; easing?: string }[] = [];
+
+        if (mode === 'bounce') {
+            beatPoints.forEach((bt) => {
+                const t = Math.min(seqDur, bt);
+                if (t > 0.08) newKfs.push({ time: +(t - 0.08).toFixed(2), value: 0 });
+                newKfs.push({ time: +t.toFixed(2), value: 1 });
+                if (t + 0.08 < seqDur) newKfs.push({ time: +(t + 0.08).toFixed(2), value: 0 });
+            });
+        } else if (mode === 'stutter') {
+            beatPoints.forEach((bt, idx) => {
+                const t = Math.min(seqDur, bt);
+                const val = +(idx / Math.max(1, beatPoints.length - 1)).toFixed(2);
+                newKfs.push({ time: +t.toFixed(2), value: val, easing: 'step' });
+            });
+        } else if (mode === 'wave') {
+            beatPoints.forEach((bt, idx) => {
+                const t = Math.min(seqDur, bt);
+                const val = +((Math.sin((idx * Math.PI) / 2) + 1) / 2).toFixed(2);
+                newKfs.push({ time: +t.toFixed(2), value: val });
+            });
+        } else if (mode === 'ramp') {
+            const barSize = 4;
+            beatPoints.forEach((bt, idx) => {
+                const t = Math.min(seqDur, bt);
+                const barProgress = (idx % barSize) / (barSize - 1);
+                newKfs.push({ time: +t.toFixed(2), value: +barProgress.toFixed(2) });
+            });
+        } else if (mode === 'jumps') {
+            beatPoints.forEach((bt) => {
+                const t = Math.min(seqDur, bt);
+                const val = +(0.1 + Math.random() * 0.8).toFixed(2);
+                newKfs.push({ time: +t.toFixed(2), value: val, easing: 'step' });
+            });
+        }
+
+        useStore.getState().setScrollKeyframes(newKfs.sort((a, b) => a.time - b.time));
+        setShowRhythmModal(false);
+    };
 
     const handleLoopDrag = (type: 'start' | 'end' | 'bar', e: React.PointerEvent<HTMLDivElement>) => {
         e.stopPropagation();
@@ -711,7 +756,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 </div>
                 )}
                 {(isolatedLane === 'all' || isolatedLane === 'scrollPos') && (
-                <div className="flex border-b border-editor-border group relative" style={{ height: isolatedLane === 'scrollPos' ? 220 : scrollVbH }}>
+                <div className="flex border-b border-editor-border group relative" style={{ height: laneH('scrollPos', isolatedLane === 'scrollPos' ? 220 : 100) }}>
                     <div
                         className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-editor-border sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors overflow-hidden ${isRecording ? 'ring-1 ring-inset ring-red-500/60 bg-red-500/10' : selectedLane === 'scrollPos' ? 'bg-[#2a2a2a]' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}
                         onClick={() => setSelectedLane('scrollPos')}
@@ -721,28 +766,54 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 <Mouse className="w-2.5 h-2.5 shrink-0 text-[#3b82f6]" />
                                 <span className="text-[10px] uppercase font-normal text-[#d9d9d9] truncate">Scroll POS</span>
                             </div>
-                            {scrollKeyframes.length > 0 && (
+                            <div className="flex items-center gap-1 shrink-0">
                                 <button
-                                    className="text-[9px] text-[#808080] hover:text-[#d9d9d9] transition-colors shrink-0 ml-1"
-                                    title="Clear scroll automation"
-                                    onClick={(e) => { e.stopPropagation(); clearScrollKeyframes(); }}
-                                >✕</button>
-                            )}
+                                    className="text-[8px] bg-editor-accent-purple/20 hover:bg-editor-accent-purple text-editor-accent-purple hover:text-white px-1 py-0.5 rounded transition-colors font-mono font-bold"
+                                    title="Auto-Generate Rhythm Curve from Audio Beats"
+                                    onClick={(e) => { e.stopPropagation(); setShowRhythmModal(true); }}
+                                >⚡RHYTHM</button>
+                                {scrollKeyframes.length > 0 && (
+                                    <button
+                                        className="text-[9px] text-[#808080] hover:text-[#d9d9d9] transition-colors"
+                                        title="Clear scroll automation"
+                                        onClick={(e) => { e.stopPropagation(); clearScrollKeyframes(); }}
+                                    >✕</button>
+                                )}
+                            </div>
                         </div>
                         <span className="text-[9px] font-mono text-[#808080] truncate pl-[14px]">{(scrollProgress * 100).toFixed(1)}%</span>
                     </div>
                     <div
                         className="flex-1 relative overflow-hidden bg-[#3b82f6]/[0.03]"
                         style={{ cursor: activeTool === 'pen' ? 'crosshair' : activeTool === 'eraser' ? 'cell' : undefined }}
-                        onMouseDown={(e) => {
+                        onPointerDown={(e) => {
                             if (activeTool !== 'pen') return;
                             e.stopPropagation();
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            const rawTime = Math.max(0, Math.min(SEQUENCE_DURATION, ((e.clientX - rect.left) / rect.width) * SEQUENCE_DURATION));
-                            const time = snapTimeToBeat(rawTime);
-                            const value = Math.max(0, Math.min(1, 1 - (e.clientY - rect.top) / rect.height));
+                            const target = e.currentTarget;
+                            target.setPointerCapture(e.pointerId);
                             useStore.getState().pushHistory();
-                            useStore.getState().addScrollKeyframe(time, value);
+
+                            const addPoint = (clientX: number, clientY: number) => {
+                                const rect = target.getBoundingClientRect();
+                                const rawTime = Math.max(0, Math.min(SEQUENCE_DURATION, ((clientX - rect.left) / rect.width) * SEQUENCE_DURATION));
+                                const time = snapTimeToBeat(rawTime);
+                                const value = Math.max(0, Math.min(1, 1 - (clientY - rect.top) / rect.height));
+                                useStore.getState().addScrollKeyframe(time, value);
+                            };
+
+                            addPoint(e.clientX, e.clientY);
+
+                            const onMove = (ev: PointerEvent) => {
+                                if (ev.buttons & 1) addPoint(ev.clientX, ev.clientY);
+                            };
+
+                            const onUp = () => {
+                                target.removeEventListener('pointermove', onMove as any);
+                                target.removeEventListener('pointerup', onUp as any);
+                            };
+
+                            target.addEventListener('pointermove', onMove as any);
+                            target.addEventListener('pointerup', onUp as any);
                         }}
                     >
                         <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${scrollVbH}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
@@ -1165,6 +1236,61 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 </div>
                 </div>
             </div>
+
+            {/* Auto-Rhythm Beat Curve Generator Modal */}
+            {showRhythmModal && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <div className="bg-[#181818] border border-[#333] rounded-xl p-5 w-[420px] shadow-2xl space-y-4 font-sans text-editor-fg">
+                        <div className="flex items-center justify-between border-b border-[#2e2e2e] pb-3">
+                            <div className="flex items-center gap-2 text-editor-accent-purple font-bold">
+                                <SlidersHorizontal className="w-5 h-5" />
+                                <span>Auto-Rhythm Beat Curve Generator</span>
+                            </div>
+                            <button className="text-gray-400 hover:text-white text-lg font-mono" onClick={() => setShowRhythmModal(false)}>✕</button>
+                        </div>
+                        <p className="text-[11px] text-gray-400">
+                            Extract beat transients from audio and automatically generate rhythmic video scroll curves:
+                        </p>
+                        <div className="grid grid-cols-2 gap-2 text-[11px]">
+                            <button
+                                className="flex flex-col items-start p-3 rounded-lg border border-[#333] hover:border-editor-accent-purple bg-[#222] hover:bg-[#2a2a2a] transition-all group text-left"
+                                onClick={() => generateRhythmCurve('bounce')}
+                            >
+                                <span className="font-bold text-white group-hover:text-editor-accent-purple">🥁 Kick Bounce</span>
+                                <span className="text-[10px] text-gray-400 mt-0.5">Pulses video scroll up on every kick beat</span>
+                            </button>
+                            <button
+                                className="flex flex-col items-start p-3 rounded-lg border border-[#333] hover:border-teal-500 bg-[#222] hover:bg-[#2a2a2a] transition-all group text-left"
+                                onClick={() => generateRhythmCurve('stutter')}
+                            >
+                                <span className="font-bold text-white group-hover:text-teal-400">⚡ Stutter Cuts</span>
+                                <span className="text-[10px] text-gray-400 mt-0.5">Step-cut video progress on each transient</span>
+                            </button>
+                            <button
+                                className="flex flex-col items-start p-3 rounded-lg border border-[#333] hover:border-blue-500 bg-[#222] hover:bg-[#2a2a2a] transition-all group text-left"
+                                onClick={() => generateRhythmCurve('wave')}
+                            >
+                                <span className="font-bold text-white group-hover:text-blue-400">🌊 Rhythmic Wave</span>
+                                <span className="text-[10px] text-gray-400 mt-0.5">Smooth sine wave oscillation locked to BPM</span>
+                            </button>
+                            <button
+                                className="flex flex-col items-start p-3 rounded-lg border border-[#333] hover:border-green-500 bg-[#222] hover:bg-[#2a2a2a] transition-all group text-left"
+                                onClick={() => generateRhythmCurve('ramp')}
+                            >
+                                <span className="font-bold text-white group-hover:text-green-400">📈 Bar Ramp</span>
+                                <span className="text-[10px] text-gray-400 mt-0.5">Linear ramps up over 4-beat bars</span>
+                            </button>
+                            <button
+                                className="col-span-2 flex flex-col items-start p-3 rounded-lg border border-[#333] hover:border-orange-500 bg-[#222] hover:bg-[#2a2a2a] transition-all group text-left"
+                                onClick={() => generateRhythmCurve('jumps')}
+                            >
+                                <span className="font-bold text-white group-hover:text-orange-400">🔀 Random Beat Jumps</span>
+                                <span className="text-[10px] text-gray-400 mt-0.5">Jumps to random video keyframes on each beat</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </footer>
     );
 }

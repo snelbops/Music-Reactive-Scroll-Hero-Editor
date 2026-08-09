@@ -39,12 +39,14 @@ export default function TheatreSync() {
     useEffect(() => {
         if (!isPlaying) return;
 
-        const effectiveEnd = isLoop ? (loopEnd || sequenceDuration) : sequenceDuration;
-        const effectiveStart = isLoop ? loopStart : 0;
+        const recordingActive = useStore.getState().isRecording;
+        const loopActive = useStore.getState().isLoop;
+        const lStart = useStore.getState().loopStart || 0;
+        const lEnd = useStore.getState().loopEnd || sequenceDuration;
 
-        // If we're at or beyond end, restart from beginning / loopStart
-        if (sheet.sequence.position >= effectiveEnd) {
-            sheet.sequence.position = effectiveStart;
+        // If starting playback outside loop range, snap to loopStart
+        if (loopActive && !recordingActive && (sheet.sequence.position >= lEnd || sheet.sequence.position < lStart)) {
+            sheet.sequence.position = lStart;
         }
 
         let lastTime: number | null = null;
@@ -55,40 +57,42 @@ export default function TheatreSync() {
                 const delta = now - lastTime;
                 const nextPos = sheet.sequence.position + delta / 1000;
                 const currentDuration = useStore.getState().sequenceDuration;
-                const recordingActive = useStore.getState().isRecording;
+                const isRec = useStore.getState().isRecording;
+                const isLp = useStore.getState().isLoop;
+                const startL = useStore.getState().loopStart || 0;
+                const endL = useStore.getState().loopEnd || currentDuration;
 
                 // Dynamic duration extension during recording
-                if (recordingActive && nextPos >= currentDuration - 1) {
+                if (isRec && nextPos >= currentDuration - 1) {
                     useStore.getState().setSequenceDuration(Math.ceil(nextPos + 5));
                 }
 
-                const maxPos = isLoop ? (useStore.getState().loopEnd || currentDuration) : currentDuration;
+                if (isLp && !isRec && (nextPos >= endL || nextPos < startL)) {
+                    sheet.sequence.position = startL;
+                    const kfs = useStore.getState().scrollKeyframes;
+                    useStore.getState().setSceneProgress(interpolateScrollAt(kfs, startL, currentDuration));
 
-                if (nextPos >= maxPos && !recordingActive) {
-                    if (isLoop) {
-                        const restartPos = useStore.getState().loopStart || 0;
-                        sheet.sequence.position = restartPos;
-                        const kfs = useStore.getState().scrollKeyframes;
-                        useStore.getState().setSceneProgress(interpolateScrollAt(kfs, restartPos, currentDuration));
-                        
-                        const pkfs0 = useStore.getState().paramKeyframes;
-                        const rSpeed0 = interpolateParamAt((pkfs0['rotationSpeed'] ?? []) as ParamKf[], restartPos);
-                        if (rSpeed0 !== null) useStore.getState().setRotationSpeed(rSpeed0);
-                        const depth0 = interpolateParamAt((pkfs0['depth'] ?? []) as ParamKf[], restartPos);
-                        if (depth0 !== null) useStore.getState().setParticleDepth(depth0);
-                        const size0 = interpolateParamAt((pkfs0['size'] ?? []) as ParamKf[], restartPos);
-                        if (size0 !== null) useStore.getState().setParticleSize(size0);
-                        const opacity0 = interpolateParamAt((pkfs0['cssOpacity'] ?? []) as ParamKf[], restartPos);
-                        if (opacity0 !== null) useStore.getState().setCssOpacity(opacity0);
-                        lastTime = now;
-                        rafId = requestAnimationFrame(tick);
-                    } else {
-                        sheet.sequence.position = currentDuration;
-                        const kfs = useStore.getState().scrollKeyframes;
-                        useStore.getState().setSceneProgress(interpolateScrollAt(kfs, currentDuration, currentDuration));
-                        useStore.getState().setIsPlaying(false);
-                        useStore.getState().setIsRecording(false);
-                    }
+                    const pkfs0 = useStore.getState().paramKeyframes;
+                    const rSpeed0 = interpolateParamAt((pkfs0['rotationSpeed'] ?? []) as ParamKf[], startL);
+                    if (rSpeed0 !== null) useStore.getState().setRotationSpeed(rSpeed0);
+                    const depth0 = interpolateParamAt((pkfs0['depth'] ?? []) as ParamKf[], startL);
+                    if (depth0 !== null) useStore.getState().setParticleDepth(depth0);
+                    const size0 = interpolateParamAt((pkfs0['size'] ?? []) as ParamKf[], startL);
+                    if (size0 !== null) useStore.getState().setParticleSize(size0);
+                    const opacity0 = interpolateParamAt((pkfs0['cssOpacity'] ?? []) as ParamKf[], startL);
+                    if (opacity0 !== null) useStore.getState().setCssOpacity(opacity0);
+
+                    lastTime = now;
+                    rafId = requestAnimationFrame(tick);
+                    return;
+                }
+
+                if (!isLp && nextPos >= currentDuration && !isRec) {
+                    sheet.sequence.position = currentDuration;
+                    const kfs = useStore.getState().scrollKeyframes;
+                    useStore.getState().setSceneProgress(interpolateScrollAt(kfs, currentDuration, currentDuration));
+                    useStore.getState().setIsPlaying(false);
+                    useStore.getState().setIsRecording(false);
                     return;
                 }
 
