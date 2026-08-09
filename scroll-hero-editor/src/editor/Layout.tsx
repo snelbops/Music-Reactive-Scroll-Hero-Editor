@@ -1,6 +1,6 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Minimize2 } from 'lucide-react';
+import { Minimize2, Plus } from 'lucide-react';
 import studio from '@theatre/studio';
 import LeftPanel from './LeftPanel';
 import Inspector from './Inspector';
@@ -10,7 +10,7 @@ import HelpPanel from './HelpPanel';
 import ProjectModal from './ProjectModal';
 import { useStore } from '../store/useStore';
 import { exportParticleHeroHtml, exportFrameSequenceHeroHtml, exportCurvesJson, exportLoopRegionJson } from '../export/exportHtml';
-import { saveProject, loadProject, loadWorkingProject, autoSaveWorkingProject } from '../utils/project';
+import { saveProject, loadProject, loadWorkingProject, autoSaveWorkingProject, startNewProject } from '../utils/project';
 
 export default function Layout() {
     const isDarkMode = useStore(state => state.isDarkMode);
@@ -102,7 +102,15 @@ export default function Layout() {
         const unsub = useStore.subscribe(() => {
             autoSaveWorkingProject();
         });
-        return unsub;
+        // Explicitly auto-save right before page reload/close
+        const handleBeforeUnload = () => {
+            autoSaveWorkingProject();
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => {
+            unsub();
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
     }, []);
 
     useEffect(() => {
@@ -159,7 +167,18 @@ export default function Layout() {
             <header className="h-8 border-b border-editor-border bg-editor-panel text-editor-muted flex items-center px-4 justify-between text-[11px] font-medium tracking-wide shrink-0 font-sans select-none">
                 <span className="text-editor-fg font-semibold tracking-tight">Scroll Hero Editor</span>
 
-                <div className="flex items-center space-x-5">
+                <div className="flex items-center space-x-4">
+                    <button
+                        onClick={() => {
+                            if (confirm('Start a new project? Any unsaved changes in current project will be cleared.')) {
+                                startNewProject();
+                            }
+                        }}
+                        className="px-2 py-0.5 bg-white/10 hover:bg-white/20 text-white font-semibold rounded text-[11px] border border-white/20 transition-all flex items-center gap-1"
+                        title="Clear timeline and start a fresh project"
+                    >
+                        <Plus className="w-3 h-3 text-cyan-400" /> New Project
+                    </button>
                     <button
                         onClick={() => setShowProjectModal(true)}
                         className="px-2 py-0.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 font-semibold rounded text-[11px] border border-cyan-500/30 transition-all flex items-center gap-1"

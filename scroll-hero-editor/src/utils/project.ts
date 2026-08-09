@@ -268,3 +268,16 @@ export async function loadProjectFromFile(file: File): Promise<void> {
     applyProjectDataToStore(data);
     autoSaveWorkingProject();
 }
+
+export function startNewProject(): void {
+    const blankTemplate = STARTER_TEMPLATES.find(t => t.id === 'template-blank') ?? STARTER_TEMPLATES[0];
+    applyProjectDataToStore(blankTemplate);
+    const s = useStore.getState();
+    s.setPlayheadPosition(0);
+    s.setTimelineScrollLeft(0);
+    s.setTimelineZoom(1);
+    s.setVerticalZoom(1);
+    s.setSelectedKeyframes([]);
+    s.setTimeSelection(null);
+    autoSaveWorkingProject();
+}

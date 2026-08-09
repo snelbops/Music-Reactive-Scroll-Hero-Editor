@@ -9,6 +9,7 @@ import {
     loadProjectFromFile,
     STARTER_TEMPLATES,
     autoSaveWorkingProject,
+    startNewProject,
     type ProjectData,
 } from '../utils/project';
 
@@ -80,12 +81,26 @@ export default function ProjectModal({ onClose }: ProjectModalProps) {
                             <p className="text-[11px] text-gray-400">Save to browser storage, load templates, or export/import files</p>
                         </div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-                    >
-                        <X className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => {
+                                if (confirm('Start a new blank project? Any unsaved changes in current session will be cleared.')) {
+                                    startNewProject();
+                                    onClose();
+                                }
+                            }}
+                            className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white font-semibold text-xs rounded-lg transition-colors flex items-center gap-1"
+                            title="Start fresh blank project"
+                        >
+                            <Plus className="w-3.5 h-3.5 text-cyan-400" /> New Project
+                        </button>
+                        <button
+                            onClick={onClose}
+                            className="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Tabs */}
