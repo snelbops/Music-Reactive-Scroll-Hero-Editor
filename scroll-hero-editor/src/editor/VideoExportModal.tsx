@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Film, Download, StopCircle, Layers } from 'lucide-react';
+import { X, Film, Download, StopCircle, Smartphone, Monitor, Square, Video, Scaling } from 'lucide-react';
 import { videoExporter } from '../export/exportVideo';
 import { useStore } from '../store/useStore';
 
@@ -8,6 +8,9 @@ interface VideoExportModalProps {
 }
 
 export default function VideoExportModal({ onClose }: VideoExportModalProps) {
+    const activeRatio = useStore(s => s.aspectRatio);
+
+    const [exportRatio, setExportRatio] = useState<string>(activeRatio || '16:9');
     const [fps, setFps] = useState<30 | 60>(60);
     const [format, setFormat] = useState<'webm' | 'mp4'>('mp4');
     const [isExporting, setIsExporting] = useState(false);
@@ -17,14 +20,6 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
 
     const sequenceDuration = useStore(s => s.sequenceDuration);
     const audioUrl = useStore(s => s.audioUrl);
-    const aspectRatio = useStore(s => s.aspectRatio);
-
-    const getResolutionLabel = () => {
-        if (aspectRatio === '9:16') return '📱 1080 x 1920 (Vertical Reel HD)';
-        if (aspectRatio === '1:1') return '🔲 1080 x 1080 (Square HD)';
-        if (aspectRatio === '16:9') return '💻 1920 x 1080 (Full HD Widescreen)';
-        return '🖥️ Active Viewport Aspect Ratio';
-    };
 
     const handleStartExport = () => {
         setIsExporting(true);
@@ -36,6 +31,7 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
             fps,
             format,
             mode: 'offline',
+            aspectRatio: exportRatio,
             onProgress: (p, time) => {
                 setProgress(p);
                 setCurrentTime(time);
@@ -82,18 +78,86 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
 
                 {/* Body Options */}
                 <div className="p-5 space-y-4 text-xs">
-                    {/* Device Aspect Ratio Match Badge */}
-                    <div className="p-2.5 rounded-lg bg-[#252527] border border-cyan-500/30 flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-cyan-400 font-semibold">
-                            <Layers className="w-4 h-4" />
-                            <span>Output Device Resolution:</span>
+                    {/* Resolution / Device Format Selector */}
+                    <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                            <label className="text-gray-300 font-semibold block">Export Resolution & Format:</label>
+                            <span className="text-[10px] text-cyan-400 font-mono font-bold">
+                                Active: {activeRatio}
+                            </span>
                         </div>
-                        <span className="font-mono text-white font-bold">{getResolutionLabel()}</span>
+                        <div className="grid grid-cols-3 gap-1.5">
+                            <button
+                                onClick={() => setExportRatio('9:16')}
+                                disabled={isExporting}
+                                className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 transition-colors ${
+                                    exportRatio === '9:16'
+                                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 font-bold'
+                                        : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
+                                }`}
+                            >
+                                <Smartphone className="w-4 h-4 text-cyan-400" />
+                                <span className="text-[10px]">9:16 Reel</span>
+                                <span className="text-[8px] font-mono text-gray-400">1080x1920</span>
+                            </button>
+                            <button
+                                onClick={() => setExportRatio('1:1')}
+                                disabled={isExporting}
+                                className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 transition-colors ${
+                                    exportRatio === '1:1'
+                                        ? 'bg-purple-500/20 border-purple-400 text-purple-300 font-bold'
+                                        : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
+                                }`}
+                            >
+                                <Square className="w-4 h-4 text-purple-400" />
+                                <span className="text-[10px]">1:1 Square</span>
+                                <span className="text-[8px] font-mono text-gray-400">1080x1080</span>
+                            </button>
+                            <button
+                                onClick={() => setExportRatio('16:9')}
+                                disabled={isExporting}
+                                className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 transition-colors ${
+                                    exportRatio === '16:9'
+                                        ? 'bg-blue-500/20 border-blue-400 text-blue-300 font-bold'
+                                        : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
+                                }`}
+                            >
+                                <Monitor className="w-4 h-4 text-blue-400" />
+                                <span className="text-[10px]">16:9 Widescreen</span>
+                                <span className="text-[8px] font-mono text-gray-400">1920x1080</span>
+                            </button>
+                            <button
+                                onClick={() => setExportRatio('viewport')}
+                                disabled={isExporting}
+                                className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 transition-colors col-span-1.5 ${
+                                    exportRatio === 'viewport'
+                                        ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold'
+                                        : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
+                                }`}
+                            >
+                                <Scaling className="w-4 h-4 text-emerald-400" />
+                                <span className="text-[10px]">Current Viewport</span>
+                                <span className="text-[8px] font-mono text-gray-400">Match Display</span>
+                            </button>
+                            <button
+                                onClick={() => setExportRatio('native')}
+                                disabled={isExporting}
+                                className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 transition-colors col-span-1.5 ${
+                                    exportRatio === 'native'
+                                        ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-bold'
+                                        : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
+                                }`}
+                            >
+                                <Video className="w-4 h-4 text-amber-400" />
+                                <span className="text-[10px]">Native Video</span>
+                                <span className="text-[8px] font-mono text-gray-400">Original MP4</span>
+                            </button>
+                        </div>
                     </div>
 
                     {/* Format Selection */}
                     <div className="space-y-1.5">
-                        <label className="text-gray-300 font-semibold block">Video Format:</label>
+                        <label className="text-gray-300 font-semibold block">Video File Container:</label>
                         <div className="grid grid-cols-2 gap-2">
                             <button
                                 onClick={() => setFormat('mp4')}
@@ -104,8 +168,8 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                                         : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
                                 }`}
                             >
-                                <span className="text-xs text-editor-accent-blue">MP4 Video</span>
-                                <span className="text-[10px] text-gray-400 font-normal">Standard MP4 format for mobile & social sharing</span>
+                                <span className="text-xs text-editor-accent-blue">MP4 Video (.mp4)</span>
+                                <span className="text-[10px] text-gray-400 font-normal">Standard MP4 for mobile & Instagram</span>
                             </button>
                             <button
                                 onClick={() => setFormat('webm')}
@@ -116,7 +180,7 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                                         : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
                                 }`}
                             >
-                                <span className="text-xs text-editor-accent-purple">WebM (VP9 HD)</span>
+                                <span className="text-xs text-editor-accent-purple">WebM Video (.webm)</span>
                                 <span className="text-[10px] text-gray-400 font-normal">Ultra-high resolution browser video</span>
                             </button>
                         </div>

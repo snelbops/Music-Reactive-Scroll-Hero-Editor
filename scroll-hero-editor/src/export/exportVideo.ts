@@ -6,6 +6,7 @@ export type VideoExportOptions = {
     fps: 30 | 60;
     format: 'webm' | 'mp4';
     mode: 'offline' | 'realtime';
+    aspectRatio?: string;
     onProgress?: (progress: number, currentTime: number) => void;
     onComplete?: () => void;
     onError?: (err: Error) => void;
@@ -22,7 +23,7 @@ export class VideoExporter {
 
         const seqDur = useStore.getState().sequenceDuration;
         const fps = options.fps || 60;
-        const aspectRatioState = useStore.getState().aspectRatio;
+        const selectedRatio = options.aspectRatio || useStore.getState().aspectRatio || '16:9';
 
         // Locate viewport container elements
         const container = document.querySelector('div[data-purpose="viewport-container"]') as HTMLElement | null;
@@ -34,27 +35,34 @@ export class VideoExporter {
             return;
         }
 
-        // Calculate resolution based on selected device / aspect ratio setting
+        // Calculate resolution based on selected export aspect ratio
         let targetWidth = 1920;
         let targetHeight = 1080;
 
-        if (aspectRatioState === '9:16') {
+        if (selectedRatio === '9:16') {
             targetWidth = 1080;
             targetHeight = 1920;
-        } else if (aspectRatioState === '1:1') {
+        } else if (selectedRatio === '1:1') {
             targetWidth = 1080;
             targetHeight = 1080;
-        } else if (aspectRatioState === '16:9') {
+        } else if (selectedRatio === '16:9') {
             targetWidth = 1920;
             targetHeight = 1080;
+        } else if (selectedRatio === 'native' && videoEl && videoEl.videoWidth > 0) {
+            targetWidth = videoEl.videoWidth;
+            targetHeight = videoEl.videoHeight;
         } else if (container) {
             const rect = container.getBoundingClientRect();
             if (rect.height > 0 && rect.width > 0) {
-                const ratio = rect.width / rect.height;
+                const scale = 1080 / rect.height;
                 targetHeight = 1080;
-                targetWidth = Math.round(1080 * ratio);
+                targetWidth = Math.round(rect.width * scale);
             }
         }
+
+        // Ensure even pixel dimensions for video encoders
+        if (targetWidth % 2 !== 0) targetWidth += 1;
+        if (targetHeight % 2 !== 0) targetHeight += 1;
 
         try {
             // High-resolution Composite Canvas matching selected aspect ratio
@@ -136,7 +144,7 @@ export class VideoExporter {
                 a.href = url;
                 const isMp4 = mimeType.includes('mp4') || options.format === 'mp4';
                 const ext = isMp4 ? 'mp4' : 'webm';
-                a.download = `scroll-hero-${aspectRatioState}-${targetWidth}x${targetHeight}-${Date.now()}.${ext}`;
+                a.download = `scroll-hero-${selectedRatio}-${targetWidth}x${targetHeight}-${Date.now()}.${ext}`;
                 a.click();
                 URL.revokeObjectURL(url);
 
