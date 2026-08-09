@@ -14,6 +14,7 @@ export class VideoExporter {
     private mediaRecorder: MediaRecorder | null = null;
     private chunks: Blob[] = [];
     private isCancelled = false;
+    private animFrameId: number | null = null;
 
     async startExport(options: VideoExportOptions): Promise<void> {
         this.isCancelled = false;
@@ -22,28 +23,66 @@ export class VideoExporter {
         const seqDur = useStore.getState().sequenceDuration;
         const fps = options.fps || 60;
 
-        // Locate preview canvas or video element
-        const canvas = (document.querySelector('div[data-purpose="viewport-container"] canvas') ||
-            document.querySelector('canvas')) as HTMLCanvasElement | null;
+        // Locate viewport container elements
+        const container = document.querySelector('div[data-purpose="viewport-container"]');
+        const videoEl = container?.querySelector('video') as HTMLVideoElement | null;
+        const threeCanvas = container?.querySelector('canvas') as HTMLCanvasElement | null;
 
-        if (!canvas) {
-            options.onError?.(new Error('Preview canvas not found. Make sure scene is active.'));
+        if (!videoEl && !threeCanvas) {
+            options.onError?.(new Error('No preview canvas or video element found in viewport.'));
             return;
         }
 
         try {
-            // Setup MediaStream from canvas
-            const canvasStream = canvas.captureStream(fps);
-            let combinedStream = canvasStream;
+            // Create a high-res Composite Canvas (1920x1080 Full HD or native viewport size)
+            const compositeCanvas = document.createElement('canvas');
+            const targetWidth = threeCanvas?.width || videoEl?.videoWidth || 1920;
+            const targetHeight = threeCanvas?.height || videoEl?.videoHeight || 1080;
+            compositeCanvas.width = targetWidth;
+            compositeCanvas.height = targetHeight;
+            const ctx = compositeCanvas.getContext('2d', { alpha: false })!;
 
-            // Connect Audio if active
+            // Composite rendering loop — draws background video + canvas overlay every frame
+            const renderCompositeFrame = () => {
+                if (this.isCancelled) return;
+
+                ctx.fillStyle = '#0a0a0f';
+                ctx.fillRect(0, 0, targetWidth, targetHeight);
+
+                // 1. Draw HTML5 Video background if active
+                if (videoEl && videoEl.readyState >= 2) {
+                    try {
+                        ctx.drawImage(videoEl, 0, 0, targetWidth, targetHeight);
+                    } catch (e) {}
+                }
+
+                // 2. Draw Three.js / Canvas overlay if active
+                if (threeCanvas && threeCanvas.width > 0) {
+                    try {
+                        ctx.drawImage(threeCanvas, 0, 0, targetWidth, targetHeight);
+                    } catch (e) {}
+                }
+
+                this.animFrameId = requestAnimationFrame(renderCompositeFrame);
+            };
+
+            renderCompositeFrame();
+
+            // Stream from Composite Canvas
+            const compositeStream = compositeCanvas.captureStream(fps);
+            let finalStream = compositeStream;
+
+            // Audio Stream pipeline
             const audioUrl = useStore.getState().audioUrl;
             let audioEl: HTMLAudioElement | null = null;
+            let audioCtx: AudioContext | null = null;
+
             if (audioUrl) {
                 try {
-                    audioEl = new Audio(audioUrl);
+                    audioEl = new Audio();
+                    audioEl.src = audioUrl;
                     audioEl.crossOrigin = 'anonymous';
-                    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
                     const source = audioCtx.createMediaElementSource(audioEl);
                     const dest = audioCtx.createMediaStreamDestination();
                     source.connect(dest);
@@ -51,28 +90,41 @@ export class VideoExporter {
 
                     const audioTrack = dest.stream.getAudioTracks()[0];
                     if (audioTrack) {
-                        combinedStream = new MediaStream([...canvasStream.getVideoTracks(), audioTrack]);
+                        finalStream = new MediaStream([...compositeStream.getVideoTracks(), audioTrack]);
                     }
                 } catch (e) {
-                    console.warn('Audio track capture notice:', e);
+                    console.warn('Audio capture setup warning:', e);
+                }
+            } else if (videoEl) {
+                // If no separate audio file, check if background video has audio stream
+                try {
+                    const videoStream = (videoEl as any).captureStream ? (videoEl as any).captureStream() : (videoEl as any).mozCaptureStream ? (videoEl as any).mozCaptureStream() : null;
+                    if (videoStream) {
+                        const audioTrack = videoStream.getAudioTracks()[0];
+                        if (audioTrack) {
+                            finalStream = new MediaStream([...compositeStream.getVideoTracks(), audioTrack]);
+                        }
+                    }
+                } catch (e) {}
+            }
+
+            // Determine best supported MIME type for MP4 / WebM
+            const formats = options.format === 'mp4'
+                ? ['video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm']
+                : ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+
+            let mimeType = '';
+            for (const f of formats) {
+                if (MediaRecorder.isTypeSupported(f)) {
+                    mimeType = f;
+                    break;
                 }
             }
+            if (!mimeType) mimeType = 'video/webm';
 
-            // Determine MIME type
-            let mimeType = 'video/webm;codecs=vp9';
-            if (!MediaRecorder.isTypeSupported(mimeType)) {
-                mimeType = 'video/webm;codecs=vp8';
-            }
-            if (!MediaRecorder.isTypeSupported(mimeType)) {
-                mimeType = 'video/webm';
-            }
-            if (options.format === 'mp4' && MediaRecorder.isTypeSupported('video/mp4')) {
-                mimeType = 'video/mp4';
-            }
-
-            this.mediaRecorder = new MediaRecorder(combinedStream, {
+            this.mediaRecorder = new MediaRecorder(finalStream, {
                 mimeType,
-                videoBitsPerSecond: 8000000, // 8 Mbps high quality
+                videoBitsPerSecond: 12000000, // 12 Mbps Full HD high bit-rate
             });
 
             this.mediaRecorder.ondataavailable = (e) => {
@@ -82,25 +134,34 @@ export class VideoExporter {
             };
 
             this.mediaRecorder.onstop = () => {
+                if (this.animFrameId) {
+                    cancelAnimationFrame(this.animFrameId);
+                    this.animFrameId = null;
+                }
+
                 if (this.isCancelled) return;
 
                 const blob = new Blob(this.chunks, { type: mimeType });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
-                a.download = `scroll-hero-animation-${Date.now()}.${ext}`;
+                const isMp4 = mimeType.includes('mp4') || options.format === 'mp4';
+                const ext = isMp4 ? 'mp4' : 'webm';
+                a.download = `scroll-hero-video-${Date.now()}.${ext}`;
                 a.click();
                 URL.revokeObjectURL(url);
 
                 if (audioEl) {
                     audioEl.pause();
                 }
+                if (audioCtx) {
+                    audioCtx.close();
+                }
 
                 options.onComplete?.();
             };
 
-            // Reset sequence to 0 and start playback + recording
+            // Seek sequence to 0 and start playback + recording synchronously
             sheet.sequence.position = 0;
             useStore.getState().setIsPlaying(true);
             this.mediaRecorder.start(100);
@@ -110,7 +171,7 @@ export class VideoExporter {
                 audioEl.play();
             }
 
-            // Monitor position until sequence completion
+            // Monitor position until sequence duration completes
             const startTime = performance.now();
             const checkInterval = setInterval(() => {
                 if (this.isCancelled) {
@@ -132,12 +193,20 @@ export class VideoExporter {
             }, 50);
 
         } catch (err: any) {
+            if (this.animFrameId) {
+                cancelAnimationFrame(this.animFrameId);
+                this.animFrameId = null;
+            }
             options.onError?.(err);
         }
     }
 
     cancelExport() {
         this.isCancelled = true;
+        if (this.animFrameId) {
+            cancelAnimationFrame(this.animFrameId);
+            this.animFrameId = null;
+        }
         if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
             this.mediaRecorder.stop();
         }
