@@ -48,6 +48,9 @@ interface EditorState {
     activeVideoPadIdx: number;
     setActiveVideoPadIdx: (idx: number) => void;
     setVideoPad: (idx: number, pad: { name: string; url: string }) => void;
+    videoSyncMode: 'fit' | 'realtime' | 'loop'; setVideoSyncMode: (mode: 'fit' | 'realtime' | 'loop') => void;
+    videoSpeedRatio: number; setVideoSpeedRatio: (ratio: number) => void;
+    remapKeyframesToRatio: (ratio: number) => void;
     extractedFrames: Blob[]; setExtractedFrames: (frames: Blob[]) => void;
     extractionProgress: number; setExtractionProgress: (p: number) => void;
     extractionStatus: 'idle' | 'extracting' | 'done' | 'error'; setExtractionStatus: (s: 'idle' | 'extracting' | 'done' | 'error') => void;
@@ -140,6 +143,33 @@ export const useStore = create<EditorState>((set, get) => {
         { id: 5, name: 'Empty Pad 4', url: '' },
     ],
     activeVideoPadIdx: 0,
+    videoSyncMode: 'fit',
+    setVideoSyncMode: (mode) => set({ videoSyncMode: mode }),
+    videoSpeedRatio: 1.0,
+    setVideoSpeedRatio: (ratio) => set({ videoSpeedRatio: Math.max(0.1, Math.min(5, ratio)) }),
+    remapKeyframesToRatio: (ratio) => {
+        const s = get();
+        if (ratio <= 0 || ratio === 1) return;
+        s.pushHistory();
+        const newScrollKfs = s.scrollKeyframes.map(kf => ({
+            ...kf,
+            time: +(kf.time * ratio).toFixed(2),
+            handleIn: kf.handleIn ? { ...kf.handleIn, dt: +(kf.handleIn.dt * ratio).toFixed(2) } : undefined,
+            handleOut: kf.handleOut ? { ...kf.handleOut, dt: +(kf.handleOut.dt * ratio).toFixed(2) } : undefined,
+        })).filter(kf => kf.time <= s.sequenceDuration);
+
+        const newParamKfs: Record<string, ParamKf[]> = {};
+        Object.entries(s.paramKeyframes).forEach(([laneId, kfs]) => {
+            newParamKfs[laneId] = kfs.map(kf => ({
+                ...kf,
+                time: +(kf.time * ratio).toFixed(2),
+                handleIn: kf.handleIn ? { ...kf.handleIn, dt: +(kf.handleIn.dt * ratio).toFixed(2) } : undefined,
+                handleOut: kf.handleOut ? { ...kf.handleOut, dt: +(kf.handleOut.dt * ratio).toFixed(2) } : undefined,
+            })).filter(kf => kf.time <= s.sequenceDuration);
+        });
+
+        set({ scrollKeyframes: newScrollKfs, paramKeyframes: newParamKfs });
+    },
     setActiveVideoPadIdx: (idx) => {
         const pads = get().videoPads;
         const targetUrl = pads[idx]?.url || get().videoUrl;

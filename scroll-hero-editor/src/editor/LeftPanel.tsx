@@ -67,6 +67,10 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
     const setExtractionProgress = useStore(s => s.setExtractionProgress);
     const extractionStatus = useStore(s => s.extractionStatus);
     const setExtractionStatus = useStore(s => s.setExtractionStatus);
+    const videoSyncMode = useStore(s => s.videoSyncMode);
+    const setVideoSyncMode = useStore(s => s.setVideoSyncMode);
+    const videoSpeedRatio = useStore(s => s.videoSpeedRatio);
+    const setVideoSpeedRatio = useStore(s => s.setVideoSpeedRatio);
 
     const mp4InputRef = useRef<HTMLInputElement>(null);
 
@@ -396,6 +400,71 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                 </div>
                             </div>
                         )}
+
+                        {/* Video Duration & Time Sync Ratio Controls */}
+                        <div className="mt-3 space-y-2 glass-panel p-2 rounded border border-editor-border">
+                            <div className="flex justify-between items-center text-[9px] text-editor-muted uppercase tracking-widest">
+                                <span>Video Sync & Ratio</span>
+                                <span className="text-editor-accent-blue font-mono font-bold">{videoSyncMode.toUpperCase()}</span>
+                            </div>
+
+                            {/* Sync Mode Selector */}
+                            <div className="grid grid-cols-3 gap-1">
+                                {(['fit', 'realtime', 'loop'] as const).map(mode => (
+                                    <button
+                                        key={mode}
+                                        onClick={() => setVideoSyncMode(mode)}
+                                        className={`py-1 text-[9px] font-bold rounded border transition-colors ${
+                                            videoSyncMode === mode
+                                                ? 'bg-editor-accent-blue/20 border-editor-accent-blue text-editor-accent-blue'
+                                                : 'bg-editor-surface border-editor-border text-editor-muted hover:bg-editor-surface-hover'
+                                        }`}
+                                        title={mode === 'fit' ? 'Stretches 0-100% of video over sequence duration' : mode === 'realtime' ? '1s timeline = 1s video playback' : 'Loops video over sequence duration'}
+                                    >
+                                        {mode === 'fit' ? '↔ Fit 100%' : mode === 'realtime' ? '⏱ Realtime' : '🔁 Loop'}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Speed Ratio Slider */}
+                            <div className="space-y-1 pt-1">
+                                <div className="flex justify-between text-[9px] text-editor-muted">
+                                    <span>SPEED MULTIPLIER:</span>
+                                    <span className="font-mono text-cyan-400 font-bold">{videoSpeedRatio.toFixed(2)}x</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="0.25"
+                                    max="3.0"
+                                    step="0.05"
+                                    value={videoSpeedRatio}
+                                    onChange={(e) => setVideoSpeedRatio(parseFloat(e.target.value))}
+                                    className="w-full h-1 accent-cyan-400 cursor-pointer"
+                                />
+                                <div className="flex justify-between text-[8px] text-gray-500 font-mono">
+                                    <span>0.25x</span>
+                                    <span className="cursor-pointer hover:text-white" onClick={() => setVideoSpeedRatio(1.0)}>1.0x (Reset)</span>
+                                    <span>3.00x</span>
+                                </div>
+                            </div>
+
+                            {/* Quick Keyframe Stretch Ratio Helper */}
+                            <div className="border-t border-editor-border pt-1.5 flex gap-1">
+                                <button
+                                    onClick={() => {
+                                        const ratioStr = prompt('Enter keyframe scale ratio (e.g. 0.8 to shrink keyframes by 20%, 1.25 to stretch by 25%):', '0.8');
+                                        if (ratioStr) {
+                                            const r = parseFloat(ratioStr);
+                                            if (!isNaN(r) && r > 0) useStore.getState().remapKeyframesToRatio(r);
+                                        }
+                                    }}
+                                    className="w-full py-1 text-[9px] bg-editor-accent-purple/20 hover:bg-editor-accent-purple border border-editor-accent-purple/40 text-editor-accent-purple hover:text-white rounded font-mono font-bold transition-all flex items-center justify-center gap-1"
+                                    title="Stretch or shrink automation keyframes to fit a different video length ratio"
+                                >
+                                    ⚡ Remap Keyframe Time Ratio
+                                </button>
+                            </div>
+                        </div>
 
                         {/* Video Drumpad Launcher */}
                         <div className="mt-3 space-y-1">
