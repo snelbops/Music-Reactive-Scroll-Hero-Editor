@@ -125,48 +125,120 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const [laneHeights, setLaneHeights] = useState<Record<string, number>>({});
     const laneH = (id: string, def = 40) => laneHeights[id] ?? Math.round(def * verticalZoom);
 
-    const generateRhythmCurve = (mode: 'bounce' | 'stutter' | 'wave' | 'ramp' | 'jumps') => {
+    const [audioMenu, setAudioMenu] = useState<{ visible: boolean; x: number; y: number; clickTime: number } | null>(null);
+    const [audioTargetLane, setAudioTargetLane] = useState<string>('scrollPos');
+
+    const generateRhythmCurveForLane = (
+        targetLane: string,
+        mode: 'envelope' | 'bounce' | 'stutter' | 'wave' | 'ramp' | 'jumps' | 'ducking' | 'flutter',
+        onlyLoopRegion: boolean = true
+    ) => {
         useStore.getState().pushHistory();
         const seqDur = useStore.getState().sequenceDuration;
-        const beatPoints = beats.length > 0 ? beats : Array.from({ length: Math.floor(seqDur / 0.5) }, (_, i) => i * 0.5);
-        const newKfs: { time: number; value: number; easing?: string }[] = [];
+        const isLoopActive = useStore.getState().isLoop;
+        const lStart = onlyLoopRegion && isLoopActive ? (useStore.getState().loopStart || 0) : 0;
+        const lEnd = onlyLoopRegion && isLoopActive ? (useStore.getState().loopEnd || seqDur) : seqDur;
 
-        if (mode === 'bounce') {
-            beatPoints.forEach((bt) => {
-                const t = Math.min(seqDur, bt);
-                if (t > 0.08) newKfs.push({ time: +(t - 0.08).toFixed(2), value: 0 });
-                newKfs.push({ time: +t.toFixed(2), value: 1 });
-                if (t + 0.08 < seqDur) newKfs.push({ time: +(t + 0.08).toFixed(2), value: 0 });
+        const laneConfigs: Record<string, { min: number; max: number }> = {
+            scrollPos: { min: 0, max: 1 },
+            rotationSpeed: { min: 0, max: 0.05 },
+            depth: { min: 5, max: 60 },
+            size: { min: 0.1, max: 3 },
+            cssOpacity: { min: 0, max: 1 },
+        };
+        const cfg = laneConfigs[targetLane] ?? { min: 0, max: 1 };
+        const range = cfg.max - cfg.min;
+
+        const rangeBeats = (beats.length > 0 ? beats : Array.from({ length: Math.floor(seqDur / 0.5) }, (_, i) => i * 0.5))
+            .filter(bt => bt >= lStart && bt <= lEnd);
+
+        const generatedKfs: { time: number; value: number; easing?: string }[] = [];
+
+        // Base rest values outside selection (Silence level)
+        if (lStart > 0) {
+            generatedKfs.push({ time: 0, value: cfg.min });
+            generatedKfs.push({ time: +lStart.toFixed(2), value: cfg.min });
+        }
+
+        if (mode === 'envelope' && waveform.length > 0) {
+            const step = seqDur / waveform.length;
+            waveform.forEach((val: number, idx: number) => {
+                const t = idx * step;
+                if (t >= lStart && t <= lEnd) {
+                    const normVal = cfg.min + val * range;
+                    generatedKfs.push({ time: +t.toFixed(2), value: +normVal.toFixed(3) });
+                }
+            });
+        } else if (mode === 'bounce') {
+            rangeBeats.forEach((bt) => {
+                if (bt - 0.08 >= lStart) generatedKfs.push({ time: +(bt - 0.08).toFixed(2), value: cfg.min });
+                generatedKfs.push({ time: +bt.toFixed(2), value: cfg.max });
+                if (bt + 0.08 <= lEnd) generatedKfs.push({ time: +(bt + 0.08).toFixed(2), value: cfg.min });
             });
         } else if (mode === 'stutter') {
-            beatPoints.forEach((bt, idx) => {
-                const t = Math.min(seqDur, bt);
-                const val = +(idx / Math.max(1, beatPoints.length - 1)).toFixed(2);
-                newKfs.push({ time: +t.toFixed(2), value: val, easing: 'step' });
+            rangeBeats.forEach((bt, idx) => {
+                const val = cfg.min + (idx / Math.max(1, rangeBeats.length - 1)) * range;
+                generatedKfs.push({ time: +bt.toFixed(2), value: +val.toFixed(3), easing: 'step' });
             });
         } else if (mode === 'wave') {
-            beatPoints.forEach((bt, idx) => {
-                const t = Math.min(seqDur, bt);
-                const val = +((Math.sin((idx * Math.PI) / 2) + 1) / 2).toFixed(2);
-                newKfs.push({ time: +t.toFixed(2), value: val });
+            rangeBeats.forEach((bt, idx) => {
+                const normVal = cfg.min + ((Math.sin((idx * Math.PI) / 2) + 1) / 2) * range;
+                generatedKfs.push({ time: +bt.toFixed(2), value: +normVal.toFixed(3) });
             });
         } else if (mode === 'ramp') {
             const barSize = 4;
-            beatPoints.forEach((bt, idx) => {
-                const t = Math.min(seqDur, bt);
+            rangeBeats.forEach((bt, idx) => {
                 const barProgress = (idx % barSize) / (barSize - 1);
-                newKfs.push({ time: +t.toFixed(2), value: +barProgress.toFixed(2) });
+                const val = cfg.min + barProgress * range;
+                generatedKfs.push({ time: +bt.toFixed(2), value: +val.toFixed(3) });
+            });
+        } else if (mode === 'ducking') {
+            rangeBeats.forEach((bt) => {
+                if (bt - 0.08 >= lStart) generatedKfs.push({ time: +(bt - 0.08).toFixed(2), value: cfg.max });
+                generatedKfs.push({ time: +bt.toFixed(2), value: cfg.min });
+                if (bt + 0.08 <= lEnd) generatedKfs.push({ time: +(bt + 0.08).toFixed(2), value: cfg.max });
+            });
+        } else if (mode === 'flutter') {
+            rangeBeats.forEach((bt) => {
+                for (let sub = 0; sub < 4; sub++) {
+                    const t = bt + sub * 0.12;
+                    if (t <= lEnd) {
+                        const val = sub % 2 === 0 ? cfg.max : cfg.min;
+                        generatedKfs.push({ time: +t.toFixed(2), value: +val.toFixed(3) });
+                    }
+                }
             });
         } else if (mode === 'jumps') {
-            beatPoints.forEach((bt) => {
-                const t = Math.min(seqDur, bt);
-                const val = +(0.1 + Math.random() * 0.8).toFixed(2);
-                newKfs.push({ time: +t.toFixed(2), value: val, easing: 'step' });
+            rangeBeats.forEach((bt) => {
+                const val = cfg.min + (0.1 + Math.random() * 0.8) * range;
+                generatedKfs.push({ time: +bt.toFixed(2), value: +val.toFixed(3), easing: 'step' });
             });
         }
 
-        useStore.getState().setScrollKeyframes(newKfs.sort((a, b) => a.time - b.time));
+        if (lEnd < seqDur) {
+            generatedKfs.push({ time: +lEnd.toFixed(2), value: cfg.min });
+            generatedKfs.push({ time: +seqDur.toFixed(2), value: cfg.min });
+        }
+
+        const sorted = generatedKfs.sort((a, b) => a.time - b.time);
+
+        if (targetLane === 'scrollPos') {
+            useStore.getState().setScrollKeyframes(sorted);
+        } else {
+            const paramKfs: ParamKf[] = sorted.map(k => ({
+                time: k.time,
+                value: k.value,
+                easing: k.easing || 'linear'
+            }));
+            useStore.getState().setParamKeyframes(targetLane, paramKfs);
+        }
+
+        setAudioMenu(null);
         setShowRhythmModal(false);
+    };
+
+    const generateRhythmCurve = (mode: 'bounce' | 'stutter' | 'wave' | 'ramp' | 'jumps') => {
+        generateRhythmCurveForLane('scrollPos', mode, true);
     };
 
     const smoothCurrentScrollCurve = () => {
@@ -199,6 +271,65 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         }
 
         useStore.getState().setScrollKeyframes(thinned.sort((a, b) => a.time - b.time));
+    };
+
+    const handleSegmentDrag = (
+        laneId: string,
+        kf1Time: number,
+        kf2Time: number,
+        val1: number,
+        val2: number,
+        min: number,
+        max: number,
+        e: React.PointerEvent
+    ) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const target = e.currentTarget;
+        target.setPointerCapture(e.pointerId);
+        useStore.getState().pushHistory();
+
+        const startY = e.clientY;
+        const range = max - min;
+
+        const onMove = (ev: PointerEvent) => {
+            const deltaPixels = ev.clientY - startY;
+            const deltaVal = -(deltaPixels / 120) * range;
+
+            if (laneId === 'scrollPos') {
+                const kfs = useStore.getState().scrollKeyframes;
+                const updated = kfs.map((k) => {
+                    if (Math.abs(k.time - kf1Time) < 0.005) {
+                        return { ...k, value: Math.max(0, Math.min(1, +(val1 + deltaVal).toFixed(3))) };
+                    }
+                    if (Math.abs(k.time - kf2Time) < 0.005) {
+                        return { ...k, value: Math.max(0, Math.min(1, +(val2 + deltaVal).toFixed(3))) };
+                    }
+                    return k;
+                });
+                useStore.getState().setScrollKeyframes(updated);
+            } else {
+                const kfs = (useStore.getState().paramKeyframes[laneId] ?? []) as ParamKf[];
+                const updated = kfs.map((k) => {
+                    if (Math.abs(k.time - kf1Time) < 0.005) {
+                        return { ...k, value: Math.max(min, Math.min(max, +(val1 + deltaVal).toFixed(3))) };
+                    }
+                    if (Math.abs(k.time - kf2Time) < 0.005) {
+                        return { ...k, value: Math.max(min, Math.min(max, +(val2 + deltaVal).toFixed(3))) };
+                    }
+                    return k;
+                });
+                useStore.getState().setParamKeyframes(laneId, updated);
+            }
+        };
+
+        const onUp = () => {
+            target.removeEventListener('pointermove', onMove as any);
+            target.removeEventListener('pointerup', onUp as any);
+        };
+
+        target.addEventListener('pointermove', onMove as any);
+        target.addEventListener('pointerup', onUp as any);
     };
 
     const handleLoopDrag = (type: 'start' | 'end' | 'bar', e: React.PointerEvent<HTMLDivElement>) => {
@@ -710,7 +841,15 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             >✕</button>
                         )}
                     </div>
-                    <div className="flex-1 relative overflow-hidden flex items-center">
+                    <div
+                        className="flex-1 relative overflow-hidden flex items-center cursor-context-menu"
+                        onContextMenu={(e) => {
+                            e.preventDefault();
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const clickTime = ((e.clientX - rect.left) / rect.width) * SEQUENCE_DURATION;
+                            setAudioMenu({ visible: true, x: e.clientX, y: e.clientY, clickTime });
+                        }}
+                    >
                         <input type="file" accept="audio/*" className="hidden" id="timeline-audio-upload"
                             onChange={(e) => { const f = e.target.files?.[0]; if (f) useStore.getState().setAudioUrl(URL.createObjectURL(f)); }} />
                         {!audioUrl ? (
@@ -1013,6 +1152,23 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     <>
                                         <path d={fillD} fill="url(#scrollFill)" stroke="none"/>
                                         <path d={d} fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="1" strokeLinecap="round" vectorEffect="non-scaling-stroke"/>
+                                        {scrollKeyframes.slice(0, -1).map((kf1, i) => {
+                                            const kf2 = scrollKeyframes[i + 1];
+                                            const x1 = (kf1.time / SEQUENCE_DURATION) * VB_W;
+                                            const y1 = (1 - kf1.value) * scrollVbH;
+                                            const x2 = (kf2.time / SEQUENCE_DURATION) * VB_W;
+                                            const y2 = (1 - kf2.value) * scrollVbH;
+                                            return (
+                                                <line
+                                                    key={`seg-${i}`}
+                                                    x1={x1} y1={y1} x2={x2} y2={y2}
+                                                    stroke="transparent"
+                                                    strokeWidth="10"
+                                                    className="cursor-ns-resize pointer-events-auto"
+                                                    onPointerDown={(e) => handleSegmentDrag('scrollPos', kf1.time, kf2.time, kf1.value, kf2.value, 0, 1, e)}
+                                                />
+                                            );
+                                        })}
                                     </>
                                 );
                             })()}
@@ -1247,6 +1403,23 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     {curvePath && (
                                         <path d={curvePath} fill="none" stroke="var(--color-editor-fill)" strokeOpacity="0.7" strokeWidth="1" strokeLinecap="round" vectorEffect="non-scaling-stroke"/>
                                     )}
+                                    {kfs.slice(0, -1).map((kf1, i) => {
+                                        const kf2 = kfs[i + 1];
+                                        const x1 = (kf1.time / SEQUENCE_DURATION) * VB_W;
+                                        const y1 = normalY(kf1.value);
+                                        const x2 = (kf2.time / SEQUENCE_DURATION) * VB_W;
+                                        const y2 = normalY(kf2.value);
+                                        return (
+                                            <line
+                                                key={`seg-${i}`}
+                                                x1={x1} y1={y1} x2={x2} y2={y2}
+                                                stroke="transparent"
+                                                strokeWidth="10"
+                                                className="cursor-ns-resize pointer-events-auto"
+                                                onPointerDown={(e) => handleSegmentDrag(lane.id, kf1.time, kf2.time, kf1.value, kf2.value, lane.min, lane.max, e)}
+                                            />
+                                        );
+                                    })}
                                     {activeTool === 'select' && kfs.map((kf, idx) => {
                                         const isKfSelected = selectedKeyframes.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.005);
                                         if (!isKfSelected) return null;
@@ -1470,6 +1643,90 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 <span className="font-bold text-white group-hover:text-orange-400">🔀 Random Beat Jumps</span>
                                 <span className="text-[10px] text-gray-400 mt-0.5">Jumps to random video keyframes on each beat</span>
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Right-Click Audio Track Context Menu */}
+            {audioMenu && (
+                <div
+                    className="fixed inset-0 z-[150]"
+                    onClick={() => setAudioMenu(null)}
+                    onContextMenu={(e) => { e.preventDefault(); setAudioMenu(null); }}
+                >
+                    <div
+                        className="absolute bg-[#1c1c1e] border border-[#3a3a3c] rounded-lg shadow-2xl p-2.5 w-[290px] font-sans text-editor-fg space-y-2 text-[11px]"
+                        style={{ left: Math.min(window.innerWidth - 300, audioMenu.x), top: Math.min(window.innerHeight - 360, audioMenu.y) }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between border-b border-[#2c2c2e] pb-1.5 px-1 font-bold text-editor-accent-orange">
+                            <div className="flex items-center gap-1.5">
+                                <Music className="w-3.5 h-3.5" />
+                                <span>Push Audio to Parameter</span>
+                            </div>
+                            <button className="text-gray-400 hover:text-white" onClick={() => setAudioMenu(null)}>✕</button>
+                        </div>
+
+                        {/* Target Parameter Selector */}
+                        <div className="space-y-1">
+                            <span className="text-[9px] uppercase font-bold text-gray-400 px-1">Target Parameter:</span>
+                            <div className="grid grid-cols-2 gap-1 font-mono text-[10px]">
+                                {[
+                                    { id: 'scrollPos', label: 'Scroll POS', color: '#3b82f6' },
+                                    { id: 'rotationSpeed', label: 'Rotation', color: '#a855f7' },
+                                    { id: 'depth', label: 'Particle Depth', color: '#22c55e' },
+                                    { id: 'size', label: 'Particle Size', color: '#14b8a6' },
+                                    { id: 'cssOpacity', label: 'Opacity', color: '#f97316' },
+                                ].map((item) => (
+                                    <button
+                                        key={item.id}
+                                        className={`px-2 py-1 rounded text-left truncate transition-colors border ${
+                                            audioTargetLane === item.id ? 'bg-[#2c2c2e] border-white/40 font-bold text-white' : 'border-transparent text-gray-300 hover:bg-[#252527]'
+                                        }`}
+                                        onClick={() => setAudioTargetLane(item.id)}
+                                    >
+                                        <span className="w-2 h-2 rounded-full inline-block mr-1.5" style={{ backgroundColor: item.color }} />
+                                        {item.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="border-t border-[#2c2c2e] my-1" />
+
+                        {/* Rhythm Preset Push Options */}
+                        <div className="space-y-1">
+                            <span className="text-[9px] uppercase font-bold text-gray-400 px-1">Push Rhythm Preset:</span>
+                            <div className="space-y-1">
+                                <button
+                                    className="w-full text-left px-2 py-1.5 rounded hover:bg-[#2c2c2e] transition-colors flex flex-col group"
+                                    onClick={() => generateRhythmCurveForLane(audioTargetLane, 'envelope', true)}
+                                >
+                                    <span className="font-bold text-editor-accent-orange group-hover:text-white">🔊 Audio Volume Envelope (RMS)</span>
+                                    <span className="text-[9px] text-gray-400">Continuous volume contour. Silence = 0 level.</span>
+                                </button>
+                                <button
+                                    className="w-full text-left px-2 py-1.5 rounded hover:bg-[#2c2c2e] transition-colors flex flex-col group"
+                                    onClick={() => generateRhythmCurveForLane(audioTargetLane, 'bounce', true)}
+                                >
+                                    <span className="font-bold text-editor-accent-purple group-hover:text-white">🥁 Kick Transient Spikes</span>
+                                    <span className="text-[9px] text-gray-400">Pulses up on kick beats; rests flat in silence.</span>
+                                </button>
+                                <button
+                                    className="w-full text-left px-2 py-1.5 rounded hover:bg-[#2c2c2e] transition-colors flex flex-col group"
+                                    onClick={() => generateRhythmCurveForLane(audioTargetLane, 'stutter', true)}
+                                >
+                                    <span className="font-bold text-teal-400 group-hover:text-white">⚡ Quantized Step-Cuts</span>
+                                    <span className="text-[9px] text-gray-400">Stutter cuts on beat sub-divisions.</span>
+                                </button>
+                                <button
+                                    className="w-full text-left px-2 py-1.5 rounded hover:bg-[#2c2c2e] transition-colors flex flex-col group"
+                                    onClick={() => generateRhythmCurveForLane(audioTargetLane, 'ducking', true)}
+                                >
+                                    <span className="font-bold text-blue-400 group-hover:text-white">📉 Inverted Ducking Envelope</span>
+                                    <span className="text-[9px] text-gray-400">Ducks down on beat, returns to max in quiet parts.</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
