@@ -1441,7 +1441,21 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     <div
                         className="flex-1 relative overflow-hidden bg-[#3b82f6]/[0.03]"
                         style={{ cursor: activeTool === 'pen' ? 'crosshair' : activeTool === 'eraser' ? 'cell' : undefined }}
+                        onContextMenu={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setSelectedLane('scrollPos');
+                            setAudioTargetLane('scrollPos');
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const clickTime = ((e.clientX - rect.left) / rect.width) * sequenceDuration;
+                            setAudioMenu({ visible: true, x: e.clientX, y: e.clientY, clickTime });
+                        }}
                         onPointerDown={(e) => {
+                            if (e.shiftKey || (activeTool === 'select' && e.target === e.currentTarget)) {
+                                setSelectedLane('scrollPos');
+                                handleTrackPointerDown(e);
+                                return;
+                            }
                             if (activeTool !== 'pen' && activeTool !== 'eraser') return;
                             e.stopPropagation();
                             const target = e.currentTarget;
@@ -1755,6 +1769,15 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             <div
                                 className="flex-1 relative overflow-hidden"
                                 style={{ cursor: activeTool === 'pen' ? 'crosshair' : activeTool === 'eraser' ? 'cell' : undefined }}
+                                onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setSelectedLane(lane.id);
+                                    setAudioTargetLane(lane.id);
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const clickTime = ((e.clientX - rect.left) / rect.width) * sequenceDuration;
+                                    setAudioMenu({ visible: true, x: e.clientX, y: e.clientY, clickTime });
+                                }}
                                 onDoubleClick={(e) => {
                                     e.stopPropagation();
                                     const el = lanesRef.current;
@@ -1767,6 +1790,11 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     addParamKeyframe(lane.id, t, existing ?? currentVal);
                                 }}
                                 onPointerDown={(e) => {
+                                    if (e.shiftKey || (activeTool === 'select' && e.target === e.currentTarget)) {
+                                        setSelectedLane(lane.id);
+                                        handleTrackPointerDown(e);
+                                        return;
+                                    }
                                     if (activeTool !== 'pen' && activeTool !== 'eraser') return;
                                     e.stopPropagation();
                                     const target = e.currentTarget;
