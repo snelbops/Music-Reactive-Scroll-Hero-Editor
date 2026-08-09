@@ -1,6 +1,6 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Minimize2, Plus } from 'lucide-react';
+import { Minimize2, Plus, Film } from 'lucide-react';
 import studio from '@theatre/studio';
 import LeftPanel from './LeftPanel';
 import Inspector from './Inspector';
@@ -8,6 +8,7 @@ import Timeline from './Timeline';
 import Viewport from '../preview/Viewport';
 import HelpPanel from './HelpPanel';
 import ProjectModal from './ProjectModal';
+import VideoExportModal from './VideoExportModal';
 import { useStore } from '../store/useStore';
 import { exportParticleHeroHtml, exportFrameSequenceHeroHtml, exportCurvesJson, exportLoopRegionJson } from '../export/exportHtml';
 import { saveProject, loadProject, loadWorkingProject, autoSaveWorkingProject, startNewProject } from '../utils/project';
@@ -29,8 +30,9 @@ export default function Layout() {
     const [isLoadError, setIsLoadError] = useState(false);
     const [isExportingLoop, setIsExportingLoop] = useState(false);
     const [showExportLoopModal, setShowExportLoopModal] = useState(false);
-    const [showHelp, setShowHelp] = useState(false);
     const [showProjectModal, setShowProjectModal] = useState(false);
+    const [showVideoExportModal, setShowVideoExportModal] = useState(false);
+    const [showHelp, setShowHelp] = useState(false);
     const loadInputRef = useRef<HTMLInputElement>(null);
     const [timelineH, setTimelineH] = useState(280);
     const [leftW, setLeftW] = useState(220);
@@ -186,6 +188,13 @@ export default function Layout() {
                     >
                         📁 Projects
                     </button>
+                    <button
+                        onClick={() => setShowVideoExportModal(true)}
+                        className="px-2.5 py-0.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded text-[11px] border border-purple-400/40 shadow-md transition-all flex items-center gap-1"
+                        title="Render animation and audio to WebM or MP4 video file"
+                    >
+                        <Film className="w-3 h-3" /> Export Video
+                    </button>
                     <span className="cursor-pointer hover:text-editor-fg transition-colors" onClick={() => saveProject()} title="Quick export .shero file">Save File</span>
                     <span className="cursor-pointer hover:text-editor-fg transition-colors" onClick={() => loadInputRef.current?.click()} title="Quick load .shero file">
                         {isLoadError ? 'Load failed' : 'Load File'}
@@ -318,9 +327,8 @@ export default function Layout() {
 
             {/* ── Help Panel ────────────────────────────────────────────────── */}
             {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
-
-            {/* ── Project Manager Modal ──────────────────────────────────────── */}
             {showProjectModal && <ProjectModal onClose={() => setShowProjectModal(false)} />}
+            {showVideoExportModal && <VideoExportModal onClose={() => setShowVideoExportModal(false)} />}
 
         </div>
     );

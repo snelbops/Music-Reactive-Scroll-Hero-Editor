@@ -172,6 +172,7 @@ export default function Viewport() {
             <div ref={previewRef} className="flex-1 flex items-center justify-center gap-4 px-6 overflow-hidden bg-editor-surface relative">
                 {/* Letterbox Stage */}
                 <div
+                    data-purpose="viewport-container"
                     className={`relative overflow-hidden ${isRecording ? 'ring-2 ring-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.15)]' : ''}`}
                     style={{
                         aspectRatio: RATIO_VALUES[aspectRatio] ?? undefined,
