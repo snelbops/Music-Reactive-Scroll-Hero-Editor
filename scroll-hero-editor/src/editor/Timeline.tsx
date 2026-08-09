@@ -121,6 +121,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const [isolatedLane, setIsolatedLane] = useState<'all' | 'scrollPos' | 'rotationSpeed' | 'cssOpacity' | 'depth' | 'size'>('all');
     const [showRhythmModal, setShowRhythmModal] = useState(false);
     const loopTrackRef = useRef<HTMLDivElement>(null);
+    const audioUploadInputRef = useRef<HTMLInputElement>(null);
     const canUndo = useStore(s => s._past.length > 0);
     const canRedo = useStore(s => s._future.length > 0);
     const draggingHandleRef = useRef<{ kfTime: number; side: 'in' | 'out' } | null>(null);
@@ -1253,12 +1254,28 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             setAudioMenu({ visible: true, x: e.clientX, y: e.clientY, clickTime });
                         }}
                     >
-                        <input type="file" accept="audio/*" className="hidden" id="timeline-audio-upload"
-                            onChange={(e) => { const f = e.target.files?.[0]; if (f) useStore.getState().setAudioUrl(URL.createObjectURL(f)); }} />
+                        <input
+                            ref={audioUploadInputRef}
+                            type="file"
+                            accept="audio/*"
+                            className="hidden"
+                            onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) useStore.getState().setAudioUrl(URL.createObjectURL(f));
+                                e.target.value = '';
+                            }}
+                        />
                         {!audioUrl ? (
                             <button
-                                className="flex items-center gap-1.5 px-2 text-[10px] text-editor-muted hover:text-editor-accent-orange transition-colors italic"
-                                onClick={(e) => { e.stopPropagation(); document.getElementById('timeline-audio-upload')?.click(); }}
+                                className="flex items-center gap-1.5 px-2 py-1 text-[10px] text-editor-muted hover:text-editor-accent-orange transition-colors italic z-20 pointer-events-auto cursor-pointer"
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (audioUploadInputRef.current) {
+                                        audioUploadInputRef.current.value = '';
+                                        audioUploadInputRef.current.click();
+                                    }
+                                }}
                             >
                                 <UploadCloud className="w-3 h-3 shrink-0" /> Import audio...
                             </button>
