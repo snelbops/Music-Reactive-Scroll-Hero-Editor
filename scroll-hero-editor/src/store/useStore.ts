@@ -104,7 +104,7 @@ export const useStore = create<EditorState>((set, get) => {
         document.documentElement.classList.toggle('dark', dark);
     },
     isPlaying: false, setIsPlaying: (playing) => set({ isPlaying: playing }),
-    videoUrl: 'https://scrollyvideo.js.org/goldengate.mp4', setVideoUrl: (url) => set({ videoUrl: url }),
+    videoUrl: null, setVideoUrl: (url) => set({ videoUrl: url }),
     audioUrl: null, setAudioUrl: (url) => set({ audioUrl: url }),
     isRecording: false, setIsRecording: (rec) => set({ isRecording: rec }),
     recordCountdown: null, setRecordCountdown: (n) => set({ recordCountdown: n }),
@@ -126,10 +126,10 @@ export const useStore = create<EditorState>((set, get) => {
     setMp4Asset: (asset) => set({ mp4Asset: asset, videoUrl: asset ? asset.url : null }),
     removeMp4Asset: () => set({ mp4Asset: null, videoUrl: null, extractedFrames: [], extractionStatus: 'idle' }),
     videoPads: [
-        { id: 7, name: 'Golden Gate MP4', url: 'https://scrollyvideo.js.org/goldengate.mp4' },
-        { id: 8, name: 'Sample Video MP4', url: '/sample.mp4' },
-        { id: 4, name: 'Empty Pad 4', url: '' },
-        { id: 5, name: 'Empty Pad 5', url: '' },
+        { id: 7, name: 'Sample Video', url: '/sample.mp4' },
+        { id: 8, name: 'Empty Pad 2', url: '' },
+        { id: 4, name: 'Empty Pad 3', url: '' },
+        { id: 5, name: 'Empty Pad 4', url: '' },
     ],
     activeVideoPadIdx: 0,
     setActiveVideoPadIdx: (idx) => {

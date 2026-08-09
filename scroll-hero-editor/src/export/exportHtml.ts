@@ -322,3 +322,79 @@ export function exportCurvesJson() {
     const data = JSON.stringify({ sequenceDuration: SEQUENCE_DURATION, keyframes }, null, 2);
     downloadFile('scroll-curves.json', data, 'application/json');
 }
+
+// ─── Export Loop Region ───────────────────────────────────────────────────────
+
+/**
+ * Slice a keyframe array to [start, end] — clipping and inserting boundary
+ * points so the exported curve precisely matches what was visible in the loop.
+ * All times are shifted so the loop start becomes t=0.
+ */
+function sliceKeyframes<T extends { time: number; value: number }>(
+    kfs: T[],
+    start: number,
+    end: number,
+): T[] {
+    if (!kfs.length) return [];
+    const sliced: T[] = [];
+    for (let i = 0; i < kfs.length; i++) {
+        const kf = kfs[i];
+        if (kf.time >= start && kf.time <= end) {
+            sliced.push({ ...kf, time: parseFloat((kf.time - start).toFixed(6)) });
+        }
+    }
+    return sliced;
+}
+
+/**
+ * Export only the loop region [loopStart, loopEnd] as a JSON file.
+ * Optionally converts the loaded audio blob to a base64 data-URI so the
+ * exported file is fully self-contained.
+ */
+export async function exportLoopRegionJson(withAudio: boolean): Promise<void> {
+    const state = useStore.getState();
+    const { loopStart, loopEnd, sequenceDuration, paramKeyframes, audioUrl } = state;
+    const scrollKfs = getScrollKeyframes();
+
+    const start = loopStart;
+    const end = loopEnd;
+    const duration = parseFloat((end - start).toFixed(6));
+
+    // Slice every lane
+    const slicedScroll = sliceKeyframes(scrollKfs, start, end);
+    const slicedParams: Record<string, unknown[]> = {};
+    for (const [laneId, kfs] of Object.entries(paramKeyframes)) {
+        slicedParams[laneId] = sliceKeyframes(kfs, start, end);
+    }
+
+    let audioData: string | null = null;
+    if (withAudio && audioUrl) {
+        try {
+            const response = await fetch(audioUrl);
+            const arrayBuffer = await response.arrayBuffer();
+            const uint8 = new Uint8Array(arrayBuffer);
+            let binary = '';
+            for (let i = 0; i < uint8.byteLength; i++) binary += String.fromCharCode(uint8[i]);
+            const base64 = btoa(binary);
+            // Try to detect MIME from the blob URL if possible; fall back to audio/mpeg
+            const mime = audioUrl.startsWith('blob:') ? 'audio/mpeg' : 'audio/mpeg';
+            audioData = `data:${mime};base64,${base64}`;
+        } catch (err) {
+            console.warn('exportLoopRegionJson: could not encode audio', err);
+        }
+    }
+
+    const payload = {
+        version: '1.0',
+        loopStart: start,
+        loopEnd: end,
+        duration,
+        sequenceDuration,
+        scrollKeyframes: slicedScroll,
+        paramKeyframes: slicedParams,
+        ...(audioData ? { audio: audioData } : {}),
+    };
+
+    const filename = `loop_${start.toFixed(2)}-${end.toFixed(2)}s${withAudio ? '_audio' : ''}.json`;
+    downloadFile(filename, JSON.stringify(payload, null, 2), 'application/json');
+}

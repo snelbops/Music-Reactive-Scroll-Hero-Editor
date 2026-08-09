@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useState } from 'react';
+import { useRef, useEffect, useLayoutEffect, useCallback, useState } from 'react';
 import type React from 'react';
 import { Play, Pause, Square, Music, Circle, ZoomIn, ZoomOut, Video, MousePointer2, Repeat, Eraser, Pen, Mouse, SlidersHorizontal, UploadCloud, Magnet, Undo2, Redo2 } from 'lucide-react';
 import { onChange } from '@theatre/core';
@@ -19,12 +19,11 @@ const PARAM_LANES = [
     { id: 'size',          label: 'Particle Size (Add-on)',  color: '#22c55e', selBg: 'bg-green-500/10', min: 0.1, max: 5   },
 ] as const;
 
-function buildParamPath(kfs: ParamKf[], min: number, max: number): string | null {
+function buildParamPath(kfs: ParamKf[], min: number, max: number, seqDur = 10): string | null {
     if (kfs.length < 2) return null;
-    const scaleX = VB_W / SEQUENCE_DURATION;
     const valueRange = max - min;
     const pts = kfs.map(kf => ({
-        x: kf.time * scaleX,
+        x: (kf.time / seqDur) * VB_W,
         y: (1 - (kf.value - min) / valueRange) * VB_H,
     }));
     let d = `M ${pts[0].x} ${pts[0].y}`;
@@ -39,9 +38,9 @@ function buildParamPath(kfs: ParamKf[], min: number, max: number): string | null
             const outDv = kfPrev.handleOut?.dv ?? 0;
             const inDt  = kfCurr.handleIn?.dt  ?? -dt / 3;
             const inDv  = kfCurr.handleIn?.dv  ?? 0;
-            const hox = prev.x + outDt * scaleX;
+            const hox = prev.x + (outDt / seqDur) * VB_W;
             const hoy = prev.y - (outDv / valueRange) * VB_H;
-            const hix = curr.x + inDt * scaleX;
+            const hix = curr.x + (inDt / seqDur) * VB_W;
             const hiy = curr.y - (inDv / valueRange) * VB_H;
             d += ` C ${hox} ${hoy}, ${hix} ${hiy}, ${curr.x} ${curr.y}`;
             continue;
@@ -60,11 +59,11 @@ function buildParamPath(kfs: ParamKf[], min: number, max: number): string | null
     return d;
 }
 
-function buildParamFillPath(kfs: ParamKf[], min: number, max: number): string | null {
-    const open = buildParamPath(kfs, min, max);
+function buildParamFillPath(kfs: ParamKf[], min: number, max: number, seqDur = 10): string | null {
+    const open = buildParamPath(kfs, min, max, seqDur);
     if (!open) return null;
-    const firstX = (kfs[0].time / SEQUENCE_DURATION) * VB_W;
-    const lastX = (kfs[kfs.length - 1].time / SEQUENCE_DURATION) * VB_W;
+    const firstX = (kfs[0].time / seqDur) * VB_W;
+    const lastX = (kfs[kfs.length - 1].time / seqDur) * VB_W;
     return `${open} L ${lastX} ${VB_H} L ${firstX} ${VB_H} Z`;
 }
 
@@ -132,6 +131,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const [audioMenu, setAudioMenu] = useState<{ visible: boolean; x: number; y: number; clickTime: number } | null>(null);
     const [audioTargetLane, setAudioTargetLane] = useState<string>('scrollPos');
     const [shapeIterations, setShapeIterations] = useState<number>(4);
+    const [audioGain, setAudioGain] = useState<number>(75);
 
     const generateRhythmCurveForLane = (
         targetLane: string,
@@ -163,6 +163,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         };
         const cfg = laneConfigs[targetLane] ?? { min: 0, max: 1 };
         const range = cfg.max - cfg.min;
+        const gainMult = audioGain / 100;
 
         const rawBeats = beats.filter(bt => bt >= lStart && bt <= lEnd);
         const rangeBeats = rawBeats.length >= 2
@@ -182,53 +183,56 @@ export default function Timeline({ height = 280 }: { height?: number }) {
             waveform.forEach((val: number, idx: number) => {
                 const t = idx * step;
                 if (t >= lStart && t <= lEnd) {
-                    const normVal = cfg.min + val * range;
-                    newSectionKfs.push({ time: +t.toFixed(2), value: +normVal.toFixed(3) });
+                    const normVal = cfg.min + val * range * gainMult;
+                    newSectionKfs.push({ time: +t.toFixed(2), value: +Math.min(cfg.max, Math.max(cfg.min, normVal)).toFixed(3) });
                 }
             });
         } else if (mode === 'bounce') {
             rangeBeats.forEach((bt) => {
                 if (bt - 0.08 >= lStart) newSectionKfs.push({ time: +(bt - 0.08).toFixed(2), value: cfg.min });
-                newSectionKfs.push({ time: +bt.toFixed(2), value: cfg.max });
+                const peakVal = cfg.min + range * gainMult;
+                newSectionKfs.push({ time: +bt.toFixed(2), value: +Math.min(cfg.max, Math.max(cfg.min, peakVal)).toFixed(3) });
                 if (bt + 0.08 <= lEnd) newSectionKfs.push({ time: +(bt + 0.08).toFixed(2), value: cfg.min });
             });
         } else if (mode === 'stutter') {
             rangeBeats.forEach((bt, idx) => {
-                const val = cfg.min + (idx / Math.max(1, rangeBeats.length - 1)) * range;
-                newSectionKfs.push({ time: +bt.toFixed(2), value: +val.toFixed(3), easing: 'step' });
+                const val = cfg.min + (idx / Math.max(1, rangeBeats.length - 1)) * range * gainMult;
+                newSectionKfs.push({ time: +bt.toFixed(2), value: +Math.min(cfg.max, Math.max(cfg.min, val)).toFixed(3), easing: 'step' });
             });
         } else if (mode === 'wave') {
             rangeBeats.forEach((bt, idx) => {
-                const normVal = cfg.min + ((Math.sin((idx * Math.PI) / 2) + 1) / 2) * range;
-                newSectionKfs.push({ time: +bt.toFixed(2), value: +normVal.toFixed(3) });
+                const normVal = cfg.min + ((Math.sin((idx * Math.PI) / 2) + 1) / 2) * range * gainMult;
+                newSectionKfs.push({ time: +bt.toFixed(2), value: +Math.min(cfg.max, Math.max(cfg.min, normVal)).toFixed(3) });
             });
         } else if (mode === 'ramp') {
             const barSize = 4;
             rangeBeats.forEach((bt, idx) => {
                 const barProgress = (idx % barSize) / (barSize - 1);
-                const val = cfg.min + barProgress * range;
-                newSectionKfs.push({ time: +bt.toFixed(2), value: +val.toFixed(3) });
+                const val = cfg.min + barProgress * range * gainMult;
+                newSectionKfs.push({ time: +bt.toFixed(2), value: +Math.min(cfg.max, Math.max(cfg.min, val)).toFixed(3) });
             });
         } else if (mode === 'ducking') {
+            // Ducking: peak is full, dip scales with gainMult (deeper dip = more intense)
             rangeBeats.forEach((bt) => {
-                if (bt - 0.08 >= lStart) newSectionKfs.push({ time: +(bt - 0.08).toFixed(2), value: cfg.max });
+                const topVal = cfg.min + range * gainMult;
+                if (bt - 0.08 >= lStart) newSectionKfs.push({ time: +(bt - 0.08).toFixed(2), value: +Math.min(cfg.max, topVal).toFixed(3) });
                 newSectionKfs.push({ time: +bt.toFixed(2), value: cfg.min });
-                if (bt + 0.08 <= lEnd) newSectionKfs.push({ time: +(bt + 0.08).toFixed(2), value: cfg.max });
+                if (bt + 0.08 <= lEnd) newSectionKfs.push({ time: +(bt + 0.08).toFixed(2), value: +Math.min(cfg.max, topVal).toFixed(3) });
             });
         } else if (mode === 'flutter') {
             rangeBeats.forEach((bt) => {
                 for (let sub = 0; sub < 4; sub++) {
                     const t = bt + sub * 0.12;
                     if (t <= lEnd) {
-                        const val = sub % 2 === 0 ? cfg.max : cfg.min;
-                        newSectionKfs.push({ time: +t.toFixed(2), value: +val.toFixed(3) });
+                        const val = sub % 2 === 0 ? cfg.min + range * gainMult : cfg.min;
+                        newSectionKfs.push({ time: +t.toFixed(2), value: +Math.min(cfg.max, Math.max(cfg.min, val)).toFixed(3) });
                     }
                 }
             });
         } else if (mode === 'jumps') {
             rangeBeats.forEach((bt) => {
-                const val = cfg.min + (0.1 + Math.random() * 0.8) * range;
-                newSectionKfs.push({ time: +bt.toFixed(2), value: +val.toFixed(3), easing: 'step' });
+                const val = cfg.min + (0.1 + Math.random() * 0.8) * range * gainMult;
+                newSectionKfs.push({ time: +bt.toFixed(2), value: +Math.min(cfg.max, Math.max(cfg.min, val)).toFixed(3), easing: 'step' });
             });
         }
 
@@ -287,6 +291,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         };
         const cfg = laneConfigs[targetLane] ?? { min: 0, max: 1 };
         const range = cfg.max - cfg.min;
+        const gainMult = audioGain / 100;
 
         const numSteps = Math.max(16, iterations * 16);
         const newSectionKfs: { time: number; value: number; easing?: string }[] = [];
@@ -329,9 +334,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     normVal = cycleProgress;
             }
 
-            const val = cfg.min + normVal * range;
+            const val = cfg.min + normVal * range * gainMult;
             const easingStr = shapeType === 'square' ? 'step' : 'linear';
-            newSectionKfs.push({ time: +t.toFixed(3), value: +val.toFixed(3), easing: easingStr });
+            newSectionKfs.push({ time: +t.toFixed(3), value: +Math.min(cfg.max, Math.max(cfg.min, val)).toFixed(3), easing: easingStr });
         }
 
         if (targetLane === 'scrollPos') {
@@ -353,6 +358,143 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
         setAudioMenu(null);
     };
+
+    /** Scale amplitude of all keyframes in selection across all lanes. Scales away from cfg.min. */
+    const scaleSelectionKeyframes = (targetLane: string, scaleRatio: number) => {
+        const timeSel = useStore.getState().timeSelection;
+        const isLoopActive = useStore.getState().isLoop;
+        const lStart = timeSel ? timeSel.start : (isLoopActive ? useStore.getState().loopStart || 0 : 0);
+        const lEnd = timeSel ? timeSel.end : (isLoopActive ? useStore.getState().loopEnd || 10 : 10);
+        useStore.getState().pushHistory();
+
+        const laneConfigs: Record<string, { min: number; max: number }> = {
+            scrollPos: { min: 0, max: 1 },
+            rotationSpeed: { min: 0, max: 0.05 },
+            depth: { min: 5, max: 60 },
+            size: { min: 0.1, max: 3 },
+            cssOpacity: { min: 0, max: 1 },
+        };
+
+        const applyToLane = (lane: string) => {
+            const cfg = laneConfigs[lane] ?? { min: 0, max: 1 };
+            if (lane === 'scrollPos') {
+                const kfs = useStore.getState().scrollKeyframes;
+                const updated = kfs.map(k => {
+                    if (k.time >= lStart && k.time <= lEnd) {
+                        const scaled = cfg.min + (k.value - cfg.min) * scaleRatio;
+                        return { ...k, value: Math.max(cfg.min, Math.min(cfg.max, +scaled.toFixed(4))) };
+                    }
+                    return k;
+                });
+                useStore.getState().setScrollKeyframes(updated);
+            } else {
+                const kfs = (useStore.getState().paramKeyframes[lane] ?? []) as ParamKf[];
+                if (!kfs.length) return;
+                const updated = kfs.map(k => {
+                    if (k.time >= lStart && k.time <= lEnd) {
+                        const scaled = cfg.min + (k.value - cfg.min) * scaleRatio;
+                        return { ...k, value: Math.max(cfg.min, Math.min(cfg.max, +scaled.toFixed(4))) };
+                    }
+                    return k;
+                });
+                useStore.getState().setParamKeyframes(lane, updated);
+            }
+        };
+
+        if (targetLane === '__all__') {
+            ['scrollPos', 'rotationSpeed', 'depth', 'size', 'cssOpacity'].forEach(applyToLane);
+        } else {
+            applyToLane(targetLane);
+        }
+    };
+
+    /** Shift (translate) keyframe values up/down by delta in normalised 0–1 space, applied to all lanes in selection. */
+    const shiftSelectionKeyframes = (targetLane: string, normDelta: number) => {
+        const timeSel = useStore.getState().timeSelection;
+        const isLoopActive = useStore.getState().isLoop;
+        const lStart = timeSel ? timeSel.start : (isLoopActive ? useStore.getState().loopStart || 0 : 0);
+        const lEnd = timeSel ? timeSel.end : (isLoopActive ? useStore.getState().loopEnd || 10 : 10);
+
+        const laneConfigs: Record<string, { min: number; max: number }> = {
+            scrollPos: { min: 0, max: 1 },
+            rotationSpeed: { min: 0, max: 0.05 },
+            depth: { min: 5, max: 60 },
+            size: { min: 0.1, max: 3 },
+            cssOpacity: { min: 0, max: 1 },
+        };
+
+        const applyToLane = (lane: string) => {
+            const cfg = laneConfigs[lane] ?? { min: 0, max: 1 };
+            const delta = normDelta * (cfg.max - cfg.min);
+            if (lane === 'scrollPos') {
+                const kfs = useStore.getState().scrollKeyframes;
+                const updated = kfs.map(k => {
+                    if (k.time >= lStart && k.time <= lEnd) {
+                        return { ...k, value: Math.max(cfg.min, Math.min(cfg.max, +(k.value + delta).toFixed(4))) };
+                    }
+                    return k;
+                });
+                useStore.getState().setScrollKeyframes(updated);
+            } else {
+                const kfs = (useStore.getState().paramKeyframes[lane] ?? []) as ParamKf[];
+                if (!kfs.length) return;
+                const updated = kfs.map(k => {
+                    if (k.time >= lStart && k.time <= lEnd) {
+                        return { ...k, value: Math.max(cfg.min, Math.min(cfg.max, +(k.value + delta).toFixed(4))) };
+                    }
+                    return k;
+                });
+                useStore.getState().setParamKeyframes(lane, updated);
+            }
+        };
+
+        if (targetLane === '__all__') {
+            ['scrollPos', 'rotationSpeed', 'depth', 'size', 'cssOpacity'].forEach(applyToLane);
+        } else {
+            applyToLane(targetLane);
+        }
+    };
+
+    /**
+     * Pointer-drag on the selection overlay.
+     * Alt + drag ↑↓  →  scale amplitude (away from min)
+     * Shift + drag ↑↓ → translate values up/down
+     */
+    const handleSelectionDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (e.button !== 0) return;
+        const isAlt = e.altKey;
+        const isShift = e.shiftKey;
+        if (!isAlt && !isShift) return;
+
+        e.stopPropagation();
+        e.preventDefault();
+        const target = e.currentTarget;
+        target.setPointerCapture(e.pointerId);
+
+        useStore.getState().pushHistory();
+        const startY = e.clientY;
+        const SENSITIVITY = 0.004; // normalised units per pixel
+
+        const onMove = (ev: PointerEvent) => {
+            const deltaPixels = startY - ev.clientY; // up = positive
+            const normDelta = deltaPixels * SENSITIVITY;
+            if (isAlt) {
+                // Scale: ratio > 1 = amplify, < 1 = compress
+                const ratio = 1 + normDelta * 2;
+                if (ratio > 0) scaleSelectionKeyframes('__all__', ratio);
+            } else if (isShift) {
+                shiftSelectionKeyframes('__all__', normDelta);
+            }
+        };
+
+        const onUp = () => {
+            target.removeEventListener('pointermove', onMove as any);
+            target.removeEventListener('pointerup', onUp as any);
+        };
+        target.addEventListener('pointermove', onMove as any);
+        target.addEventListener('pointerup', onUp as any);
+    };
+
 
     const generateRhythmCurve = (mode: 'bounce' | 'stutter' | 'wave' | 'ramp' | 'jumps') => {
         generateRhythmCurveForLane('scrollPos', mode, true);
@@ -564,24 +706,54 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         return () => observer.disconnect();
     }, []);
 
-    // Ctrl+scroll = horizontal zoom, Alt+scroll = vertical zoom (non-passive so preventDefault works)
+    // Mouse-anchored timeline zoom
+    const zoomAnchorRef = useRef<{ mouseXInContainer: number; ratio: number } | null>(null);
+
+    useLayoutEffect(() => {
+        if (!zoomAnchorRef.current || !lanesRef.current) return;
+        const { mouseXInContainer, ratio } = zoomAnchorRef.current;
+        const el = lanesRef.current;
+        const currentTrackWidth = el.scrollWidth - LABEL_W;
+        if (currentTrackWidth <= 0) return;
+        const newContentX = LABEL_W + ratio * currentTrackWidth;
+        const newScrollLeft = newContentX - mouseXInContainer;
+        el.scrollLeft = Math.max(0, newScrollLeft);
+        zoomAnchorRef.current = null;
+    }, [timelineZoom]);
+
+    // Ctrl+scroll / Meta+scroll = horizontal zoom at mouse position, Alt+scroll = vertical zoom
     useEffect(() => {
         const el = lanesRef.current;
         if (!el) return;
         let accumH = 0;
         const onWheel = (e: WheelEvent) => {
-            if (e.metaKey || e.ctrlKey || e.altKey) {
+            if (e.metaKey || e.ctrlKey) {
                 e.preventDefault();
                 accumH += e.deltaY;
-                const thresh = e.shiftKey ? 10 : 40;
+                const thresh = e.shiftKey ? 10 : 30;
                 if (Math.abs(accumH) >= thresh) {
                     const steps = Math.trunc(accumH / thresh);
                     accumH -= steps * thresh;
+
+                    // Record mouse anchor position relative to timeline container
+                    const rect = el.getBoundingClientRect();
+                    const mouseXInContainer = e.clientX - rect.left;
+                    const contentX = el.scrollLeft + mouseXInContainer;
+                    const currentTrackWidth = el.scrollWidth - LABEL_W;
+                    if (currentTrackWidth > 0 && mouseXInContainer >= 0 && mouseXInContainer <= rect.width) {
+                        const ratio = Math.max(0, Math.min(1, (contentX - LABEL_W) / currentTrackWidth));
+                        zoomAnchorRef.current = { mouseXInContainer, ratio };
+                    }
+
                     setTimelineZoom(prev => {
                         const i = ZOOM_LEVELS.indexOf(prev);
                         return ZOOM_LEVELS[Math.max(0, Math.min(ZOOM_LEVELS.length - 1, i - steps))];
                     });
                 }
+            } else if (e.altKey) {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                setVerticalZoom(prev => Math.max(0.4, Math.min(4, +(prev + delta).toFixed(2))));
             }
         };
         el.addEventListener('wheel', onWheel, { passive: false });
@@ -715,12 +887,11 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         ? scrollHistory.current.map(p => `${p.pos * VB_W},${(1 - p.val) * scrollVbH}`).join(' ')
         : '';
 
-    const waveformBgPath = (() => {
-        if (!isReady || waveform.length === 0) return null;
-        const samples = 300;
+    const buildWaveformSvgPath = useCallback((vbHeight: number, samples = 500) => {
+        if (!isReady || !waveform || waveform.length === 0) return null;
         const step = waveform.length / samples;
-        const cy = scrollVbH / 2;
-        const maxAmp = cy * 0.8;
+        const cy = vbHeight / 2;
+        const maxAmp = cy * 0.85;
         const upper: string[] = [];
         const lower: string[] = [];
         for (let i = 0; i < samples; i++) {
@@ -730,7 +901,10 @@ export default function Timeline({ height = 280 }: { height?: number }) {
             lower.push(`${x.toFixed(1)},${(cy + val * maxAmp).toFixed(1)}`);
         }
         return `M ${upper.join(' L ')} L ${[...lower].reverse().join(' L ')} Z`;
-    })();
+    }, [isReady, waveform]);
+
+    const audioTrackWaveformPath = buildWaveformSvgPath(100, 500);
+    const waveformBgPath = buildWaveformSvgPath(scrollVbH, 500);
 
     return (
         <footer className="border-t border-editor-border bg-editor-bg flex flex-col z-20" style={{ height }}>
@@ -985,12 +1159,48 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         className="absolute top-5 bottom-0 bg-cyan-500/15 border-x-2 border-cyan-400 z-40 pointer-events-none flex flex-col justify-between shadow-[0_0_15px_rgba(6,182,212,0.2)]"
                         style={{ left: `calc(120px + (100% - 120px) * ${timeSelection.start / sequenceDuration})`, width: `calc((100% - 120px) * ${(timeSelection.end - timeSelection.start) / sequenceDuration})` }}
                     >
-                        <div className="bg-cyan-500 text-black font-mono font-bold text-[8px] px-1.5 py-0.5 self-start rounded-b flex items-center gap-1 shadow">
-                            <span>SELECTION: {timeSelection.start.toFixed(1)}s - {timeSelection.end.toFixed(1)}s</span>
-                            <span className="text-[7px] text-cyan-950 font-normal">(Right-click to push automation)</span>
+                        {/* Top header bar — buttons */}
+                        <div className="bg-cyan-500 text-black font-mono font-bold text-[8px] px-1.5 py-0.5 self-start rounded-b flex items-center gap-1 shadow pointer-events-auto">
+                            <span>⟵ {timeSelection.start.toFixed(1)}s — {timeSelection.end.toFixed(1)}s ⟶</span>
+                            <div className="flex items-center gap-1 ml-2 font-mono">
+                                <span className="text-[7px] text-cyan-950 font-bold">SCALE:</span>
+                                <button
+                                    className="px-1 bg-black/20 hover:bg-black/50 text-black font-bold rounded text-[7px] transition-colors"
+                                    onClick={() => scaleSelectionKeyframes('__all__', 0.75)}
+                                    title="Scale down amplitude by 25% on all lanes"
+                                >
+                                    -25%
+                                </button>
+                                <button
+                                    className="px-1 bg-black/20 hover:bg-black/50 text-black font-bold rounded text-[7px] transition-colors"
+                                    onClick={() => scaleSelectionKeyframes('__all__', 1.25)}
+                                    title="Scale up amplitude by 25% on all lanes"
+                                >
+                                    +25%
+                                </button>
+                                <button
+                                    className="px-1 bg-black/20 hover:bg-black/50 text-black font-bold rounded text-[7px] transition-colors ml-1"
+                                    onClick={() => useStore.getState().setTimeSelection(null)}
+                                    title="Clear selection"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Drag handle strip at bottom — Alt+drag to scale, Shift+drag to shift */}
+                        <div
+                            className="h-5 pointer-events-auto flex items-center justify-center gap-1 cursor-ns-resize select-none rounded-t border-t border-cyan-400/50 bg-cyan-400/10 hover:bg-cyan-400/25 transition-colors group/drag"
+                            onPointerDown={handleSelectionDrag}
+                            title="Alt+drag: scale amplitude ↕  |  Shift+drag: shift values ↑↓"
+                        >
+                            <span className="text-cyan-400 text-[8px] font-mono opacity-60 group-hover/drag:opacity-100 transition-opacity">
+                                ⠿ Alt↕scale · Shift↕shift
+                            </span>
                         </div>
                     </div>
                 )}
+
                 {(isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('audio') }}>
                     <div className="w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border bg-editor-panel text-editor-fg sticky left-0 z-30 overflow-hidden">
@@ -1011,8 +1221,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         onPointerDown={(e) => handleTrackPointerDown(e)}
                         onContextMenu={(e) => {
                             e.preventDefault();
+                            e.stopPropagation();
                             const rect = e.currentTarget.getBoundingClientRect();
-                            const clickTime = ((e.clientX - rect.left) / rect.width) * SEQUENCE_DURATION;
+                            const clickTime = ((e.clientX - rect.left) / rect.width) * sequenceDuration;
                             setAudioMenu({ visible: true, x: e.clientX, y: e.clientY, clickTime });
                         }}
                     >
@@ -1029,16 +1240,21 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             <span className="text-[10px] text-editor-accent-orange animate-pulse px-2">Analyzing audio...</span>
                         ) : (
                             <>
-                                <div className="absolute inset-0 flex items-center gap-[1px] opacity-40 px-2 overflow-hidden">
-                                    {Array.from(waveform).slice(0, 300).map((val: any, i: number) => (
-                                        <div key={i} className="w-[2px] bg-editor-accent-orange min-w-[2px]" style={{ height: `${val * 80}%` }}></div>
-                                    ))}
-                                </div>
+                                <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox={`0 0 ${VB_W} 100`} preserveAspectRatio="none">
+                                    {audioTrackWaveformPath && (
+                                        <path
+                                            d={audioTrackWaveformPath}
+                                            fill="rgba(249, 115, 22, 0.35)"
+                                            stroke="rgba(249, 115, 22, 0.8)"
+                                            strokeWidth="0.8"
+                                        />
+                                    )}
+                                </svg>
                                 {beats.map((beatTime: number, i: number) => (
                                     <div
                                         key={i}
                                         className="absolute top-0 bottom-0 w-[2px] bg-white z-10 group/beat hover:bg-editor-accent-orange cursor-pointer transition-colors"
-                                        style={{ left: `${(beatTime / 10) * 100}%` }}
+                                        style={{ left: `${(beatTime / sequenceDuration) * 100}%` }}
                                     >
                                         <div className="opacity-0 group-hover/beat:opacity-100 text-[8px] absolute top-1 left-2 font-mono text-editor-fg whitespace-nowrap bg-black/50 px-1 rounded">BEAT {beatTime.toFixed(1)}s</div>
                                     </div>
@@ -1285,8 +1501,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             {snapToBeat && beats.map((bt, i) => (
                                 <line
                                     key={i}
-                                    x1={(bt / SEQUENCE_DURATION) * VB_W} y1={0}
-                                    x2={(bt / SEQUENCE_DURATION) * VB_W} y2={scrollVbH}
+                                    x1={(bt / sequenceDuration) * VB_W} y1={0}
+                                    x2={(bt / sequenceDuration) * VB_W} y2={scrollVbH}
                                     stroke="rgba(168,85,247,0.25)" strokeWidth="0.8"
                                 />
                             ))}
@@ -1294,7 +1510,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 <polyline points={scrollPolyline} fill="none" stroke="rgba(59,130,246,0.2)" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
                             )}
                             {scrollKeyframes.length >= 2 && (() => {
-                                const scaleX = VB_W / SEQUENCE_DURATION;
+                                const scaleX = VB_W / sequenceDuration;
                                 const pts = scrollKeyframes.map(kf => ({
                                     x: kf.time * scaleX,
                                     y: (1 - kf.value) * scrollVbH,
@@ -1320,9 +1536,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         <path d={d} fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="1" strokeLinecap="round" vectorEffect="non-scaling-stroke"/>
                                         {scrollKeyframes.slice(0, -1).map((kf1, i) => {
                                             const kf2 = scrollKeyframes[i + 1];
-                                            const x1 = (kf1.time / SEQUENCE_DURATION) * VB_W;
+                                            const x1 = (kf1.time / sequenceDuration) * VB_W;
                                             const y1 = (1 - kf1.value) * scrollVbH;
-                                            const x2 = (kf2.time / SEQUENCE_DURATION) * VB_W;
+                                            const x2 = (kf2.time / sequenceDuration) * VB_W;
                                             const y2 = (1 - kf2.value) * scrollVbH;
                                             return (
                                                 <line
@@ -1339,7 +1555,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 );
                             })()}
                             {activeTool === 'select' && (() => {
-                                const scaleX = VB_W / SEQUENCE_DURATION;
+                                const scaleX = VB_W / sequenceDuration;
                                 return scrollKeyframes.map((kf, idx) => {
                                     const isKfSelected = selectedKeyframes.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.005);
                                     if (!isKfSelected) return null;
@@ -1402,7 +1618,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         className={`absolute rounded-full border-[1.5px] ${activeTool === 'eraser' ? 'cursor-cell' : 'cursor-move'} pointer-events-auto`}
                                         style={{
                                             width: size, height: size,
-                                            left: `calc(${(kf.time / SEQUENCE_DURATION) * 100}% - ${size/2}px)`,
+                                            left: `calc(${(kf.time / sequenceDuration) * 100}% - ${size/2}px)`,
                                             top: `calc(${(1 - kf.value) * 100}% - ${size/2}px)`,
                                             borderColor: isSelected ? '#3b82f6' : '#60a5fa',
                                             backgroundColor: isSelected ? '#60a5fa' : 'var(--color-editor-bg)',
@@ -1464,8 +1680,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     const kfs = (paramKeyframes[lane.id] ?? []) as ParamKf[];
                     const currentVal = paramCurrentValues[lane.id];
                     const normalY = (v: number) => (1 - (v - lane.min) / (lane.max - lane.min)) * VB_H;
-                    const curvePath = buildParamPath(kfs, lane.min, lane.max);
-                    const fillPath = buildParamFillPath(kfs, lane.min, lane.max);
+                    const curvePath = buildParamPath(kfs, lane.min, lane.max, sequenceDuration);
+                    const fillPath = buildParamFillPath(kfs, lane.min, lane.max, sequenceDuration);
                     const isSelected = selectedLane === lane.id;
                     const currentLaneHeight = isolatedLane === lane.id ? 220 : laneH(lane.id);
                     return (
@@ -1571,9 +1787,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     )}
                                     {kfs.slice(0, -1).map((kf1, i) => {
                                         const kf2 = kfs[i + 1];
-                                        const x1 = (kf1.time / SEQUENCE_DURATION) * VB_W;
+                                        const x1 = (kf1.time / sequenceDuration) * VB_W;
                                         const y1 = normalY(kf1.value);
-                                        const x2 = (kf2.time / SEQUENCE_DURATION) * VB_W;
+                                        const x2 = (kf2.time / sequenceDuration) * VB_W;
                                         const y2 = normalY(kf2.value);
                                         return (
                                             <line
@@ -1589,7 +1805,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     {activeTool === 'select' && kfs.map((kf, idx) => {
                                         const isKfSelected = selectedKeyframes.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.005);
                                         if (!isKfSelected) return null;
-                                        const scaleX = VB_W / SEQUENCE_DURATION;
+                                        const scaleX = VB_W / sequenceDuration;
                                         const valueRange = lane.max - lane.min;
                                         const kx = kf.time * scaleX;
                                         const ky = normalY(kf.value);
@@ -1621,7 +1837,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                     const rect = svgEl.getBoundingClientRect();
                                                     const svgX = ((e.clientX - rect.left) / rect.width) * VB_W;
                                                     const svgY = ((e.clientY - rect.top) / rect.height) * VB_H;
-                                                    const laneScaleX = VB_W / SEQUENCE_DURATION;
+                                                    const laneScaleX = VB_W / sequenceDuration;
                                                     const newDt = (svgX - refKf.time * laneScaleX) / laneScaleX;
                                                     const newDv = -((svgY - normalY(refKf.value)) / VB_H) * valueRange;
                                                     updateParamKeyframeHandle(laneId, kfTime, s, {
@@ -1650,7 +1866,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         className={`absolute rounded-full border-[1.5px] ${activeTool === 'eraser' ? 'cursor-cell' : 'cursor-move'} pointer-events-auto`}
                                         style={{
                                             width: size, height: size,
-                                            left: `calc(${(kf.time / SEQUENCE_DURATION) * 100}% - ${size/2}px)`,
+                                            left: `calc(${(kf.time / sequenceDuration) * 100}% - ${size/2}px)`,
                                             top: `calc(${normalY(kf.value) / VB_H * 100}% - ${size/2}px)`,
                                             borderColor: lane.color,
                                             backgroundColor: kfSelected ? lane.color : 'var(--color-editor-bg)',
@@ -1681,7 +1897,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             const rect = container.getBoundingClientRect();
                                             const x = e.clientX - rect.left;
                                             const y = e.clientY - rect.top;
-                                            const newTime = Math.max(0, Math.min(SEQUENCE_DURATION, (x / rect.width) * SEQUENCE_DURATION));
+                                            const newTime = Math.max(0, Math.min(sequenceDuration, (x / rect.width) * sequenceDuration));
                                             const newValue = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - y / rect.height) * (lane.max - lane.min)));
                                             const existingKf = (paramKeyframes[laneId] ?? []).find(k => Math.abs(k.time - origTime) < 0.005);
                                             const { easing: existingEasing = 'linear', handleOut, handleIn } = existingKf ?? {};
@@ -1721,7 +1937,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 className="absolute rounded-full border-[1.5px] pointer-events-none"
                                 style={{
                                     width: 6, height: 6,
-                                    left: `calc(${(sheet.sequence.position / SEQUENCE_DURATION) * 100}% - 3px)`,
+                                    left: `calc(${(sheet.sequence.position / sequenceDuration) * 100}% - 3px)`,
                                     top: `calc(${normalY(currentVal) / VB_H * 100}% - 3px)`,
                                     borderColor: lane.color,
                                     backgroundColor: 'var(--color-editor-bg)',
@@ -1821,11 +2037,14 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     onContextMenu={(e) => { e.preventDefault(); setAudioMenu(null); }}
                 >
                     <div
-                        className="absolute bg-[#1c1c1e] border border-[#3a3a3c] rounded-lg shadow-2xl p-2.5 w-[290px] font-sans text-editor-fg space-y-2 text-[11px]"
-                        style={{ left: Math.min(window.innerWidth - 300, audioMenu.x), top: Math.min(window.innerHeight - 360, audioMenu.y) }}
+                        className="absolute bg-[#1c1c1e] border border-[#3a3a3c] rounded-lg shadow-2xl p-2.5 w-[310px] max-h-[82vh] overflow-y-auto thin-scrollbar font-sans text-editor-fg space-y-2 text-[11px]"
+                        style={{
+                            left: Math.max(10, Math.min(window.innerWidth - 325, audioMenu.x)),
+                            top: Math.max(10, Math.min(window.innerHeight - 520, audioMenu.y))
+                        }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between border-b border-[#2c2c2e] pb-1.5 px-1 font-bold text-editor-accent-orange">
+                        <div className="flex items-center justify-between border-b border-[#2c2c2e] pb-1.5 px-1 font-bold text-editor-accent-orange sticky top-0 bg-[#1c1c1e] z-10">
                             <div className="flex items-center gap-1.5">
                                 <Music className="w-3.5 h-3.5" />
                                 <span>Push Audio to Parameter</span>
@@ -1855,6 +2074,28 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         {item.label}
                                     </button>
                                 ))}
+                            </div>
+                        </div>
+
+                        {/* Audio Peak Intensity / Gain Control */}
+                        <div className="space-y-1 bg-[#252527] p-2 rounded border border-[#3a3a3c]">
+                            <div className="flex items-center justify-between text-[10px]">
+                                <span className="font-bold text-gray-300">Peak Intensity:</span>
+                                <span className="font-mono text-editor-accent-orange font-bold">{audioGain}%</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="20"
+                                max="150"
+                                step="5"
+                                value={audioGain}
+                                onChange={(e) => setAudioGain(parseInt(e.target.value))}
+                                className="w-full h-1 bg-[#3a3a3c] accent-editor-accent-orange rounded cursor-pointer"
+                            />
+                            <div className="flex justify-between text-[8px] text-gray-400 font-mono">
+                                <span>20% (Subtle)</span>
+                                <span>75% (Default)</span>
+                                <span>150% (Wild)</span>
                             </div>
                         </div>
 
