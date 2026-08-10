@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { ChevronDown, ChevronRight, UploadCloud, Video, Film, Layers, SlidersHorizontal, ImageIcon, X } from 'lucide-react';
-import { saveMediaFile } from '../utils/mediaStore';
+import { saveMediaFile, getMediaDataUrl, dataUrlToBlob } from '../utils/mediaStore';
 
 const ControlSlider = ({ label, value, min, max, step = 0.01, onChange }: {
     label: string; value: number; min: number; max: number; step?: number;
@@ -503,7 +503,15 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                     return (
                                         <div
                                             key={pad.id}
-                                            onClick={() => setActiveVideoPadIdx(idx)}
+                                            onClick={async () => {
+                                                setActiveVideoPadIdx(idx);
+                                                if (pad.url) useStore.getState().setVideoUrl(pad.url);
+                                                const padData = await getMediaDataUrl(`video-pad-${idx}`);
+                                                if (padData) {
+                                                    const blob = dataUrlToBlob(padData);
+                                                    await saveMediaFile('active-video', blob);
+                                                }
+                                            }}
                                             onDragOver={(e) => e.preventDefault()}
                                             onDrop={handlePadDrop}
                                             className={`p-2 rounded border flex flex-col justify-between text-left cursor-pointer transition-all relative group/pad ${

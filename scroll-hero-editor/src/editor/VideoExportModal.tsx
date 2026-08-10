@@ -60,7 +60,7 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
 
     const handleStartRemotionExport = async () => {
         setIsRemotionExporting(true);
-        setStatusMessage(`Preparing video media & rendering 60 FPS MP4 via Remotion (${exportRange === 'loop' ? 'Loop Range' : 'Full Sequence'} ${targetStart.toFixed(1)}s — ${targetEnd.toFixed(1)}s)…`);
+        setStatusMessage(`Preparing active video & rendering 60 FPS MP4 via Remotion (${exportRange === 'loop' ? 'Loop Range' : 'Full Sequence'} ${targetStart.toFixed(1)}s — ${targetEnd.toFixed(1)}s)…`);
 
         try {
             let width = 1920;
@@ -72,29 +72,15 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
             const startFrame = Math.round(targetStart * fps);
             const durationInFrames = Math.round(targetDuration * fps);
 
-            // 5-Step Bulletproof Video Finder across IndexedDB & DOM
+            // Priority 5-Step Video Finder (Always favors CURRENT active video)
             let videoBase64: string | null = null;
 
-            // Step 1: IndexedDB active-video
-            videoBase64 = await getMediaDataUrl('active-video');
-
-            // Step 2: IndexedDB active video pad
-            if (!videoBase64) {
+            // Priority 1: Current active video pad slot in IndexedDB
+            if (activeVideoPadIdx !== undefined && activeVideoPadIdx !== null) {
                 videoBase64 = await getMediaDataUrl(`video-pad-${activeVideoPadIdx}`);
             }
 
-            // Step 3: IndexedDB all video pad slots 0 to 5
-            if (!videoBase64) {
-                for (let i = 0; i <= 5; i++) {
-                    const padData = await getMediaDataUrl(`video-pad-${i}`);
-                    if (padData) {
-                        videoBase64 = padData;
-                        break;
-                    }
-                }
-            }
-
-            // Step 4: Active DOM video element src if valid
+            // Priority 2: Current active video element playing in live Viewport DOM
             if (!videoBase64) {
                 const container = document.querySelector('div[data-purpose="viewport-container"]') as HTMLElement | null;
                 const activeVideoEl = container?.querySelector('video') as HTMLVideoElement | null;
@@ -109,7 +95,7 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                 }
             }
 
-            // Step 5: Zustand store videoUrl if valid
+            // Priority 3: Current active videoUrl from Zustand store
             if (!videoBase64 && videoUrl) {
                 try {
                     const r = await fetch(videoUrl);
@@ -120,14 +106,27 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                 } catch (e) {}
             }
 
-            // 2-Step Bulletproof Audio Finder
+            // Priority 4: IndexedDB active-video single key
+            if (!videoBase64) {
+                videoBase64 = await getMediaDataUrl('active-video');
+            }
+
+            // Priority 5: Fallback search across video pad slots 0 to 5
+            if (!videoBase64) {
+                for (let i = 0; i <= 5; i++) {
+                    const padData = await getMediaDataUrl(`video-pad-${i}`);
+                    if (padData) {
+                        videoBase64 = padData;
+                        break;
+                    }
+                }
+            }
+
+            // Priority 2-Step Audio Finder
             let audioBase64: string | null = null;
 
-            // Step 1: IndexedDB active-audio
-            audioBase64 = await getMediaDataUrl('active-audio');
-
-            // Step 2: Zustand store audioUrl if valid
-            if (!audioBase64 && audioUrl) {
+            // Priority 1: audioUrl from Zustand store
+            if (audioUrl) {
                 try {
                     const r = await fetch(audioUrl);
                     if (r.ok) {
@@ -135,6 +134,11 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                         audioBase64 = await blobToDataUrl(b);
                     }
                 } catch (e) {}
+            }
+
+            // Priority 2: IndexedDB active-audio key
+            if (!audioBase64) {
+                audioBase64 = await getMediaDataUrl('active-audio');
             }
 
             const res = await fetch('/api/export-remotion', {
