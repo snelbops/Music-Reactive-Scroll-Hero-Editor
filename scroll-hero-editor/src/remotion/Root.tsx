@@ -1,4 +1,4 @@
-import { Composition } from 'remotion';
+import { Composition, registerRoot } from 'remotion';
 import { ScrollHeroRemotion } from './ScrollHeroRemotion';
 
 export const RemotionRoot = () => {
@@ -19,3 +19,6 @@ export const RemotionRoot = () => {
         </>
     );
 };
+
+registerRoot(RemotionRoot);
+
