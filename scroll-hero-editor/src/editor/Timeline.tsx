@@ -913,6 +913,12 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         const el = lanesRef.current;
         if (!el) return;
         if (e.clientX - el.getBoundingClientRect().left < LABEL_W) return;
+
+        // Do NOT seek playhead if using select tool, holding Shift, or clicking interactive keyframes/overlays!
+        if (e.shiftKey || activeTool === 'select' || (e.target as HTMLElement).closest('.pointer-events-auto')) {
+            return;
+        }
+
         setIsPlaying(false);
         const p = progressFromClientX(e.clientX);
         if (p !== null) seekTo(p);
@@ -920,7 +926,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);
-    }, [progressFromClientX, setIsPlaying, seekTo]);
+    }, [progressFromClientX, setIsPlaying, seekTo, activeTool]);
 
     useEffect(() => {
         if (recordCountdown === null) return;
@@ -954,7 +960,6 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         cssOpacity,
     };
 
-    const seqPos = sheet.sequence.position / SEQUENCE_DURATION;
     const scrollVbH = laneH('scrollPos', 48);
     const scrollPolyline = scrollHistory.current.length > 1
         ? scrollHistory.current.map(p => `${p.pos * VB_W},${(1 - p.val) * scrollVbH}`).join(' ')
@@ -1977,7 +1982,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 className="absolute rounded-full border-[1.5px] border-[#3b82f6] shadow-[0_0_6px_rgba(59,130,246,0.8)] pointer-events-none"
                                 style={{
                                     width: 6, height: 6,
-                                    left: `calc(${seqPos * 100}% - 3px)`,
+                                    left: `calc(${(seqTime / sequenceDuration) * 100}% - 3px)`,
                                     top: `calc(${(1 - scrollProgress) * 100}% - 3px)`,
                                     backgroundColor: 'var(--color-editor-bg)'
                                 }}
@@ -2390,7 +2395,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 className="absolute rounded-full border-[1.5px] pointer-events-none"
                                 style={{
                                     width: 6, height: 6,
-                                    left: `calc(${(sheet.sequence.position / sequenceDuration) * 100}% - 3px)`,
+                                    left: `calc(${(seqTime / sequenceDuration) * 100}% - 3px)`,
                                     top: `calc(${normalY(currentVal) / VB_H * 100}% - 3px)`,
                                     borderColor: lane.color,
                                     backgroundColor: 'var(--color-editor-bg)',

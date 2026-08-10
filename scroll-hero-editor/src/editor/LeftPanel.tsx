@@ -174,7 +174,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                 <Grid className="w-3.5 h-3.5 text-[#c98a4d] shrink-0" />
                                 <span className="truncate">Video Drumpads</span>
                             </div>
-                            <span className="text-[9.5px] font-mono text-[#8a9198] border border-[#23272c] bg-[#171a1e] px-1.5 py-0.5 rounded shrink-0">Numpad [7..0]</span>
+                            <span className="text-[9.5px] font-mono text-[#8a9198] border border-[#23272c] bg-[#171a1e] px-1.5 py-0.5 rounded shrink-0">Numpad [7..3]</span>
                         </button>
 
                         {isVideoPadsOpen && (
@@ -208,8 +208,6 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                             }
                                         };
 
-                                        const isWideZeroPad = pad.id === 0;
-
                                         return (
                                             <div
                                                 key={pad.id}
@@ -227,8 +225,6 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                                 onDragOver={(e) => e.preventDefault()}
                                                 onDrop={handlePadDrop}
                                                 className={`p-1.5 rounded-md border flex flex-col justify-between text-left cursor-pointer transition-all relative group/pad min-w-0 ${
-                                                    isWideZeroPad ? 'col-span-3' : ''
-                                                } ${
                                                     isActive
                                                         ? 'bg-[#1c222b] border-[#c98a4d] text-[#e2e5e8] font-bold shadow-xs'
                                                         : 'bg-[#101215] border-[#23272c] text-[#7d848c] hover:bg-[#1a1e23] hover:text-[#e2e5e8] hover:border-[#3a4249]'
