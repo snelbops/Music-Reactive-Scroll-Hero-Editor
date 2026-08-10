@@ -47,6 +47,7 @@ export default function ScrollyVideoPlayer() {
                 preload="auto"
                 muted
                 playsInline
+                data-purpose="active-video-element"
                 className="w-full h-full object-contain pointer-events-none"
                 onLoadedMetadata={() => {
                     const v = videoRef.current;

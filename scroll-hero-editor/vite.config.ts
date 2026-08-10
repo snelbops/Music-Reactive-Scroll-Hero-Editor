@@ -12,13 +12,15 @@ function remotionExportPlugin(): Plugin {
         if (req.method !== 'POST') return next();
 
         // Prevent Node HTTP server socket timeout during Remotion rendering
-        req.setTimeout(300000);
-        res.setTimeout(300000);
+        req.setTimeout(600000);
+        res.setTimeout(600000);
 
-        let body = '';
-        req.on('data', chunk => { body += chunk; });
+        // Accumulate raw Buffer chunks — avoids V8 string-concat OOM for large base64 payloads (50-200 MB)
+        const chunks: Buffer[] = [];
+        req.on('data', (chunk: Buffer) => { chunks.push(chunk); });
         req.on('end', async () => {
           try {
+            const body = Buffer.concat(chunks).toString('utf8');
             const data = JSON.parse(body);
             const { renderRemotionVideoServer } = await import('./src/server/remotionServer');
 
@@ -29,16 +31,20 @@ function remotionExportPlugin(): Plugin {
 
             // Save video buffer to static public folder for Headless Chrome
             if (data.videoBase64) {
-              const base64Data = data.videoBase64.replace(/^data:video\/\w+;base64,/, '');
+              // Strip any data URL header regardless of MIME type
+              const base64Data = data.videoBase64.replace(/^data:[^;]+;base64,/, '');
               const videoBuffer = Buffer.from(base64Data, 'base64');
               const tempVideoPath = path.resolve(publicDir, 'temp-export-video.mp4');
               fs.writeFileSync(tempVideoPath, videoBuffer);
+              console.log(`[Remotion] Wrote video: ${(videoBuffer.length / 1024 / 1024).toFixed(1)} MB → ${tempVideoPath}`);
               data.inputProps.videoUrl = 'http://localhost:5174/temp-export-video.mp4';
+            } else {
+              console.warn('[Remotion] No videoBase64 received — Remotion will render without video');
             }
 
             // Save audio buffer to static public folder for Headless Chrome
             if (data.audioBase64) {
-              const base64Data = data.audioBase64.replace(/^data:audio\/\w+;base64,/, '');
+              const base64Data = data.audioBase64.replace(/^data:[^;]+;base64,/, '');
               const audioBuffer = Buffer.from(base64Data, 'base64');
               const tempAudioPath = path.resolve(publicDir, 'temp-export-audio.mp3');
               fs.writeFileSync(tempAudioPath, audioBuffer);
@@ -82,6 +88,7 @@ function remotionExportPlugin(): Plugin {
     },
   };
 }
+
 
 // https://vite.dev/config/
 export default defineConfig({

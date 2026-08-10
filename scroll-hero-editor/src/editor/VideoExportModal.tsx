@@ -163,8 +163,10 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
             // Get video duration from the live DOM video element before we convert it
             let videoDuration: number = sequenceDuration;
             try {
-                const container = document.querySelector('div[data-purpose="viewport-container"]');
-                const domVideo = (container?.querySelector('video') ?? document.querySelector('video')) as HTMLVideoElement | null;
+                const domVideo = (
+                    document.querySelector('video[data-purpose="active-video-element"]') ??
+                    document.querySelector('video')
+                ) as HTMLVideoElement | null;
                 if (domVideo && isFinite(domVideo.duration) && domVideo.duration > 0) {
                     videoDuration = domVideo.duration;
                 }

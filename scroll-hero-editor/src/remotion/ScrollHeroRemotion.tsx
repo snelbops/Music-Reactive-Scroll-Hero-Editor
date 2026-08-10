@@ -40,20 +40,23 @@ export const ScrollHeroRemotion: React.FC<ScrollHeroRemotionProps> = ({
     // Reproduce the exact same scrollProgress the editor would show at this moment
     const scrollProgress = interpolateScrollAt(scrollKeyframes, compositionTime, sequenceDuration);
 
-    // Compute target video time, mirroring ScrollyVideoPlayer.tsx logic
+    // Compute target video time, matching ScrollyVideoPlayer.tsx logic exactly:
+    //   fit:      targetTime = (scrollProgress * v.duration) * videoSpeedRatio
+    //   loop:     targetTime = (currentTimelineTime % v.duration)
+    //   realtime: targetTime = currentTimelineTime
     let targetVideoSeconds = 0;
+    const currentTimelineTime = scrollProgress * sequenceDuration * videoSpeedRatio;
+
     if (videoSyncMode === 'fit') {
-        // scrollProgress (0–1) maps to video start–end
-        targetVideoSeconds = scrollProgress * videoDuration * videoSpeedRatio;
+        targetVideoSeconds = (scrollProgress * videoDuration) * videoSpeedRatio;
     } else if (videoSyncMode === 'loop') {
-        // real-time looping
-        targetVideoSeconds = (compositionTime * videoSpeedRatio) % videoDuration;
+        targetVideoSeconds = currentTimelineTime % videoDuration;
     } else {
         // realtime
-        targetVideoSeconds = compositionTime * videoSpeedRatio;
+        targetVideoSeconds = currentTimelineTime;
     }
 
-    // Clamp within valid video range
+    // Match the player's clamp: Math.max(0, Math.min(v.duration - 0.01, targetTime))
     targetVideoSeconds = Math.max(0, Math.min(videoDuration - 0.033, targetVideoSeconds));
 
     // OffthreadVideo renders each Remotion frame independently.
