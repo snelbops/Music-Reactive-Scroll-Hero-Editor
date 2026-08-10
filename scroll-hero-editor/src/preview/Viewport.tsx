@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Maximize2, ImageIcon } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
 import { GithubTestParticleField } from '../presets/ParticleLab';
@@ -42,9 +42,33 @@ export default function Viewport() {
 
     // Ref for the scrub handle track (vertical bar on the right)
     const trackRef = useRef<HTMLDivElement>(null);
-
-    // Ref for the preview area — used for wheel scrub
     const previewRef = useRef<HTMLDivElement>(null);
+
+    const [viewportZoom, setViewportZoom] = useState<'85' | '100' | '50' | '75' | '125' | '150'>('85');
+    const [nativeVideoRatio, setNativeVideoRatio] = useState<number | null>(16 / 9);
+
+    const activeVideoPadIdx = useStore(s => s.activeVideoPadIdx);
+    const videoPads = useStore(s => s.videoPads);
+    const videoUrl = useStore(s => s.videoUrl);
+
+    useEffect(() => {
+        if (aspectRatio !== 'native') return;
+        const activeUrl = videoPads[activeVideoPadIdx]?.url || videoUrl;
+        if (!activeUrl) return;
+        const vid = document.createElement('video');
+        vid.src = activeUrl;
+        vid.onloadedmetadata = () => {
+            if (vid.videoWidth && vid.videoHeight) {
+                setNativeVideoRatio(vid.videoWidth / vid.videoHeight);
+            }
+        };
+    }, [aspectRatio, activeVideoPadIdx, videoPads, videoUrl]);
+
+    const effectiveRatio = aspectRatio === 'native'
+        ? (nativeVideoRatio ?? 16 / 9)
+        : RATIO_VALUES[aspectRatio];
+
+    const zoomScale = parseFloat(viewportZoom) / 100;
 
     // Ref for the classic dark iframe
     const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -135,15 +159,23 @@ export default function Viewport() {
 
 
     return (
-        <main className="flex-1 flex flex-col relative bg-editor-bg">
+        <main className="flex-1 flex flex-col relative bg-editor-bg overflow-hidden">
             {/* Viewport Controls — hidden in fullscreen */}
             {!isFullscreen && <div className="h-10 border-b border-editor-border flex items-center justify-between px-4 z-10 bg-editor-panel">
                 <div className="flex items-center gap-4 text-xs">
                     <div className="flex items-center gap-2">
                         <span className="text-gray-500">Zoom</span>
-                        <select className="bg-transparent border-none p-0 text-xs focus:ring-0 outline-none">
-                            <option>85% (Fit)</option>
-                            <option>100%</option>
+                        <select
+                            value={viewportZoom}
+                            onChange={(e) => setViewportZoom(e.target.value as any)}
+                            className="bg-editor-surface border border-editor-border rounded px-1.5 py-0.5 text-xs text-editor-fg focus:ring-1 focus:ring-editor-accent-purple outline-none cursor-pointer"
+                        >
+                            <option value="50">50%</option>
+                            <option value="75">75%</option>
+                            <option value="85">85% (Fit)</option>
+                            <option value="100">100%</option>
+                            <option value="125">125%</option>
+                            <option value="150">150%</option>
                         </select>
                     </div>
                     <div className="h-4 w-[1px] bg-editor-border"></div>
@@ -155,8 +187,9 @@ export default function Viewport() {
                                 onClick={() => setAspectRatio(r)}
                                 className={`px-2 py-0.5 text-xxs border rounded transition-colors
                                     ${aspectRatio === r
-                                        ? 'bg-editor-accent-purple/20 border-editor-accent-purple/50 text-editor-accent-purple'
-                                        : 'glass-panel border-transparent hover:bg-white/10'}`}
+                                        ? 'bg-editor-accent-purple/20 border-editor-accent-purple/50 text-editor-accent-purple font-semibold'
+                                        : 'glass-panel border-transparent hover:bg-white/10 text-gray-400'}`}
+                                title={r === 'native' ? 'Lock to active video natural aspect ratio' : r === 'free' ? 'Unconstrained responsive preview' : `Set aspect ratio to ${r}`}
                             >
                                 {r}
                             </button>
@@ -173,12 +206,15 @@ export default function Viewport() {
                 {/* Letterbox Stage */}
                 <div
                     data-purpose="viewport-container"
-                    className={`relative overflow-hidden ${isRecording ? 'ring-2 ring-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.15)]' : ''}`}
+                    className={`relative overflow-hidden transition-all duration-200 ${isRecording ? 'ring-2 ring-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.15)]' : ''}`}
                     style={{
-                        aspectRatio: RATIO_VALUES[aspectRatio] ?? undefined,
-                        width: RATIO_VALUES[aspectRatio] ? 'auto' : '100%',
-                        height: '100%',
+                        aspectRatio: effectiveRatio ?? undefined,
+                        width: effectiveRatio ? 'auto' : '100%',
+                        height: effectiveRatio ? '100%' : '100%',
                         maxWidth: '100%',
+                        maxHeight: '100%',
+                        transform: `scale(${zoomScale})`,
+                        transformOrigin: 'center center',
                         opacity: cssOpacity,
                     }}
                 >

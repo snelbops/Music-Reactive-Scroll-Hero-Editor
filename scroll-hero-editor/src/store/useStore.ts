@@ -169,6 +169,7 @@ export const useStore = create<EditorState>((set, get) => {
         { id: 1, name: 'Pad 1', url: '' },
         { id: 2, name: 'Pad 2', url: '' },
         { id: 3, name: 'Pad 3', url: '' },
+        { id: 0, name: 'Pad 0', url: '' },
     ],
     activeVideoPadIdx: 0,
     videoSyncMode: 'fit',

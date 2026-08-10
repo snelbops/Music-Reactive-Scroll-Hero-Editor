@@ -880,15 +880,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         return () => window.removeEventListener('keydown', onKey);
     }, []);
 
-    useEffect(() => {
-        if (!isPlaying) return;
-        const id = setInterval(() => {
-            const pos = sheet.sequence.position / SEQUENCE_DURATION;
-            const val = useStore.getState().scrollProgress;
-            scrollHistory.current.push({ pos, val });
-        }, 50);
-        return () => clearInterval(id);
-    }, [isPlaying]);
+
 
     const progressFromClientX = useCallback((clientX: number) => {
         const el = lanesRef.current;
@@ -1329,6 +1321,12 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 const f = e.target.files?.[0];
                                 if (f) {
                                     const url = await saveMediaFile('active-audio', f);
+                                    const tempAudio = new Audio(url);
+                                    tempAudio.onloadedmetadata = () => {
+                                        if (tempAudio.duration && isFinite(tempAudio.duration) && tempAudio.duration > 0) {
+                                            useStore.getState().setSequenceDuration(Math.ceil(tempAudio.duration));
+                                        }
+                                    };
                                     useStore.getState().setAudioUrl(url);
                                 }
                                 e.target.value = '';
@@ -1357,18 +1355,19 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         <path
                                             d={audioTrackWaveformPath}
                                             fill="rgba(249, 115, 22, 0.35)"
-                                            stroke="rgba(249, 115, 22, 0.8)"
-                                            strokeWidth="0.8"
+                                            stroke="rgba(249, 115, 22, 0.85)"
+                                            strokeWidth={Math.max(0.4, 0.8 / Math.sqrt(timelineZoom))}
+                                            vectorEffect="non-scaling-stroke"
                                         />
                                     )}
                                 </svg>
                                 {beats.map((beatTime: number, i: number) => (
                                     <div
                                         key={i}
-                                        className="absolute top-0 bottom-0 w-[2px] bg-white z-10 group/beat hover:bg-editor-accent-orange cursor-pointer transition-colors"
+                                        className="absolute top-0 bottom-0 w-[1px] bg-white/15 z-10 group/beat hover:bg-editor-accent-orange cursor-pointer transition-colors"
                                         style={{ left: `${(beatTime / sequenceDuration) * 100}%` }}
                                     >
-                                        <div className="opacity-0 group-hover/beat:opacity-100 text-[8px] absolute top-1 left-2 font-mono text-editor-fg whitespace-nowrap bg-black/50 px-1 rounded">BEAT {beatTime.toFixed(1)}s</div>
+                                        <div className="opacity-0 group-hover/beat:opacity-100 text-[8px] absolute top-1 left-2 font-mono text-editor-fg whitespace-nowrap bg-black/70 px-1 rounded border border-white/10">BEAT {beatTime.toFixed(1)}s</div>
                                     </div>
                                 ))}
                             </>
@@ -2687,6 +2686,36 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         <span>20% (Subtle)</span>
                                         <span>75% (Default)</span>
                                         <span>150% (Wild)</span>
+                                    </div>
+                                </div>
+
+                                {/* Clear Automation Actions */}
+                                <div className="space-y-1 bg-[#252527] p-2.5 rounded-lg border border-red-500/30">
+                                    <span className="text-[9px] uppercase font-bold text-red-400 block">Clear Automation:</span>
+                                    <div className="flex gap-1">
+                                        <button
+                                            onClick={() => {
+                                                useStore.getState().pushHistory();
+                                                if (audioTargetLane === 'scrollPos') useStore.getState().setScrollKeyframes([]);
+                                                else useStore.getState().setParamKeyframes(audioTargetLane, []);
+                                                setAudioMenu(null);
+                                            }}
+                                            className="flex-1 py-1.5 bg-red-500/20 hover:bg-red-500 text-red-300 hover:text-white font-bold rounded text-[9.5px] transition-colors border border-red-500/40 truncate"
+                                        >
+                                            Clear {audioTargetLane} Lane
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                useStore.getState().pushHistory();
+                                                useStore.getState().setScrollKeyframes([]);
+                                                PARAM_LANES.forEach(l => useStore.getState().setParamKeyframes(l.id, []));
+                                                setAudioMenu(null);
+                                            }}
+                                            className="px-2 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded text-[9.5px] transition-colors shrink-0"
+                                            title="Clear all keyframe curves across all lanes"
+                                        >
+                                            Clear ALL
+                                        </button>
                                     </div>
                                 </div>
 
