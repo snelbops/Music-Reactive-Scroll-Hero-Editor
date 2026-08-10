@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Film, Download, StopCircle, Smartphone, Monitor, Square, Sparkles, Terminal, Play, CheckCircle } from 'lucide-react';
+import { X, Film, Download, StopCircle, Smartphone, Monitor, Square, Sparkles, Terminal, Play, CheckCircle, Repeat, Clock } from 'lucide-react';
 import { videoExporter } from '../export/exportVideo';
 import { useStore } from '../store/useStore';
 
@@ -10,25 +10,31 @@ interface VideoExportModalProps {
 export default function VideoExportModal({ onClose }: VideoExportModalProps) {
     const activeRatio = useStore(s => s.aspectRatio);
     const activePreset = useStore(s => s.activePreset);
+    const sequenceDuration = useStore(s => s.sequenceDuration);
+    const loopStart = useStore(s => s.loopStart);
+    const loopEnd = useStore(s => s.loopEnd);
+    const isLoopActive = useStore(s => s.isLoop);
 
+    const [exportRange, setExportRange] = useState<'full' | 'loop'>(isLoopActive ? 'loop' : 'full');
     const [exportRatio, setExportRatio] = useState<string>(activeRatio || '16:9');
     const [includeParticles, setIncludeParticles] = useState<boolean>(activePreset !== 'video');
     const [isExporting, setIsExporting] = useState(false);
     const [isRemotionExporting, setIsRemotionExporting] = useState(false);
     const [progress, setProgress] = useState(0);
-    const [currentTime, setCurrentTime] = useState(0);
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'browser' | 'remotion'>('browser');
+    const [activeTab, setActiveTab] = useState<'browser' | 'remotion'>('remotion');
 
-    const sequenceDuration = useStore(s => s.sequenceDuration);
     const audioUrl = useStore(s => s.audioUrl);
     const videoUrl = useStore(s => s.videoUrl);
+
+    const targetStart = exportRange === 'loop' ? loopStart : 0;
+    const targetEnd = exportRange === 'loop' ? (loopEnd || sequenceDuration) : sequenceDuration;
+    const targetDuration = targetEnd - targetStart;
 
     const handleStartBrowserExport = () => {
         setIsExporting(true);
         setProgress(0);
-        setCurrentTime(0);
-        setStatusMessage('Starting synchronized video render…');
+        setStatusMessage(`Starting render for ${exportRange === 'loop' ? 'Selected Loop Range' : 'Full Sequence'} (${targetStart.toFixed(1)}s — ${targetEnd.toFixed(1)}s)…`);
 
         videoExporter.startExport({
             fps: 60,
@@ -36,9 +42,8 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
             mode: 'realtime',
             aspectRatio: exportRatio,
             includeParticles,
-            onProgress: (p, time) => {
+            onProgress: (p) => {
                 setProgress(p);
-                setCurrentTime(time);
             },
             onComplete: () => {
                 setIsExporting(false);
@@ -53,7 +58,7 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
 
     const handleStartRemotionExport = async () => {
         setIsRemotionExporting(true);
-        setStatusMessage('Rendering 100% 60 FPS MP4 via Remotion + Headless Chrome & FFmpeg… This takes 10-20s.');
+        setStatusMessage(`Rendering 60 FPS MP4 via Remotion (${exportRange === 'loop' ? 'Loop Range' : 'Full Sequence'} ${targetStart.toFixed(1)}s — ${targetEnd.toFixed(1)}s)…`);
 
         try {
             let width = 1920;
@@ -62,7 +67,8 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
             else if (exportRatio === '1:1') { width = 1080; height = 1080; }
 
             const fps = 60;
-            const durationInFrames = Math.round((sequenceDuration || 10) * fps);
+            const startFrame = Math.round(targetStart * fps);
+            const durationInFrames = Math.round(targetDuration * fps);
 
             const res = await fetch('/api/export-remotion', {
                 method: 'POST',
@@ -71,6 +77,7 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                     fps,
                     width,
                     height,
+                    startFrame,
                     durationInFrames,
                     inputProps: {
                         videoUrl,
@@ -88,12 +95,12 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `scroll-hero-remotion-60fps-${Date.now()}.mp4`;
+            a.download = `scroll-hero-${exportRange === 'loop' ? 'loop' : 'full'}-60fps-${Date.now()}.mp4`;
             a.click();
             URL.revokeObjectURL(url);
 
             setIsRemotionExporting(false);
-            setStatusMessage('Remotion MP4 export complete! File downloaded to Downloads folder.');
+            setStatusMessage('Remotion MP4 video export complete! File downloaded.');
         } catch (err: any) {
             setIsRemotionExporting(false);
             setStatusMessage(`Remotion Export Error: ${err.message}`);
@@ -116,7 +123,7 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                         <Film className="w-5 h-5 text-editor-accent-purple" />
                         <div>
                             <h3 className="text-sm font-bold text-white tracking-wide">Export Animation to Video</h3>
-                            <p className="text-[11px] text-gray-400">1-Click Remotion + FFmpeg & In-Browser Recorders</p>
+                            <p className="text-[11px] text-gray-400">Export Full Sequence or Selected Loop Region</p>
                         </div>
                     </div>
                     <button
@@ -133,176 +140,152 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                 {/* Export Mode Tabs */}
                 <div className="flex border-b border-[#2c2c2e] bg-[#1e1e20]">
                     <button
-                        onClick={() => setActiveTab('browser')}
-                        className={`flex-1 py-2 text-xs font-bold border-b-2 transition-colors flex items-center justify-center gap-1.5 ${
-                            activeTab === 'browser' ? 'border-purple-500 text-purple-400' : 'border-transparent text-gray-400 hover:text-white'
-                        }`}
-                    >
-                        <Play className="w-3.5 h-3.5" /> Direct Recorder
-                    </button>
-                    <button
                         onClick={() => setActiveTab('remotion')}
                         className={`flex-1 py-2 text-xs font-bold border-b-2 transition-colors flex items-center justify-center gap-1.5 ${
                             activeTab === 'remotion' ? 'border-cyan-400 text-cyan-300' : 'border-transparent text-gray-400 hover:text-white'
                         }`}
                     >
-                        <Terminal className="w-3.5 h-3.5" /> 🎬 Remotion + FFmpeg (1-Click)
+                        <Terminal className="w-3.5 h-3.5" /> 🎬 Remotion 60 FPS Export
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('browser')}
+                        className={`flex-1 py-2 text-xs font-bold border-b-2 transition-colors flex items-center justify-center gap-1.5 ${
+                            activeTab === 'browser' ? 'border-purple-500 text-purple-400' : 'border-transparent text-gray-400 hover:text-white'
+                        }`}
+                    >
+                        <Play className="w-3.5 h-3.5" /> Direct Canvas Recorder
                     </button>
                 </div>
 
                 {/* Body Options */}
-                {activeTab === 'browser' ? (
-                    <div className="p-5 space-y-4 text-xs">
-                        {/* Resolution / Device Format Selector */}
-                        <div className="space-y-1.5">
-                            <div className="flex items-center justify-between">
-                                <label className="text-gray-300 font-semibold block">Export Resolution & Format:</label>
-                                <span className="text-[10px] text-cyan-400 font-mono font-bold">
-                                    Active: {activeRatio}
-                                </span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-1.5">
-                                <button
-                                    onClick={() => setExportRatio('9:16')}
-                                    disabled={isExporting}
-                                    className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 transition-colors ${
-                                        exportRatio === '9:16'
-                                            ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 font-bold'
-                                            : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
-                                    }`}
-                                >
-                                    <Smartphone className="w-4 h-4 text-cyan-400" />
-                                    <span className="text-[10px]">9:16 Reel</span>
-                                    <span className="text-[8px] font-mono text-gray-400">1080x1920</span>
-                                </button>
-                                <button
-                                    onClick={() => setExportRatio('1:1')}
-                                    disabled={isExporting}
-                                    className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 transition-colors ${
-                                        exportRatio === '1:1'
-                                            ? 'bg-purple-500/20 border-purple-400 text-purple-300 font-bold'
-                                            : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
-                                    }`}
-                                >
-                                    <Square className="w-4 h-4 text-purple-400" />
-                                    <span className="text-[10px]">1:1 Square</span>
-                                    <span className="text-[8px] font-mono text-gray-400">1080x1080</span>
-                                </button>
-                                <button
-                                    onClick={() => setExportRatio('16:9')}
-                                    disabled={isExporting}
-                                    className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 transition-colors ${
-                                        exportRatio === '16:9'
-                                            ? 'bg-blue-500/20 border-blue-400 text-blue-300 font-bold'
-                                            : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
-                                    }`}
-                                >
-                                    <Monitor className="w-4 h-4 text-blue-400" />
-                                    <span className="text-[10px]">16:9 Widescreen</span>
-                                    <span className="text-[8px] font-mono text-gray-400">1920x1080</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Particle Layer Toggle */}
-                        <div className="p-2.5 rounded-lg bg-[#252527] border border-[#3a3a3c] flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Sparkles className="w-4 h-4 text-purple-400" />
-                                <span className="text-gray-300 font-semibold">Include 3D Particle Overlay:</span>
-                            </div>
+                <div className="p-5 space-y-4 text-xs">
+                    {/* Time Range Selector: Selected Loop vs Full Video */}
+                    <div className="space-y-1.5">
+                        <label className="text-gray-300 font-semibold block flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-cyan-400" /> Export Time Range:
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
                             <button
-                                onClick={() => setIncludeParticles(!includeParticles)}
-                                disabled={isExporting}
-                                className={`px-3 py-1 rounded text-xs font-bold transition-colors ${
-                                    includeParticles
-                                        ? 'bg-purple-600 text-white'
-                                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                                onClick={() => setExportRange('loop')}
+                                disabled={isExporting || isRemotionExporting}
+                                className={`p-2.5 rounded-lg border text-left flex flex-col gap-0.5 transition-all ${
+                                    exportRange === 'loop'
+                                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 font-bold shadow-[0_0_10px_rgba(6,182,212,0.2)]'
+                                        : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
                                 }`}
                             >
-                                {includeParticles ? '✨ Particles ON' : '🚫 Clean Video'}
+                                <div className="flex items-center gap-1 text-xs">
+                                    <Repeat className="w-3.5 h-3.5 text-cyan-400" />
+                                    <span>Selected Loop Range</span>
+                                </div>
+                                <span className="text-[10px] font-mono text-cyan-200">
+                                    {loopStart.toFixed(1)}s — {(loopEnd || sequenceDuration).toFixed(1)}s ({targetDuration.toFixed(1)}s clip)
+                                </span>
+                            </button>
+
+                            <button
+                                onClick={() => setExportRange('full')}
+                                disabled={isExporting || isRemotionExporting}
+                                className={`p-2.5 rounded-lg border text-left flex flex-col gap-0.5 transition-all ${
+                                    exportRange === 'full'
+                                        ? 'bg-purple-500/20 border-purple-400 text-purple-300 font-bold shadow-[0_0_10px_rgba(168,85,247,0.2)]'
+                                        : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
+                                }`}
+                            >
+                                <div className="flex items-center gap-1 text-xs">
+                                    <Clock className="w-3.5 h-3.5 text-purple-400" />
+                                    <span>Full Video Sequence</span>
+                                </div>
+                                <span className="text-[10px] font-mono text-purple-200">
+                                    0.0s — {sequenceDuration.toFixed(1)}s (Full {sequenceDuration.toFixed(1)}s)
+                                </span>
                             </button>
                         </div>
-
-                        {/* Progress Bar & Status */}
-                        {isExporting && (
-                            <div className="space-y-2 p-3 rounded-lg bg-black/40 border border-cyan-500/30">
-                                <div className="flex justify-between text-[11px] font-mono">
-                                    <span className="text-cyan-400 font-bold">⚡ Rendering Video Sequence…</span>
-                                    <span className="text-white font-bold">{currentTime.toFixed(1)}s / {sequenceDuration.toFixed(1)}s ({Math.round(progress * 100)}%)</span>
-                                </div>
-                                <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-gradient-to-r from-cyan-500 to-purple-500 transition-all duration-75" style={{ width: `${progress * 100}%` }} />
-                                </div>
-                            </div>
-                        )}
                     </div>
-                ) : (
-                    <div className="p-5 space-y-4 text-xs">
-                        <div className="p-3 rounded-lg bg-[#252527] border border-cyan-500/30 space-y-2">
-                            <div className="flex items-center gap-2 text-cyan-300 font-bold">
-                                <Terminal className="w-4 h-4" />
-                                <span>Remotion + FFmpeg Headless MP4 Exporter</span>
-                            </div>
-                            <p className="text-[11px] text-gray-300 leading-relaxed">
-                                Uses Headless Chrome + FFmpeg to render every single frame of your animation into a 100% butter-smooth 60 FPS MP4 video file.
-                            </p>
-                        </div>
 
-                        {/* Resolution Selector for Remotion */}
-                        <div className="space-y-1.5">
-                            <label className="text-gray-300 font-semibold block">Export Resolution:</label>
-                            <div className="grid grid-cols-3 gap-1.5">
-                                <button
-                                    onClick={() => setExportRatio('9:16')}
-                                    disabled={isRemotionExporting}
-                                    className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 transition-colors ${
-                                        exportRatio === '9:16'
-                                            ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 font-bold'
-                                            : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
-                                    }`}
-                                >
-                                    <Smartphone className="w-4 h-4 text-cyan-400" />
-                                    <span className="text-[10px]">9:16 Reel</span>
-                                </button>
-                                <button
-                                    onClick={() => setExportRatio('1:1')}
-                                    disabled={isRemotionExporting}
-                                    className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 transition-colors ${
-                                        exportRatio === '1:1'
-                                            ? 'bg-purple-500/20 border-purple-400 text-purple-300 font-bold'
-                                            : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
-                                    }`}
-                                >
-                                    <Square className="w-4 h-4 text-purple-400" />
-                                    <span className="text-[10px]">1:1 Square</span>
-                                </button>
-                                <button
-                                    onClick={() => setExportRatio('16:9')}
-                                    disabled={isRemotionExporting}
-                                    className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 transition-colors ${
-                                        exportRatio === '16:9'
-                                            ? 'bg-blue-500/20 border-blue-400 text-blue-300 font-bold'
-                                            : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
-                                    }`}
-                                >
-                                    <Monitor className="w-4 h-4 text-blue-400" />
-                                    <span className="text-[10px]">16:9 Widescreen</span>
-                                </button>
-                            </div>
+                    {/* Aspect Ratio Selector */}
+                    <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                            <label className="text-gray-300 font-semibold block">Export Resolution & Device Format:</label>
+                            <span className="text-[10px] text-cyan-400 font-mono font-bold">
+                                Active: {activeRatio}
+                            </span>
                         </div>
-
-                        {/* Remotion Progress */}
-                        {isRemotionExporting && (
-                            <div className="space-y-2 p-3 rounded-lg bg-black/40 border border-cyan-500/40 animate-pulse">
-                                <div className="flex items-center gap-2 text-cyan-300 font-bold text-[11px]">
-                                    <Film className="w-4 h-4 animate-spin text-cyan-400" />
-                                    <span>Rendering 60 FPS MP4 via Remotion + Headless Chrome…</span>
-                                </div>
-                                <p className="text-[10px] text-gray-400 font-mono">FFmpeg is encoding high-quality MP4 file. Please wait ~15s.</p>
-                            </div>
-                        )}
+                        <div className="grid grid-cols-3 gap-1.5">
+                            <button
+                                onClick={() => setExportRatio('9:16')}
+                                disabled={isExporting || isRemotionExporting}
+                                className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 transition-colors ${
+                                    exportRatio === '9:16'
+                                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 font-bold'
+                                        : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
+                                }`}
+                            >
+                                <Smartphone className="w-4 h-4 text-cyan-400" />
+                                <span className="text-[10px]">9:16 Reel</span>
+                                <span className="text-[8px] font-mono text-gray-400">1080x1920</span>
+                            </button>
+                            <button
+                                onClick={() => setExportRatio('1:1')}
+                                disabled={isExporting || isRemotionExporting}
+                                className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 transition-colors ${
+                                    exportRatio === '1:1'
+                                        ? 'bg-purple-500/20 border-purple-400 text-purple-300 font-bold'
+                                        : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
+                                }`}
+                            >
+                                <Square className="w-4 h-4 text-purple-400" />
+                                <span className="text-[10px]">1:1 Square</span>
+                                <span className="text-[8px] font-mono text-gray-400">1080x1080</span>
+                            </button>
+                            <button
+                                onClick={() => setExportRatio('16:9')}
+                                disabled={isExporting || isRemotionExporting}
+                                className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 transition-colors ${
+                                    exportRatio === '16:9'
+                                        ? 'bg-blue-500/20 border-blue-400 text-blue-300 font-bold'
+                                        : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
+                                }`}
+                            >
+                                <Monitor className="w-4 h-4 text-blue-400" />
+                                <span className="text-[10px]">16:9 Widescreen</span>
+                                <span className="text-[8px] font-mono text-gray-400">1920x1080</span>
+                            </button>
+                        </div>
                     </div>
-                )}
+
+                    {/* Particle Layer Toggle */}
+                    <div className="p-2.5 rounded-lg bg-[#252527] border border-[#3a3a3c] flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-purple-400" />
+                            <span className="text-gray-300 font-semibold">Include 3D Particle Overlay:</span>
+                        </div>
+                        <button
+                            onClick={() => setIncludeParticles(!includeParticles)}
+                            disabled={isExporting || isRemotionExporting}
+                            className={`px-3 py-1 rounded text-xs font-bold transition-colors ${
+                                includeParticles
+                                    ? 'bg-purple-600 text-white'
+                                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                            }`}
+                        >
+                            {includeParticles ? '✨ Particles ON' : '🚫 Clean Video'}
+                        </button>
+                    </div>
+
+                    {/* Progress Bar & Status */}
+                    {(isExporting || isRemotionExporting) && (
+                        <div className="space-y-2 p-3 rounded-lg bg-black/40 border border-cyan-500/30 font-mono text-[11px]">
+                            <div className="flex justify-between">
+                                <span className="text-cyan-400 font-bold">⚡ Rendering {exportRange === 'loop' ? 'Selected Loop' : 'Full Video'}…</span>
+                                <span className="text-white font-bold">{targetDuration.toFixed(1)}s sequence</span>
+                            </div>
+                            <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+                                <div className="h-full bg-gradient-to-r from-cyan-500 to-purple-500 transition-all duration-75" style={{ width: `${progress * 100}%` }} />
+                            </div>
+                        </div>
+                    )}
+                </div>
 
                 {statusMessage && (
                     <div className="px-5 pb-3">
@@ -329,7 +312,7 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                                 onClick={handleStartBrowserExport}
                                 className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-lg shadow-lg transition-all flex items-center gap-1.5"
                             >
-                                <Download className="w-3.5 h-3.5" /> Start Video Render
+                                <Download className="w-3.5 h-3.5" /> Start Direct Render
                             </button>
                         ) : (
                             <button
@@ -345,7 +328,7 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                                 onClick={handleStartRemotionExport}
                                 className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs rounded-lg shadow-lg transition-all flex items-center gap-1.5"
                             >
-                                <Film className="w-3.5 h-3.5" /> 🎬 Render 60 FPS Remotion MP4
+                                <Film className="w-3.5 h-3.5" /> 🎬 Render Remotion MP4
                             </button>
                         ) : (
                             <button

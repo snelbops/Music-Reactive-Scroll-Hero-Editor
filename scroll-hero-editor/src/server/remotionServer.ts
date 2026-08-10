@@ -9,6 +9,7 @@ export async function renderRemotionVideoServer(options: {
     fps: number;
     width: number;
     height: number;
+    startFrame?: number;
     inputProps: Record<string, any>;
     outputPath: string;
     onProgress?: (progress: number) => void;
@@ -39,6 +40,7 @@ export async function renderRemotionVideoServer(options: {
         codec: 'h264',
         outputLocation: options.outputPath,
         inputProps: options.inputProps,
+        frameRange: [options.startFrame || 0, (options.startFrame || 0) + options.durationInFrames - 1],
         onProgress: ({ progress }) => {
             options.onProgress?.(progress);
         },
