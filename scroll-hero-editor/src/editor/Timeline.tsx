@@ -838,6 +838,27 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         return () => el.removeEventListener('scroll', onScroll);
     }, []);
 
+    // Option+scroll for Vertical Expand, Cmd+scroll for Horizontal Zoom
+    useEffect(() => {
+        const el = lanesRef.current;
+        if (!el) return;
+        const onWheel = (e: WheelEvent) => {
+            if (e.altKey) {
+                e.preventDefault();
+                const curV = useStore.getState().verticalZoom;
+                const delta = -e.deltaY * 0.005;
+                useStore.getState().setVerticalZoom(Math.max(0.5, Math.min(3.5, +(curV + delta).toFixed(2))));
+            } else if (e.metaKey || e.ctrlKey) {
+                e.preventDefault();
+                const curH = useStore.getState().timelineZoom;
+                const delta = -e.deltaY * 0.01;
+                useStore.getState().setTimelineZoom(Math.max(0.5, Math.min(20, +(curH + delta).toFixed(2))));
+            }
+        };
+        el.addEventListener('wheel', onWheel, { passive: false });
+        return () => el.removeEventListener('wheel', onWheel);
+    }, []);
+
     // Reactive TIME display — onChange fires whenever Theatre.js position changes (play, scrub, loop)
     useEffect(() => {
         const unsub = onChange(sheet.sequence.pointer.position, (pos) => {
@@ -928,16 +949,16 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         if (recordCountdown === null) return;
         if (recordCountdown === 0) {
             setRecordCountdown(null);
-            setRecordStartPosition(sheet.sequence.position / SEQUENCE_DURATION);
+            setRecordStartPosition(sheet.sequence.position / sequenceDuration);
             clearRecordedEvents();
             setIsRecording(true);
-            setIsPlaying(false);
-            setTimeout(() => setIsPlaying(true), 0);
+            setIsPlaying(true);
+            sheet.sequence.play({ iterationCount: isLoop ? Infinity : 1 });
             return;
         }
         const t = setTimeout(() => setRecordCountdown(recordCountdown - 1), 1000);
         return () => clearTimeout(t);
-    }, [recordCountdown, setRecordCountdown, setRecordStartPosition, clearRecordedEvents, setIsRecording, setIsPlaying]);
+    }, [recordCountdown, setRecordCountdown, setRecordStartPosition, clearRecordedEvents, setIsRecording, setIsPlaying, sequenceDuration, isLoop]);
 
     const toggleRecording = () => {
         if (isRecording) {
@@ -945,7 +966,11 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         } else if (recordCountdown !== null) {
             setRecordCountdown(null);
         } else {
-            setRecordCountdown(3);
+            if (isPlaying) {
+                setIsRecording(true);
+            } else {
+                setRecordCountdown(3);
+            }
         }
     };
 
@@ -1380,7 +1405,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             d={audioTrackWaveformPath}
                                             fill="rgba(249, 115, 22, 0.35)"
                                             stroke="rgba(249, 115, 22, 0.85)"
-                                            strokeWidth={Math.max(0.4, 0.8 / Math.sqrt(timelineZoom))}
+                                            strokeWidth="0.3"
                                             vectorEffect="non-scaling-stroke"
                                         />
                                     )}

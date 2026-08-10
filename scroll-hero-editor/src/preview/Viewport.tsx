@@ -46,6 +46,7 @@ export default function Viewport() {
 
     const [viewportZoom, setViewportZoom] = useState<'85' | '100' | '50' | '75' | '125' | '150'>('85');
     const [nativeVideoRatio, setNativeVideoRatio] = useState<number | null>(16 / 9);
+    const [nativeDimensions, setNativeDimensions] = useState<{ width: number; height: number } | null>(null);
 
     const activeVideoPadIdx = useStore(s => s.activeVideoPadIdx);
     const videoPads = useStore(s => s.videoPads);
@@ -60,6 +61,7 @@ export default function Viewport() {
         vid.onloadedmetadata = () => {
             if (vid.videoWidth && vid.videoHeight) {
                 setNativeVideoRatio(vid.videoWidth / vid.videoHeight);
+                setNativeDimensions({ width: vid.videoWidth, height: vid.videoHeight });
             }
         };
     }, [aspectRatio, activeVideoPadIdx, videoPads, videoUrl]);
@@ -209,11 +211,11 @@ export default function Viewport() {
                     className={`relative overflow-hidden transition-all duration-200 ${isRecording ? 'ring-2 ring-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.15)]' : ''}`}
                     style={{
                         aspectRatio: effectiveRatio ?? undefined,
-                        width: effectiveRatio ? 'auto' : '100%',
-                        height: effectiveRatio ? '100%' : '100%',
+                        width: aspectRatio === 'native' && nativeDimensions ? `${nativeDimensions.width * zoomScale}px` : (effectiveRatio ? 'auto' : '100%'),
+                        height: aspectRatio === 'native' && nativeDimensions ? `${nativeDimensions.height * zoomScale}px` : '100%',
                         maxWidth: '100%',
                         maxHeight: '100%',
-                        transform: `scale(${zoomScale})`,
+                        transform: aspectRatio === 'native' ? undefined : `scale(${zoomScale})`,
                         transformOrigin: 'center center',
                         opacity: cssOpacity,
                     }}
