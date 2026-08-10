@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Film, Download, StopCircle, Smartphone, Monitor, Square, Sparkles, Terminal, Play, CheckCircle, Repeat, Clock } from 'lucide-react';
 import { videoExporter } from '../export/exportVideo';
 import { useStore } from '../store/useStore';
+import { getMediaDataUrl, blobToDataUrl } from '../utils/mediaStore';
 
 interface VideoExportModalProps {
     onClose: () => void;
@@ -70,33 +71,57 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
             const startFrame = Math.round(targetStart * fps);
             const durationInFrames = Math.round(targetDuration * fps);
 
-            // Convert blob URLs to Base64 so Headless Chrome can load them over static HTTP
+            // Locate active DOM video element in viewport container for Tier 1 fallback
+            const container = document.querySelector('div[data-purpose="viewport-container"]') as HTMLElement | null;
+            const activeVideoEl = container?.querySelector('video') as HTMLVideoElement | null;
+
+            // 3-Tier Fallback Chain for Video Base64 Retrieval
             let videoBase64: string | null = null;
-            if (videoUrl) {
+
+            // Tier 1: Active DOM video element src
+            if (activeVideoEl && activeVideoEl.src) {
                 try {
-                    const blobRes = await fetch(videoUrl);
-                    const b = await blobRes.blob();
-                    videoBase64 = await new Promise<string>((res, rej) => {
-                        const r = new FileReader();
-                        r.onloadend = () => res(r.result as string);
-                        r.onerror = rej;
-                        r.readAsDataURL(b);
-                    });
+                    const r = await fetch(activeVideoEl.src);
+                    if (r.ok) {
+                        const b = await r.blob();
+                        videoBase64 = await blobToDataUrl(b);
+                    }
                 } catch (e) {}
             }
 
+            // Tier 2: videoUrl from Zustand store
+            if (!videoBase64 && videoUrl) {
+                try {
+                    const r = await fetch(videoUrl);
+                    if (r.ok) {
+                        const b = await r.blob();
+                        videoBase64 = await blobToDataUrl(b);
+                    }
+                } catch (e) {}
+            }
+
+            // Tier 3: IndexedDB active-video key
+            if (!videoBase64) {
+                videoBase64 = await getMediaDataUrl('active-video');
+            }
+
+            // 2-Tier Fallback Chain for Audio Base64 Retrieval
             let audioBase64: string | null = null;
+
+            // Tier 1: audioUrl from Zustand store
             if (audioUrl) {
                 try {
-                    const blobRes = await fetch(audioUrl);
-                    const b = await blobRes.blob();
-                    audioBase64 = await new Promise<string>((res, rej) => {
-                        const r = new FileReader();
-                        r.onloadend = () => res(r.result as string);
-                        r.onerror = rej;
-                        r.readAsDataURL(b);
-                    });
+                    const r = await fetch(audioUrl);
+                    if (r.ok) {
+                        const b = await r.blob();
+                        audioBase64 = await blobToDataUrl(b);
+                    }
                 } catch (e) {}
+            }
+
+            // Tier 2: IndexedDB active-audio key
+            if (!audioBase64) {
+                audioBase64 = await getMediaDataUrl('active-audio');
             }
 
             const res = await fetch('/api/export-remotion', {
