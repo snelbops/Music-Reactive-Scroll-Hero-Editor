@@ -9,7 +9,6 @@ import { sheet, SEQUENCE_DURATION } from '../theatre/core';
 import { interpolateParamAt, type ParamKf } from '../utils/interpolate';
 
 const LABEL_W = 120;
-const ZOOM_LEVELS = [0.25, 0.5, 1, 2, 4, 8];
 const VB_W = 1000;
 const VB_H = 40;
 
@@ -760,37 +759,30 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         zoomAnchorRef.current = null;
     }, [timelineZoom]);
 
-    // Ctrl+scroll / Meta+scroll = horizontal zoom at mouse position, Alt+scroll = vertical zoom
+    // Ctrl+scroll / Meta+scroll = smooth continuous horizontal zoom at mouse position, Alt+scroll = vertical zoom
     useEffect(() => {
         const el = lanesRef.current;
         if (!el) return;
-        let accumH = 0;
         const onWheel = (e: WheelEvent) => {
             if (e.metaKey || e.ctrlKey) {
                 e.preventDefault();
-                accumH += e.deltaY;
-                const thresh = e.shiftKey ? 10 : 30;
-                if (Math.abs(accumH) >= thresh) {
-                    const steps = Math.trunc(accumH / thresh);
-                    accumH -= steps * thresh;
-
-                    // Record mouse anchor position relative to timeline container
-                    const rect = el.getBoundingClientRect();
-                    const mouseXInContainer = e.clientX - rect.left;
-                    const contentX = el.scrollLeft + mouseXInContainer;
-                    const currentTrackWidth = el.scrollWidth - LABEL_W;
-                    if (currentTrackWidth > 0 && mouseXInContainer >= 0 && mouseXInContainer <= rect.width) {
-                        const ratio = Math.max(0, Math.min(1, (contentX - LABEL_W) / currentTrackWidth));
-                        zoomAnchorRef.current = { mouseXInContainer, ratio };
-                    }
-
-                    const i = ZOOM_LEVELS.indexOf(timelineZoom);
-                    const nextZoom = ZOOM_LEVELS[Math.max(0, Math.min(ZOOM_LEVELS.length - 1, i - steps))];
-                    setTimelineZoom(nextZoom);
+                // Record mouse anchor position relative to timeline container
+                const rect = el.getBoundingClientRect();
+                const mouseXInContainer = e.clientX - rect.left;
+                const contentX = el.scrollLeft + mouseXInContainer;
+                const currentTrackWidth = el.scrollWidth - LABEL_W;
+                if (currentTrackWidth > 0 && mouseXInContainer >= 0 && mouseXInContainer <= rect.width) {
+                    const ratio = Math.max(0, Math.min(1, (contentX - LABEL_W) / currentTrackWidth));
+                    zoomAnchorRef.current = { mouseXInContainer, ratio };
                 }
+
+                const curZoom = useStore.getState().timelineZoom;
+                const factor = Math.pow(1.0025, -e.deltaY);
+                const nextZoom = Math.max(0.25, Math.min(20.0, +(curZoom * factor).toFixed(3)));
+                setTimelineZoom(nextZoom);
             } else if (e.altKey) {
                 e.preventDefault();
-                const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                const delta = e.deltaY > 0 ? -0.05 : 0.05;
                 setVerticalZoom(Math.max(0.4, Math.min(4, +(verticalZoom + delta).toFixed(2))));
             }
         };
@@ -1029,26 +1021,51 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         </button>
                         <span className="border-l border-[#333] pl-2 ml-1 flex items-center gap-2">
                             <div className="flex items-center text-[#808080]">
-                                <button className="p-1 hover:text-[#d9d9d9] disabled:opacity-30" title="Zoom out" onClick={() => { const i = ZOOM_LEVELS.indexOf(timelineZoom); if (i > 0) setTimelineZoom(ZOOM_LEVELS[i-1]); }} disabled={timelineZoom === ZOOM_LEVELS[0]}><ZoomOut className="w-3 h-3" /></button>
-                                <div className="w-12 h-[2px] bg-[#333] relative cursor-ew-resize mx-1"
+                                <button
+                                    className="p-1 hover:text-[#d9d9d9] disabled:opacity-30"
+                                    title="Zoom Out (Cmd + Scroll Down)"
+                                    onClick={() => setTimelineZoom(Math.max(0.25, +(timelineZoom / 1.25).toFixed(2)))}
+                                    disabled={timelineZoom <= 0.25}
+                                >
+                                    <ZoomOut className="w-3.5 h-3.5" />
+                                </button>
+                                <div
+                                    className="w-14 h-[3px] bg-[#23272c] relative cursor-ew-resize mx-1 rounded-full"
+                                    title={`Horizontal Zoom: ${timelineZoom.toFixed(2)}x (Cmd + Scroll)`}
                                     onPointerDown={(e) => {
                                         e.currentTarget.setPointerCapture(e.pointerId);
                                         const rect = e.currentTarget.getBoundingClientRect();
                                         const startX = e.clientX;
-                                        const startIndex = ZOOM_LEVELS.indexOf(timelineZoom);
+                                        const startZoom = timelineZoom;
                                         const onMove = (ev: PointerEvent) => {
                                             const delta = (ev.clientX - startX) / rect.width;
-                                            const newIndex = Math.max(0, Math.min(ZOOM_LEVELS.length - 1, Math.round(startIndex + delta * (ZOOM_LEVELS.length - 1))));
-                                            setTimelineZoom(ZOOM_LEVELS[newIndex]);
+                                            const logMin = Math.log(0.25);
+                                            const logMax = Math.log(20.0);
+                                            const curLog = Math.log(startZoom);
+                                            const nextLog = Math.max(logMin, Math.min(logMax, curLog + delta * (logMax - logMin)));
+                                            setTimelineZoom(+Math.exp(nextLog).toFixed(2));
                                         };
                                         const onUp = () => { document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp); };
                                         document.addEventListener('pointermove', onMove);
                                         document.addEventListener('pointerup', onUp);
                                     }}
                                 >
-                                    <div className="absolute top-1/2 -translate-y-1/2 w-2 h-2 bg-[#808080] rounded-sm pointer-events-none" style={{ left: `${(ZOOM_LEVELS.indexOf(timelineZoom) / (ZOOM_LEVELS.length - 1)) * 100}%`, transform: `translate(-50%, -50%)` }}></div>
+                                    <div
+                                        className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-[#c98a4d] rounded-full pointer-events-none"
+                                        style={{
+                                            left: `${((Math.log(Math.max(0.25, Math.min(20.0, timelineZoom))) - Math.log(0.25)) / (Math.log(20.0) - Math.log(0.25))) * 100}%`,
+                                            transform: `translate(-50%, -50%)`
+                                        }}
+                                    />
                                 </div>
-                                <button className="p-1 hover:text-[#d9d9d9] disabled:opacity-30" title="Zoom in" onClick={() => { const i = ZOOM_LEVELS.indexOf(timelineZoom); if (i < ZOOM_LEVELS.length-1) setTimelineZoom(ZOOM_LEVELS[i+1]); }} disabled={timelineZoom === ZOOM_LEVELS[ZOOM_LEVELS.length-1]}><ZoomIn className="w-3 h-3" /></button>
+                                <button
+                                    className="p-1 hover:text-[#d9d9d9] disabled:opacity-30"
+                                    title="Zoom In (Cmd + Scroll Up)"
+                                    onClick={() => setTimelineZoom(Math.min(20.0, +(timelineZoom * 1.25).toFixed(2)))}
+                                    disabled={timelineZoom >= 20.0}
+                                >
+                                    <ZoomIn className="w-3.5 h-3.5" />
+                                </button>
                             </div>
                             <div className="flex items-center text-[#808080] ml-2">
                                 <span className="text-[9px] font-mono mr-0.5">V</span>

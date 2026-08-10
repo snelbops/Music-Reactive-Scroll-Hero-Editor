@@ -6,7 +6,17 @@ type PresetId = 'orbit' | 'light' | 'classic-dark' | 'classic-dark-copy' | 'clas
 type AspectRatio = '16:9' | '9:16' | '1:1' | 'native' | 'free';
 
 type ScrollKf = { time: number; value: number; easing?: string; handleOut?: { dt: number; dv: number }; handleIn?: { dt: number; dv: number } };
-type HistorySnapshot = { scrollKeyframes: ScrollKf[]; paramKeyframes: Record<string, ParamKf[]> };
+type HistorySnapshot = {
+    scrollKeyframes: ScrollKf[];
+    paramKeyframes: Record<string, ParamKf[]>;
+    padSwitchEvents: PadSwitchEvent[];
+    recordedEvents: RecordedEvent[];
+    videoSyncMode: 'fit' | 'realtime' | 'loop';
+    videoSpeedRatio: number;
+    sequenceDuration: number;
+    activeVideoPadIdx: number;
+    videoPads: Array<{ id: number; name: string; url: string }>;
+};
 type ClipboardEntry = { laneId: string; time: number; value: number; easing?: string; handleOut?: { dt: number; dv: number }; handleIn?: { dt: number; dv: number } };
 
 export interface RecordedEvent {
@@ -117,21 +127,29 @@ export const useStore = create<EditorState>((set, get) => {
     audioUrl: null, setAudioUrl: (url) => set({ audioUrl: url }),
     isRecording: false, setIsRecording: (rec) => set({ isRecording: rec }),
     recordCountdown: null, setRecordCountdown: (n) => set({ recordCountdown: n }),
-    recordedEvents: [], pushRecordedEvent: (ev) => set((s) => ({ recordedEvents: [...s.recordedEvents, ev] })), clearRecordedEvents: () => set({ recordedEvents: [] }),
+    recordedEvents: [],
+    pushRecordedEvent: (ev) => set((s) => ({ recordedEvents: [...s.recordedEvents, ev] })),
+    clearRecordedEvents: () => { get().pushHistory(); set({ recordedEvents: [] }); },
     padSwitchEvents: [],
-    addPadSwitchEvent: (time, padIdx) => set((s) => ({
-        padSwitchEvents: [...s.padSwitchEvents.filter(e => Math.abs(e.time - time) > 0.1), { time, padIdx }].sort((a, b) => a.time - b.time)
-    })),
-    removePadSwitchEvent: (time) => set((s) => ({
-        padSwitchEvents: s.padSwitchEvents.filter(e => Math.abs(e.time - time) > 0.05)
-    })),
-    clearPadSwitchEvents: () => set({ padSwitchEvents: [] }),
+    addPadSwitchEvent: (time, padIdx) => {
+        get().pushHistory();
+        set((s) => ({
+            padSwitchEvents: [...s.padSwitchEvents.filter(e => Math.abs(e.time - time) > 0.1), { time, padIdx }].sort((a, b) => a.time - b.time)
+        }));
+    },
+    removePadSwitchEvent: (time) => {
+        get().pushHistory();
+        set((s) => ({
+            padSwitchEvents: s.padSwitchEvents.filter(e => Math.abs(e.time - time) > 0.05)
+        }));
+    },
+    clearPadSwitchEvents: () => { get().pushHistory(); set({ padSwitchEvents: [] }); },
     scrollProgress: 0, setScrollProgress: (progress) => set({ scrollProgress: progress }),
     activePreset: 'video', setActivePreset: (preset) => set({ activePreset: preset }),
     aspectRatio: '16:9', setAspectRatio: (ratio) => set({ aspectRatio: ratio }),
     isFullscreen: false, setIsFullscreen: (v) => set({ isFullscreen: v }),
     isLoop: false, setIsLoop: (v) => set({ isLoop: v }),
-    sequenceDuration: 10, setSequenceDuration: (d) => set({ sequenceDuration: Math.max(1, d) }),
+    sequenceDuration: 10, setSequenceDuration: (d) => { get().pushHistory(); set({ sequenceDuration: Math.max(1, d) }); },
     loopStart: 0, loopEnd: 10, setLoopRange: (start, end) => set({ loopStart: Math.max(0, start), loopEnd: Math.max(start + 0.5, end) }),
     playheadPosition: 0, setPlayheadPosition: (pos) => set({ playheadPosition: Math.max(0, pos) }),
     timelineScrollLeft: 0, setTimelineScrollLeft: (s) => set({ timelineScrollLeft: Math.max(0, s) }),
@@ -155,9 +173,9 @@ export const useStore = create<EditorState>((set, get) => {
     ],
     activeVideoPadIdx: 0,
     videoSyncMode: 'fit',
-    setVideoSyncMode: (mode) => set({ videoSyncMode: mode }),
+    setVideoSyncMode: (mode) => { get().pushHistory(); set({ videoSyncMode: mode }); },
     videoSpeedRatio: 1.0,
-    setVideoSpeedRatio: (ratio) => set({ videoSpeedRatio: Math.max(0.1, Math.min(5, ratio)) }),
+    setVideoSpeedRatio: (ratio) => { get().pushHistory(); set({ videoSpeedRatio: Math.max(0.1, Math.min(5, ratio)) }); },
     remapKeyframesToRatio: (ratio) => {
         const s = get();
         if (ratio <= 0 || ratio === 1) return;
@@ -185,12 +203,14 @@ export const useStore = create<EditorState>((set, get) => {
         const s = get();
         const pads = s.videoPads;
         const targetUrl = pads[idx]?.url || s.videoUrl;
+        if (s.activeVideoPadIdx !== idx) s.pushHistory();
         set({ activeVideoPadIdx: idx, videoUrl: targetUrl, activePreset: 'video' });
         if (s.isRecording) {
             s.addPadSwitchEvent(s.playheadPosition, idx);
         }
     },
     setVideoPad: (idx, pad) => set((s) => {
+        get().pushHistory();
         const updated = [...s.videoPads];
         const padKeyMap = [7, 8, 9, 4, 5, 6, 1, 2, 3, 0];
         const padId = padKeyMap[idx] ?? (idx + 1);
@@ -286,27 +306,76 @@ export const useStore = create<EditorState>((set, get) => {
     // Undo / Redo
     _past: [], _future: [],
     pushHistory: () => set((s) => ({
-        _past: [...s._past.slice(-99), { scrollKeyframes: s.scrollKeyframes, paramKeyframes: s.paramKeyframes }],
+        _past: [
+            ...s._past.slice(-99),
+            {
+                scrollKeyframes: s.scrollKeyframes,
+                paramKeyframes: s.paramKeyframes,
+                padSwitchEvents: s.padSwitchEvents,
+                recordedEvents: s.recordedEvents,
+                videoSyncMode: s.videoSyncMode,
+                videoSpeedRatio: s.videoSpeedRatio,
+                sequenceDuration: s.sequenceDuration,
+                activeVideoPadIdx: s.activeVideoPadIdx,
+                videoPads: s.videoPads,
+            },
+        ],
         _future: [],
     })),
     undo: () => set((s) => {
         if (s._past.length === 0) return {};
         const snapshot = s._past[s._past.length - 1];
+        const current: HistorySnapshot = {
+            scrollKeyframes: s.scrollKeyframes,
+            paramKeyframes: s.paramKeyframes,
+            padSwitchEvents: s.padSwitchEvents,
+            recordedEvents: s.recordedEvents,
+            videoSyncMode: s.videoSyncMode,
+            videoSpeedRatio: s.videoSpeedRatio,
+            sequenceDuration: s.sequenceDuration,
+            activeVideoPadIdx: s.activeVideoPadIdx,
+            videoPads: s.videoPads,
+        };
         return {
             _past: s._past.slice(0, -1),
-            _future: [{ scrollKeyframes: s.scrollKeyframes, paramKeyframes: s.paramKeyframes }, ...s._future.slice(0, 99)],
+            _future: [current, ...s._future.slice(0, 99)],
             scrollKeyframes: snapshot.scrollKeyframes,
             paramKeyframes: snapshot.paramKeyframes,
+            padSwitchEvents: snapshot.padSwitchEvents,
+            recordedEvents: snapshot.recordedEvents,
+            videoSyncMode: snapshot.videoSyncMode,
+            videoSpeedRatio: snapshot.videoSpeedRatio,
+            sequenceDuration: snapshot.sequenceDuration,
+            activeVideoPadIdx: snapshot.activeVideoPadIdx,
+            videoPads: snapshot.videoPads,
         };
     }),
     redo: () => set((s) => {
         if (s._future.length === 0) return {};
         const snapshot = s._future[0];
+        const current: HistorySnapshot = {
+            scrollKeyframes: s.scrollKeyframes,
+            paramKeyframes: s.paramKeyframes,
+            padSwitchEvents: s.padSwitchEvents,
+            recordedEvents: s.recordedEvents,
+            videoSyncMode: s.videoSyncMode,
+            videoSpeedRatio: s.videoSpeedRatio,
+            sequenceDuration: s.sequenceDuration,
+            activeVideoPadIdx: s.activeVideoPadIdx,
+            videoPads: s.videoPads,
+        };
         return {
-            _past: [...s._past.slice(-99), { scrollKeyframes: s.scrollKeyframes, paramKeyframes: s.paramKeyframes }],
+            _past: [...s._past.slice(-99), current],
             _future: s._future.slice(1),
             scrollKeyframes: snapshot.scrollKeyframes,
             paramKeyframes: snapshot.paramKeyframes,
+            padSwitchEvents: snapshot.padSwitchEvents,
+            recordedEvents: snapshot.recordedEvents,
+            videoSyncMode: snapshot.videoSyncMode,
+            videoSpeedRatio: snapshot.videoSpeedRatio,
+            sequenceDuration: snapshot.sequenceDuration,
+            activeVideoPadIdx: snapshot.activeVideoPadIdx,
+            videoPads: snapshot.videoPads,
         };
     }),
     // Copy / Paste
