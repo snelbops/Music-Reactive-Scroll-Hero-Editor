@@ -1541,7 +1541,48 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             setAudioMenu({ visible: true, x: e.clientX, y: e.clientY, clickTime });
                         }}
                         onPointerDown={(e) => {
-                            if (e.shiftKey || (activeTool === 'select' && e.target === e.currentTarget)) {
+                            if (activeTool === 'select') {
+                                setSelectedLane('scrollPos');
+                                const targetEl = e.currentTarget as HTMLElement;
+                                const rect = targetEl.getBoundingClientRect();
+                                const startX = e.clientX - rect.left;
+                                const startY = e.clientY - rect.top;
+                                setMarqueeBox({ laneId: 'scrollPos', startX, startY, currentX: startX, currentY: startY });
+                                targetEl.setPointerCapture(e.pointerId);
+
+                                const onMove = (ev: PointerEvent) => {
+                                    const r = targetEl.getBoundingClientRect();
+                                    const curX = Math.max(0, Math.min(r.width, ev.clientX - r.left));
+                                    const curY = Math.max(0, Math.min(r.height, ev.clientY - r.top));
+                                    setMarqueeBox({ laneId: 'scrollPos', startX, startY, currentX: curX, currentY: curY });
+
+                                    const minX = Math.min(startX, curX);
+                                    const maxX = Math.max(startX, curX);
+                                    const minY = Math.min(startY, curY);
+                                    const maxY = Math.max(startY, curY);
+
+                                    const currentKfs = useStore.getState().scrollKeyframes;
+                                    const selected = currentKfs.filter(kf => {
+                                        const kfX = (kf.time / SEQUENCE_DURATION) * r.width;
+                                        const kfY = (1 - kf.value) * r.height;
+                                        return kfX >= minX && kfX <= maxX && kfY >= minY && kfY <= maxY;
+                                    }).map(kf => ({ laneId: 'scrollPos', position: kf.time, value: kf.value }));
+
+                                    setSelectedKeyframes(selected);
+                                };
+
+                                const onUp = () => {
+                                    setMarqueeBox(null);
+                                    targetEl.removeEventListener('pointermove', onMove as any);
+                                    targetEl.removeEventListener('pointerup', onUp as any);
+                                };
+
+                                targetEl.addEventListener('pointermove', onMove as any);
+                                targetEl.addEventListener('pointerup', onUp as any);
+                                return;
+                            }
+
+                            if (e.shiftKey) {
                                 setSelectedLane('scrollPos');
                                 handleTrackPointerDown(e);
                                 return;
@@ -1632,6 +1673,19 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             target.addEventListener('pointerup', onUp as any);
                         }}
                     >
+                        {/* Marquee Selection Box Overlay */}
+                        {marqueeBox && marqueeBox.laneId === 'scrollPos' && (
+                            <div
+                                className="absolute border border-editor-accent-purple bg-editor-accent-purple/20 pointer-events-none z-30"
+                                style={{
+                                    left: Math.min(marqueeBox.startX, marqueeBox.currentX),
+                                    top: Math.min(marqueeBox.startY, marqueeBox.currentY),
+                                    width: Math.abs(marqueeBox.currentX - marqueeBox.startX),
+                                    height: Math.abs(marqueeBox.currentY - marqueeBox.startY),
+                                }}
+                            />
+                        )}
+
                         <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${scrollVbH}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
                             <defs>
                                 <filter id="pglow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
@@ -1790,24 +1844,52 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             e.stopPropagation();
                                             (e.target as HTMLElement).setPointerCapture(e.pointerId);
                                             useStore.getState().pushHistory();
-                                            draggingKfRef.current = { origTime: kf.time, value: kf.value };
+
+                                            const isCurrentSelected = selectedKeyframes.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.005);
+                                            const activeSelection = isCurrentSelected && selectedKeyframes.filter(s => s.laneId === 'scrollPos').length > 0
+                                                ? selectedKeyframes.filter(s => s.laneId === 'scrollPos')
+                                                : [{ laneId: 'scrollPos', position: kf.time, value: kf.value }];
+
+                                            if (!isCurrentSelected) {
+                                                setSelectedKeyframes(activeSelection);
+                                            }
+
+                                            draggingKfRef.current = {
+                                                startClientX: e.clientX,
+                                                startClientY: e.clientY,
+                                                origKfs: activeSelection,
+                                                initialKfs: scrollKeyframes,
+                                            } as any;
                                         }}
                                         onPointerMove={(e) => {
                                             if (!draggingKfRef.current || !(e.buttons & 1)) return;
-                                            const { origTime } = draggingKfRef.current;
+                                            const { startClientX, startClientY, origKfs, initialKfs } = draggingKfRef.current as any;
                                             const container = (e.target as HTMLElement).parentElement!;
                                             const rect = container.getBoundingClientRect();
-                                            const x = e.clientX - rect.left;
-                                            const y = e.clientY - rect.top;
-                                            const newTime = Math.max(0, Math.min(SEQUENCE_DURATION, (x / rect.width) * SEQUENCE_DURATION));
-                                            const newValue = Math.max(0, Math.min(1, 1 - y / rect.height));
-                                            setScrollKeyframes(
-                                                scrollKeyframes
-                                                    .filter(k => Math.abs(k.time - origTime) > 0.005)
-                                                    .concat({ time: newTime, value: newValue })
-                                                    .sort((a, b) => a.time - b.time)
-                                            );
-                                            draggingKfRef.current = { origTime: newTime, value: newValue };
+
+                                            const dx = e.clientX - startClientX;
+                                            const dy = e.clientY - startClientY;
+
+                                            const deltaTime = (dx / rect.width) * sequenceDuration;
+                                            const deltaValue = -(dy / rect.height);
+
+                                            const isShift = e.shiftKey;
+
+                                            const updatedSelection = origKfs.map((orig: any) => {
+                                                const newTime = Math.max(0, Math.min(sequenceDuration, +(orig.position + (isShift ? deltaTime : 0)).toFixed(2)));
+                                                const newValue = Math.max(0, Math.min(1, +(orig.value + (isShift ? 0 : deltaValue)).toFixed(3)));
+                                                return { laneId: 'scrollPos', position: newTime, value: newValue };
+                                            });
+
+                                            const origTimes = new Set<number>(origKfs.map((k: any) => k.position));
+                                            const remainingKfs = initialKfs.filter((k: any) => !Array.from(origTimes).some((t: number) => Math.abs(k.time - t) < 0.005));
+
+                                            const mergedKfs = remainingKfs
+                                                .concat(updatedSelection.map((s: any) => ({ time: s.position, value: s.value })))
+                                                .sort((a: any, b: any) => a.time - b.time);
+
+                                            setScrollKeyframes(mergedKfs);
+                                            setSelectedKeyframes(updatedSelection);
                                         }}
                                         onPointerUp={() => { draggingKfRef.current = null; }}
                                     />
@@ -1880,7 +1962,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     addParamKeyframe(lane.id, t, existing ?? currentVal);
                                 }}
                                 onPointerDown={(e) => {
-                                    if (activeTool === 'select' && e.target === e.currentTarget) {
+                                    if (activeTool === 'select') {
                                         setSelectedLane(lane.id);
                                         const targetEl = e.currentTarget as HTMLElement;
                                         const rect = targetEl.getBoundingClientRect();
