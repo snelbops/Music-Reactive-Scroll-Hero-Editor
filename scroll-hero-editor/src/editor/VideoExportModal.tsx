@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Film, Download, StopCircle, Smartphone, Monitor, Square, Sparkles, Terminal, Play } from 'lucide-react';
+import { X, Film, Download, StopCircle, Smartphone, Monitor, Square, Sparkles, Terminal, Play, CheckCircle } from 'lucide-react';
 import { videoExporter } from '../export/exportVideo';
 import { useStore } from '../store/useStore';
 
@@ -13,25 +13,26 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
 
     const [exportRatio, setExportRatio] = useState<string>(activeRatio || '16:9');
     const [includeParticles, setIncludeParticles] = useState<boolean>(activePreset !== 'video');
-    const [fps] = useState<30 | 60>(60);
-    const [format] = useState<'webm' | 'mp4'>('mp4');
     const [isExporting, setIsExporting] = useState(false);
+    const [isRemotionExporting, setIsRemotionExporting] = useState(false);
     const [progress, setProgress] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'browser' | 'remotion'>('browser');
 
     const sequenceDuration = useStore(s => s.sequenceDuration);
+    const audioUrl = useStore(s => s.audioUrl);
+    const videoUrl = useStore(s => s.videoUrl);
 
-    const handleStartExport = () => {
+    const handleStartBrowserExport = () => {
         setIsExporting(true);
         setProgress(0);
         setCurrentTime(0);
         setStatusMessage('Starting synchronized video render…');
 
         videoExporter.startExport({
-            fps,
-            format,
+            fps: 60,
+            format: 'mp4',
             mode: 'realtime',
             aspectRatio: exportRatio,
             includeParticles,
@@ -50,9 +51,59 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
         });
     };
 
+    const handleStartRemotionExport = async () => {
+        setIsRemotionExporting(true);
+        setStatusMessage('Rendering 100% 60 FPS MP4 via Remotion + Headless Chrome & FFmpeg… This takes 10-20s.');
+
+        try {
+            let width = 1920;
+            let height = 1080;
+            if (exportRatio === '9:16') { width = 1080; height = 1920; }
+            else if (exportRatio === '1:1') { width = 1080; height = 1080; }
+
+            const fps = 60;
+            const durationInFrames = Math.round((sequenceDuration || 10) * fps);
+
+            const res = await fetch('/api/export-remotion', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    fps,
+                    width,
+                    height,
+                    durationInFrames,
+                    inputProps: {
+                        videoUrl,
+                        audioUrl,
+                    },
+                }),
+            });
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || 'Remotion server export failed');
+            }
+
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `scroll-hero-remotion-60fps-${Date.now()}.mp4`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            setIsRemotionExporting(false);
+            setStatusMessage('Remotion MP4 export complete! File downloaded to Downloads folder.');
+        } catch (err: any) {
+            setIsRemotionExporting(false);
+            setStatusMessage(`Remotion Export Error: ${err.message}`);
+        }
+    };
+
     const handleCancelExport = () => {
         videoExporter.cancelExport();
         setIsExporting(false);
+        setIsRemotionExporting(false);
         setStatusMessage('Export cancelled.');
     };
 
@@ -65,12 +116,12 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                         <Film className="w-5 h-5 text-editor-accent-purple" />
                         <div>
                             <h3 className="text-sm font-bold text-white tracking-wide">Export Animation to Video</h3>
-                            <p className="text-[11px] text-gray-400">Browser MediaRecorder & Remotion / FFmpeg Video Exporters</p>
+                            <p className="text-[11px] text-gray-400">1-Click Remotion + FFmpeg & In-Browser Recorders</p>
                         </div>
                     </div>
                     <button
                         onClick={() => {
-                            if (isExporting) handleCancelExport();
+                            if (isExporting || isRemotionExporting) handleCancelExport();
                             onClose();
                         }}
                         className="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
@@ -87,7 +138,7 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                             activeTab === 'browser' ? 'border-purple-500 text-purple-400' : 'border-transparent text-gray-400 hover:text-white'
                         }`}
                     >
-                        <Play className="w-3.5 h-3.5" /> In-Browser Recorder
+                        <Play className="w-3.5 h-3.5" /> Direct Recorder
                     </button>
                     <button
                         onClick={() => setActiveTab('remotion')}
@@ -95,7 +146,7 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                             activeTab === 'remotion' ? 'border-cyan-400 text-cyan-300' : 'border-transparent text-gray-400 hover:text-white'
                         }`}
                     >
-                        <Terminal className="w-3.5 h-3.5" /> Remotion + FFmpeg
+                        <Terminal className="w-3.5 h-3.5" /> 🎬 Remotion + FFmpeg (1-Click)
                     </button>
                 </div>
 
@@ -184,41 +235,80 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                                 </div>
                             </div>
                         )}
-
-                        {statusMessage && !isExporting && (
-                            <div className="p-2.5 rounded-lg bg-editor-accent-purple/10 border border-editor-accent-purple/30 text-editor-accent-purple text-[11px]">
-                                {statusMessage}
-                            </div>
-                        )}
                     </div>
                 ) : (
-                    <div className="p-5 space-y-3 text-xs">
+                    <div className="p-5 space-y-4 text-xs">
                         <div className="p-3 rounded-lg bg-[#252527] border border-cyan-500/30 space-y-2">
                             <div className="flex items-center gap-2 text-cyan-300 font-bold">
                                 <Terminal className="w-4 h-4" />
-                                <span>Remotion + FFmpeg Headless Renderer</span>
+                                <span>Remotion + FFmpeg Headless MP4 Exporter</span>
                             </div>
                             <p className="text-[11px] text-gray-300 leading-relaxed">
-                                Remotion uses Headless Chrome + FFmpeg to render your animation into a 100% butter-smooth 60 FPS MP4 video file with zero frame drops.
+                                Uses Headless Chrome + FFmpeg to render every single frame of your animation into a 100% butter-smooth 60 FPS MP4 video file.
                             </p>
                         </div>
 
-                        <div className="space-y-1 bg-black/50 p-3 rounded-lg border border-[#3a3a3c] font-mono text-[11px]">
-                            <span className="text-gray-400 block text-[9px] uppercase font-bold">1. Render MP4 Video via CLI:</span>
-                            <code className="text-cyan-300 select-all block bg-[#1c1c1e] p-1.5 rounded border border-white/10">
-                                npm run render-video
-                            </code>
+                        {/* Resolution Selector for Remotion */}
+                        <div className="space-y-1.5">
+                            <label className="text-gray-300 font-semibold block">Export Resolution:</label>
+                            <div className="grid grid-cols-3 gap-1.5">
+                                <button
+                                    onClick={() => setExportRatio('9:16')}
+                                    disabled={isRemotionExporting}
+                                    className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 transition-colors ${
+                                        exportRatio === '9:16'
+                                            ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 font-bold'
+                                            : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
+                                    }`}
+                                >
+                                    <Smartphone className="w-4 h-4 text-cyan-400" />
+                                    <span className="text-[10px]">9:16 Reel</span>
+                                </button>
+                                <button
+                                    onClick={() => setExportRatio('1:1')}
+                                    disabled={isRemotionExporting}
+                                    className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 transition-colors ${
+                                        exportRatio === '1:1'
+                                            ? 'bg-purple-500/20 border-purple-400 text-purple-300 font-bold'
+                                            : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
+                                    }`}
+                                >
+                                    <Square className="w-4 h-4 text-purple-400" />
+                                    <span className="text-[10px]">1:1 Square</span>
+                                </button>
+                                <button
+                                    onClick={() => setExportRatio('16:9')}
+                                    disabled={isRemotionExporting}
+                                    className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 transition-colors ${
+                                        exportRatio === '16:9'
+                                            ? 'bg-blue-500/20 border-blue-400 text-blue-300 font-bold'
+                                            : 'bg-[#252527] border-[#3a3a3c] text-gray-400 hover:bg-[#2c2c2e]'
+                                    }`}
+                                >
+                                    <Monitor className="w-4 h-4 text-blue-400" />
+                                    <span className="text-[10px]">16:9 Widescreen</span>
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="space-y-1 bg-black/50 p-3 rounded-lg border border-[#3a3a3c] font-mono text-[11px]">
-                            <span className="text-gray-400 block text-[9px] uppercase font-bold">2. Open Remotion Studio GUI Preview:</span>
-                            <code className="text-purple-300 select-all block bg-[#1c1c1e] p-1.5 rounded border border-white/10">
-                                npm run preview-remotion
-                            </code>
-                        </div>
+                        {/* Remotion Progress */}
+                        {isRemotionExporting && (
+                            <div className="space-y-2 p-3 rounded-lg bg-black/40 border border-cyan-500/40 animate-pulse">
+                                <div className="flex items-center gap-2 text-cyan-300 font-bold text-[11px]">
+                                    <Film className="w-4 h-4 animate-spin text-cyan-400" />
+                                    <span>Rendering 60 FPS MP4 via Remotion + Headless Chrome…</span>
+                                </div>
+                                <p className="text-[10px] text-gray-400 font-mono">FFmpeg is encoding high-quality MP4 file. Please wait ~15s.</p>
+                            </div>
+                        )}
+                    </div>
+                )}
 
-                        <div className="p-2.5 rounded-lg bg-white/5 border border-white/10 text-[10px] text-gray-400">
-                            💡 Remotion renders your React composition frame-by-frame on headless Chrome, producing pixel-perfect MP4 videos.
+                {statusMessage && (
+                    <div className="px-5 pb-3">
+                        <div className="p-2.5 rounded-lg bg-editor-accent-purple/10 border border-editor-accent-purple/30 text-editor-accent-purple text-[11px] flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4 shrink-0 text-cyan-400" />
+                            <span>{statusMessage}</span>
                         </div>
                     </div>
                 )}
@@ -227,26 +317,45 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                 <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-[#2c2c2e] bg-[#252527]">
                     <button
                         onClick={onClose}
-                        disabled={isExporting}
+                        disabled={isExporting || isRemotionExporting}
                         className="px-3.5 py-1.5 text-xs text-gray-400 hover:text-white transition-colors"
                     >
                         Close
                     </button>
-                    {activeTab === 'browser' && (!isExporting ? (
-                        <button
-                            onClick={handleStartExport}
-                            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-lg shadow-lg transition-all flex items-center gap-1.5"
-                        >
-                            <Download className="w-3.5 h-3.5" /> Start Video Render
-                        </button>
+
+                    {activeTab === 'browser' ? (
+                        !isExporting ? (
+                            <button
+                                onClick={handleStartBrowserExport}
+                                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-lg shadow-lg transition-all flex items-center gap-1.5"
+                            >
+                                <Download className="w-3.5 h-3.5" /> Start Video Render
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleCancelExport}
+                                className="px-4 py-2 bg-red-600/80 hover:bg-red-600 text-white font-bold text-xs rounded-lg shadow-lg transition-all flex items-center gap-1.5"
+                            >
+                                <StopCircle className="w-3.5 h-3.5" /> Cancel Render
+                            </button>
+                        )
                     ) : (
-                        <button
-                            onClick={handleCancelExport}
-                            className="px-4 py-2 bg-red-600/80 hover:bg-red-600 text-white font-bold text-xs rounded-lg shadow-lg transition-all flex items-center gap-1.5"
-                        >
-                            <StopCircle className="w-3.5 h-3.5" /> Cancel Render
-                        </button>
-                    ))}
+                        !isRemotionExporting ? (
+                            <button
+                                onClick={handleStartRemotionExport}
+                                className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs rounded-lg shadow-lg transition-all flex items-center gap-1.5"
+                            >
+                                <Film className="w-3.5 h-3.5" /> 🎬 Render 60 FPS Remotion MP4
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleCancelExport}
+                                className="px-4 py-2 bg-red-600/80 hover:bg-red-600 text-white font-bold text-xs rounded-lg shadow-lg transition-all flex items-center gap-1.5"
+                            >
+                                <StopCircle className="w-3.5 h-3.5" /> Cancel Render
+                            </button>
+                        )
+                    )}
                 </div>
             </div>
         </div>
