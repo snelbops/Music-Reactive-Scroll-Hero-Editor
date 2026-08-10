@@ -32,7 +32,7 @@ export type ProjectData = {
     videoUrl?: string | null;
     audioUrl?: string | null;
     mp4Asset?: { name: string; url: string } | null;
-    videoPads?: Array<{ id: number; name: string; url: string }>;
+    videoPads?: Array<{ id: number; name: string; url: string; color?: string }>;
     activeVideoPadIdx?: number;
     lightImages?: { name: string; url: string }[];
     activeLightImageIdx?: number;
@@ -214,7 +214,17 @@ export function applyProjectDataToStore(data: Partial<ProjectData>): void {
     if (data.videoUrl !== undefined) s.setVideoUrl(data.videoUrl);
     if (data.audioUrl !== undefined) s.setAudioUrl(data.audioUrl);
     if (data.mp4Asset !== undefined) s.setMp4Asset(data.mp4Asset);
-    if (data.videoPads) useStore.setState({ videoPads: data.videoPads });
+    const DEFAULT_PAD_COLORS: Record<number, string> = {
+        7: '#5f7f9e', 8: '#6e9c73', 9: '#a86a5c', 4: '#7a6fa8', 5: '#c98a4d',
+        6: '#5f9e96', 1: '#9e7a5f', 2: '#7d848c', 3: '#8a9e6e', 0: '#6e7a9e',
+    };
+    if (data.videoPads) {
+        const mergedPads = data.videoPads.map((p, idx) => ({
+            ...p,
+            color: p.color || DEFAULT_PAD_COLORS[p.id] || ['#5f7f9e', '#6e9c73', '#a86a5c', '#7a6fa8', '#c98a4d', '#5f9e96', '#9e7a5f', '#7d848c', '#8a9e6e', '#6e7a9e'][idx % 10],
+        }));
+        useStore.setState({ videoPads: mergedPads });
+    }
     if (typeof data.activeVideoPadIdx === 'number') s.setActiveVideoPadIdx(data.activeVideoPadIdx);
     if (data.lightImages) useStore.setState({ lightImages: data.lightImages });
     if (typeof data.activeLightImageIdx === 'number') s.setActiveLightImageIdx(data.activeLightImageIdx);

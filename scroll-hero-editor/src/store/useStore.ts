@@ -15,7 +15,7 @@ type HistorySnapshot = {
     videoSpeedRatio: number;
     sequenceDuration: number;
     activeVideoPadIdx: number;
-    videoPads: Array<{ id: number; name: string; url: string }>;
+    videoPads: Array<{ id: number; name: string; url: string; color?: string }>;
 };
 type ClipboardEntry = { laneId: string; time: number; value: number; easing?: string; handleOut?: { dt: number; dv: number }; handleIn?: { dt: number; dv: number } };
 
@@ -55,10 +55,12 @@ interface EditorState {
     recordStartPosition: number; setRecordStartPosition: (v: number) => void;
     mp4Asset: { name: string; url: string } | null; setMp4Asset: (asset: { name: string; url: string } | null) => void;
     removeMp4Asset: () => void;
-    videoPads: Array<{ id: number; name: string; url: string }>;
+    videoPads: Array<{ id: number; name: string; url: string; color?: string }>;
     activeVideoPadIdx: number;
     setActiveVideoPadIdx: (idx: number) => void;
-    setVideoPad: (idx: number, pad: { name: string; url: string }) => void;
+    setVideoPad: (idx: number, pad: { name: string; url: string; color?: string }) => void;
+    setVideoPadColor: (idx: number, color: string) => void;
+    swapVideoPads: (idxA: number, idxB: number) => void;
     videoSyncMode: 'fit' | 'realtime' | 'loop'; setVideoSyncMode: (mode: 'fit' | 'realtime' | 'loop') => void;
     videoSpeedRatio: number; setVideoSpeedRatio: (ratio: number) => void;
     remapKeyframesToRatio: (ratio: number) => void;
@@ -160,16 +162,16 @@ export const useStore = create<EditorState>((set, get) => {
     setMp4Asset: (asset) => set({ mp4Asset: asset, videoUrl: asset ? asset.url : null }),
     removeMp4Asset: () => set({ mp4Asset: null, videoUrl: null, extractedFrames: [], extractionStatus: 'idle' }),
     videoPads: [
-        { id: 7, name: 'Pad 7', url: '/sample.mp4' },
-        { id: 8, name: 'Pad 8', url: '' },
-        { id: 9, name: 'Pad 9', url: '' },
-        { id: 4, name: 'Pad 4', url: '' },
-        { id: 5, name: 'Pad 5', url: '' },
-        { id: 6, name: 'Pad 6', url: '' },
-        { id: 1, name: 'Pad 1', url: '' },
-        { id: 2, name: 'Pad 2', url: '' },
-        { id: 3, name: 'Pad 3', url: '' },
-        { id: 0, name: 'Pad 0', url: '' },
+        { id: 7, name: 'Pad 7', url: '/sample.mp4', color: '#5f7f9e' },
+        { id: 8, name: 'Pad 8', url: '', color: '#6e9c73' },
+        { id: 9, name: 'Pad 9', url: '', color: '#a86a5c' },
+        { id: 4, name: 'Pad 4', url: '', color: '#7a6fa8' },
+        { id: 5, name: 'Pad 5', url: '', color: '#c98a4d' },
+        { id: 6, name: 'Pad 6', url: '', color: '#5f9e96' },
+        { id: 1, name: 'Pad 1', url: '', color: '#9e7a5f' },
+        { id: 2, name: 'Pad 2', url: '', color: '#7d848c' },
+        { id: 3, name: 'Pad 3', url: '', color: '#8a9e6e' },
+        { id: 0, name: 'Pad 0', url: '', color: '#6e7a9e' },
     ],
     activeVideoPadIdx: 0,
     videoSyncMode: 'fit',
@@ -214,8 +216,29 @@ export const useStore = create<EditorState>((set, get) => {
         const updated = [...s.videoPads];
         const padKeyMap = [7, 8, 9, 4, 5, 6, 1, 2, 3, 0];
         const padId = padKeyMap[idx] ?? (idx + 1);
-        updated[idx] = { id: padId, ...pad };
+        updated[idx] = { ...updated[idx], id: padId, ...pad };
         return { videoPads: updated, videoUrl: s.activeVideoPadIdx === idx ? pad.url : s.videoUrl, activePreset: 'frames' };
+    }),
+    setVideoPadColor: (idx, color) => set((s) => {
+        get().pushHistory();
+        const updated = [...s.videoPads];
+        if (updated[idx]) {
+            updated[idx] = { ...updated[idx], color };
+        }
+        return { videoPads: updated };
+    }),
+    swapVideoPads: (idxA, idxB) => set((s) => {
+        if (idxA === idxB || idxA < 0 || idxB < 0 || idxA >= s.videoPads.length || idxB >= s.videoPads.length) return s;
+        get().pushHistory();
+        const updated = [...s.videoPads];
+        const temp = updated[idxA];
+        updated[idxA] = updated[idxB];
+        updated[idxB] = temp;
+        // Keep active index aligned if one of the swapped pads was active
+        let newActiveIdx = s.activeVideoPadIdx;
+        if (s.activeVideoPadIdx === idxA) newActiveIdx = idxB;
+        else if (s.activeVideoPadIdx === idxB) newActiveIdx = idxA;
+        return { videoPads: updated, activeVideoPadIdx: newActiveIdx };
     }),
     extractedFrames: [], setExtractedFrames: (frames) => set({ extractedFrames: frames }),
     extractionProgress: 0, setExtractionProgress: (p) => set({ extractionProgress: p }),

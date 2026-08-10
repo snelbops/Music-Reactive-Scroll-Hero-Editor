@@ -1,11 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { ChevronDown, ChevronRight, UploadCloud, Video, Film, Layers, SlidersHorizontal, ImageIcon, X, Sparkles, Grid } from 'lucide-react';
+import { ChevronDown, ChevronRight, UploadCloud, Video, Film, Layers, SlidersHorizontal, ImageIcon, X, Sparkles, Grid, GripVertical } from 'lucide-react';
 import { saveMediaFile, getMediaDataUrl, dataUrlToBlob } from '../utils/mediaStore';
 import { cacheActiveVideo } from '../utils/videoCache';
 import { extractFrames } from '../packages/ffmpegExtractor';
-
-
 
 const PARTICLE_LAB_PRESETS = [
     { id: 'orbit' as const,            label: 'Orbit',             description: 'Dark bg · white particles' },
@@ -24,6 +22,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
     const [isVideoPadsOpen, setIsVideoPadsOpen] = useState(true);
     const [isVideoControlsOpen, setIsVideoControlsOpen] = useState(true);
     const [isFrameExtractorOpen, setIsFrameExtractorOpen] = useState(false);
+    const [draggedPadIdx, setDraggedPadIdx] = useState<number | null>(null);
 
     const activePreset = useStore(state => state.activePreset);
     const setActivePreset = useStore(state => state.setActivePreset);
@@ -63,6 +62,8 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
     const activeVideoPadIdx = useStore(s => s.activeVideoPadIdx);
     const setActiveVideoPadIdx = useStore(s => s.setActiveVideoPadIdx);
     const setVideoPad = useStore(s => s.setVideoPad);
+    const setVideoPadColor = useStore(s => s.setVideoPadColor);
+    const swapVideoPads = useStore(s => s.swapVideoPads);
 
     const mp4InputRef = useRef<HTMLInputElement>(null);
 
@@ -183,6 +184,9 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                     {videoPads.map((pad, idx) => {
                                         const isActive = activeVideoPadIdx === idx;
                                         const fileInputId = `pad-upload-${idx}`;
+                                        const colorInputId = `pad-color-${idx}`;
+                                        const defaultColors: Record<number, string> = { 7: '#5f7f9e', 8: '#6e9c73', 9: '#a86a5c', 4: '#7a6fa8', 5: '#c98a4d', 6: '#5f9e96', 1: '#9e7a5f', 2: '#7d848c', 3: '#8a9e6e', 0: '#6e7a9e' };
+                                        const padColor = pad.color || defaultColors[pad.id] || '#5f7f9e';
 
                                         const handlePadFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
                                             const file = e.target.files?.[0];
@@ -190,19 +194,24 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                             cacheActiveVideo(file, file.name);
                                             setActiveVideoBlob(file);
                                             const url = await saveMediaFile(`video-pad-${idx}`, file);
-                                            setVideoPad(idx, { name: file.name, url });
+                                            setVideoPad(idx, { name: file.name, url, color: padColor });
                                             setMp4Asset({ name: file.name, url });
                                             setActiveVideoPadIdx(idx);
                                         };
 
                                         const handlePadDrop = async (e: React.DragEvent) => {
                                             e.preventDefault();
+                                            if (draggedPadIdx !== null && draggedPadIdx !== idx) {
+                                                swapVideoPads(draggedPadIdx, idx);
+                                                setDraggedPadIdx(null);
+                                                return;
+                                            }
                                             const file = e.dataTransfer.files?.[0];
                                             if (file && (file.type.startsWith('video/') || file.name.endsWith('.mp4') || file.name.endsWith('.webm'))) {
                                                 cacheActiveVideo(file, file.name);
                                                 setActiveVideoBlob(file);
                                                 const url = await saveMediaFile(`video-pad-${idx}`, file);
-                                                setVideoPad(idx, { name: file.name, url });
+                                                setVideoPad(idx, { name: file.name, url, color: padColor });
                                                 setMp4Asset({ name: file.name, url });
                                                 setActiveVideoPadIdx(idx);
                                             }
@@ -212,7 +221,12 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
 
                                         return (
                                             <div
-                                                key={pad.id}
+                                                key={`pad-slot-${idx}`}
+                                                draggable
+                                                onDragStart={() => setDraggedPadIdx(idx)}
+                                                onDragOver={(e) => e.preventDefault()}
+                                                onDragEnd={() => setDraggedPadIdx(null)}
+                                                onDrop={handlePadDrop}
                                                 onClick={async () => {
                                                     setActiveVideoPadIdx(idx);
                                                     if (pad.url) useStore.getState().setVideoUrl(pad.url);
@@ -224,16 +238,36 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                                         setActiveVideoBlob(blob);
                                                     }
                                                 }}
-                                                onDragOver={(e) => e.preventDefault()}
-                                                onDrop={handlePadDrop}
-                                                className={`p-1.5 rounded-md border flex flex-col justify-between text-left cursor-pointer transition-all relative group/pad min-w-0 ${
-                                                    isWideZeroPad ? 'col-span-3' : ''
+                                                className={`rounded-md border flex flex-col justify-between text-left cursor-pointer transition-all relative group/pad min-w-0 overflow-hidden ${
+                                                    isWideZeroPad ? 'col-span-3 h-11' : 'h-14'
                                                 } ${
                                                     isActive
-                                                        ? 'bg-[#1c222b] border-[#c98a4d] text-[#e2e5e8] font-bold shadow-xs'
+                                                        ? 'bg-[#1c222b] text-[#e2e5e8] font-bold shadow-xs'
                                                         : 'bg-[#101215] border-[#23272c] text-[#7d848c] hover:bg-[#1a1e23] hover:text-[#e2e5e8] hover:border-[#3a4249]'
                                                 }`}
+                                                style={{
+                                                    borderColor: isActive ? padColor : undefined,
+                                                }}
                                             >
+                                                {/* Color Bar / Accent Line at Top */}
+                                                <div
+                                                    className="h-1.5 w-full shrink-0 relative cursor-pointer group/bar flex items-center justify-end px-1"
+                                                    style={{ backgroundColor: padColor, opacity: isActive ? 1 : 0.6 }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        document.getElementById(colorInputId)?.click();
+                                                    }}
+                                                    title="Click to customize pad color"
+                                                >
+                                                    <input
+                                                        type="color"
+                                                        id={colorInputId}
+                                                        value={padColor}
+                                                        onChange={(e) => setVideoPadColor(idx, e.target.value)}
+                                                        className="opacity-0 absolute w-0 h-0 pointer-events-none"
+                                                    />
+                                                </div>
+
                                                 <input
                                                     type="file"
                                                     id={fileInputId}
@@ -241,24 +275,36 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                                     className="hidden"
                                                     onChange={handlePadFileUpload}
                                                 />
-                                                <div className="flex justify-between items-center w-full mb-1">
-                                                    <span className={`text-[10px] font-semibold font-mono ${isActive ? 'text-[#c98a4d]' : 'text-[#8a9198]'}`}>
-                                                        PAD {pad.id}
-                                                    </span>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            document.getElementById(fileInputId)?.click();
-                                                        }}
-                                                        title="Assign Video File"
-                                                        className="text-[10px] text-[#7d848c] hover:text-[#e2e5e8] hover:bg-[#23272c] w-4 h-4 flex items-center justify-center rounded transition-colors"
-                                                    >
-                                                        +
-                                                    </button>
-                                                </div>
-                                                <div className="text-[9.5px] font-medium truncate w-full flex items-center gap-1 min-w-0">
-                                                    <Video className="w-2.5 h-2.5 shrink-0 opacity-70" />
-                                                    <span className="truncate">{pad.name || 'Drop Video'}</span>
+
+                                                <div className="px-1.5 py-1 flex-1 flex flex-col justify-between min-w-0">
+                                                    <div className="flex justify-between items-center w-full min-w-0 gap-1">
+                                                        <div className="flex items-center gap-1 min-w-0">
+                                                            <GripVertical className="w-2.5 h-2.5 text-[#555] opacity-0 group-hover/pad:opacity-100 cursor-grab shrink-0 transition-opacity" />
+                                                            <span
+                                                                className="text-[9px] font-mono font-bold px-1 rounded shrink-0"
+                                                                style={{
+                                                                    backgroundColor: `${padColor}25`,
+                                                                    color: padColor,
+                                                                }}
+                                                            >
+                                                                #{pad.id}
+                                                            </span>
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                document.getElementById(fileInputId)?.click();
+                                                            }}
+                                                            title="Assign Video File"
+                                                            className="text-[10px] text-[#7d848c] hover:text-[#e2e5e8] hover:bg-[#23272c] w-4 h-4 flex items-center justify-center rounded transition-colors shrink-0"
+                                                        >
+                                                            +
+                                                        </button>
+                                                    </div>
+                                                    <div className="text-[9px] font-medium truncate w-full flex items-center gap-1 min-w-0">
+                                                        <Video className="w-2.5 h-2.5 shrink-0 opacity-60" />
+                                                        <span className="truncate">{pad.name || 'Drop Video'}</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         );

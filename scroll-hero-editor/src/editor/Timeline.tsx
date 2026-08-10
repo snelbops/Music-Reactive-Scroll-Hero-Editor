@@ -109,6 +109,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const clearPadSwitchEvents = useStore(s => s.clearPadSwitchEvents);
     const removePadSwitchEvent = useStore(s => s.removePadSwitchEvent);
     const videoPads = useStore(s => s.videoPads);
+    const activeVideoPadIdx = useStore(s => s.activeVideoPadIdx);
 
     const paramKeyframes = useStore(s => s.paramKeyframes);
     const addParamKeyframe = useStore(s => s.addParamKeyframe);
@@ -593,7 +594,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         if (e.button !== 0) return;
         const target = e.currentTarget;
         const rect = target.getBoundingClientRect();
-        const startTime = Math.max(0, Math.min(SEQUENCE_DURATION, ((e.clientX - rect.left) / rect.width) * SEQUENCE_DURATION));
+        const seqDurTrack = useStore.getState().sequenceDuration;
+        const startTime = Math.max(0, Math.min(seqDurTrack, ((e.clientX - rect.left) / rect.width) * seqDurTrack));
 
         if (!e.shiftKey && activeTool !== 'select') {
             useStore.getState().setTimeSelection(null);
@@ -607,7 +609,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         const onMove = (ev: PointerEvent) => {
             if (ev.buttons & 1) {
                 const r = target.getBoundingClientRect();
-                const currTime = Math.max(0, Math.min(SEQUENCE_DURATION, ((ev.clientX - r.left) / r.width) * SEQUENCE_DURATION));
+                const currTime = Math.max(0, Math.min(seqDurTrack, ((ev.clientX - r.left) / r.width) * seqDurTrack));
                 const start = +Math.min(startTime, currTime).toFixed(2);
                 const end = +Math.max(startTime, currTime).toFixed(2);
                 if (end - start > 0.05) {
@@ -980,137 +982,156 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
     return (
         <footer className="border-t border-editor-border bg-editor-bg flex flex-col z-20" style={{ height }}>
-            <div className="h-9 border-b border-editor-border flex items-center px-4 justify-between bg-editor-panel shrink-0 select-none overflow-x-auto thin-scrollbar min-w-0 gap-3 whitespace-nowrap">
-                <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2 text-[#808080]">
-                        <span className="border-r border-[#333] pr-2 mr-1 flex items-center gap-0.5">
+            <div className="h-9 border-b border-editor-border flex items-center px-2 bg-editor-panel shrink-0 select-none gap-1 min-w-0">
+                {/* LEFT: tools, rhythm, zoom */}
+                <div className="flex items-center gap-1 shrink-0">
+                    <span className="border-r border-[#333] pr-1.5 mr-0.5 flex items-center gap-0.5 text-[#808080]">
+                        <button
+                            title="Undo (Cmd+Z)"
+                            onClick={() => useStore.getState().undo()}
+                            disabled={!canUndo}
+                            className="p-1 rounded transition-colors hover:text-[#d9d9d9] disabled:opacity-25 disabled:cursor-not-allowed"
+                        >
+                            <Undo2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                            title="Redo (Cmd+Shift+Z)"
+                            onClick={() => useStore.getState().redo()}
+                            disabled={!canRedo}
+                            className="p-1 rounded transition-colors hover:text-[#d9d9d9] disabled:opacity-25 disabled:cursor-not-allowed"
+                        >
+                            <Redo2 className="w-3.5 h-3.5" />
+                        </button>
+                    </span>
+                    <span className="border-r border-[#333] pr-1.5 mr-0.5 flex items-center text-[#808080]">
+                        {([
+                            { id: 'select' as const, Icon: MousePointer2, title: 'Select (V)' },
+                            { id: 'pen'    as const, Icon: Pen,           title: 'Pen (P)'    },
+                            { id: 'eraser' as const, Icon: Eraser,        title: 'Eraser (E)' },
+                        ]).map(({ id, Icon, title }) => (
                             <button
-                                title="Undo (Cmd+Z)"
-                                onClick={() => useStore.getState().undo()}
-                                disabled={!canUndo}
-                                className="p-1 rounded transition-colors hover:text-[#d9d9d9] disabled:opacity-25 disabled:cursor-not-allowed"
+                                key={id}
+                                title={title}
+                                onClick={() => setActiveTool(id)}
+                                className={`p-1 rounded transition-colors ${activeTool === id ? 'text-[#d9d9d9]' : 'hover:text-[#d9d9d9]'}`}
                             >
-                                <Undo2 className="w-3.5 h-3.5" />
+                                <Icon className="w-3.5 h-3.5 inline-block mx-0.5" />
                             </button>
-                            <button
-                                title="Redo (Cmd+Shift+Z)"
-                                onClick={() => useStore.getState().redo()}
-                                disabled={!canRedo}
-                                className="p-1 rounded transition-colors hover:text-[#d9d9d9] disabled:opacity-25 disabled:cursor-not-allowed"
-                            >
-                                <Redo2 className="w-3.5 h-3.5" />
-                            </button>
-                        </span>
-                        <span className="border-r border-[#333] pr-2 mr-1">
-                            {([
-                                { id: 'select' as const, Icon: MousePointer2, title: 'Select (V)' },
-                                { id: 'pen'    as const, Icon: Pen,           title: 'Pen (P)'    },
-                                { id: 'eraser' as const, Icon: Eraser,        title: 'Eraser (E)' },
-                            ]).map(({ id, Icon, title }) => (
-                                <button
-                                    key={id}
-                                    title={title}
-                                    onClick={() => setActiveTool(id)}
-                                    className={`p-1 rounded transition-colors ${activeTool === id ? 'text-[#d9d9d9]' : 'hover:text-[#d9d9d9]'}`}
-                                >
-                                    <Icon className="w-3.5 h-3.5 inline-block mx-0.5" />
-                                </button>
-                            ))}
-                        </span>
+                        ))}
+                    </span>
+                    <button
+                        title={snapToBeat ? 'Snap to Beat: ON' : 'Snap to Beat: OFF'}
+                        onClick={() => setSnapToBeat(v => !v)}
+                        className={`p-1 rounded transition-colors text-[#808080] ${snapToBeat ? 'text-editor-accent-purple' : 'hover:text-[#d9d9d9]'}`}
+                    >
+                        <Magnet className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                        title="Auto-Generate Rhythm Curve from Audio Beats"
+                        onClick={() => setShowRhythmModal(true)}
+                        className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-editor-accent-purple/20 hover:bg-editor-accent-purple text-editor-accent-purple hover:text-white font-mono text-[9px] font-bold transition-all border border-editor-accent-purple/30 shrink-0"
+                    >
+                        <span>⚡ RHYTHM</span>
+                    </button>
+                    <button
+                        title="Smooth out bumps & jitter in current curve"
+                        onClick={() => smoothCurrentScrollCurve()}
+                        className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-editor-accent-blue/20 hover:bg-editor-accent-blue text-editor-accent-blue hover:text-white font-mono text-[9px] font-bold transition-all border border-editor-accent-blue/30 shrink-0"
+                    >
+                        <span>✨ SMOOTH</span>
+                    </button>
+                    {/* H-zoom slider */}
+                    <span className="border-l border-[#333] pl-1.5 ml-0.5 flex items-center gap-1 text-[#808080]">
                         <button
-                            title={snapToBeat ? 'Snap to Beat: ON' : 'Snap to Beat: OFF'}
-                            onClick={() => setSnapToBeat(v => !v)}
-                            className={`p-1 rounded transition-colors ${snapToBeat ? 'text-editor-accent-purple' : 'hover:text-[#d9d9d9]'}`}
+                            className="p-1 hover:text-[#d9d9d9] disabled:opacity-30"
+                            title="Zoom Out (Cmd + Scroll Down)"
+                            onClick={() => setTimelineZoom(Math.max(0.25, +(timelineZoom / 1.25).toFixed(2)))}
+                            disabled={timelineZoom <= 0.25}
                         >
-                            <Magnet className="w-3.5 h-3.5" />
+                            <ZoomOut className="w-3.5 h-3.5" />
                         </button>
+                        {/* Horizontal zoom track */}
+                        <div
+                            className="w-14 relative cursor-ew-resize flex items-center"
+                            style={{ height: 16 }}
+                            title={`Horizontal Zoom: ${timelineZoom.toFixed(2)}x (Cmd + Scroll)`}
+                            onPointerDown={(e) => {
+                                e.currentTarget.setPointerCapture(e.pointerId);
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const startX = e.clientX;
+                                const startZoom = timelineZoom;
+                                const onMove = (ev: PointerEvent) => {
+                                    const delta = (ev.clientX - startX) / rect.width;
+                                    const logMin = Math.log(0.25);
+                                    const logMax = Math.log(20.0);
+                                    const curLog = Math.log(startZoom);
+                                    const nextLog = Math.max(logMin, Math.min(logMax, curLog + delta * (logMax - logMin)));
+                                    setTimelineZoom(+Math.exp(nextLog).toFixed(2));
+                                };
+                                const onUp = () => { document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp); };
+                                document.addEventListener('pointermove', onMove);
+                                document.addEventListener('pointerup', onUp);
+                            }}
+                        >
+                            {/* Track line */}
+                            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[2px] bg-[#3a3a3a] rounded-full pointer-events-none" />
+                            {/* Thumb */}
+                            <div
+                                className="absolute w-3 h-3 bg-white rounded-full shadow pointer-events-none"
+                                style={{
+                                    left: `${((Math.log(Math.max(0.25, Math.min(20.0, timelineZoom))) - Math.log(0.25)) / (Math.log(20.0) - Math.log(0.25))) * 100}%`,
+                                    top: '50%',
+                                    transform: 'translate(-50%, -50%)',
+                                }}
+                            />
+                        </div>
                         <button
-                            title="Auto-Generate Rhythm Curve from Audio Beats"
-                            onClick={() => setShowRhythmModal(true)}
-                            className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-editor-accent-purple/20 hover:bg-editor-accent-purple text-editor-accent-purple hover:text-white font-mono text-[9px] font-bold transition-all border border-editor-accent-purple/30 ml-1 shrink-0"
+                            className="p-1 hover:text-[#d9d9d9] disabled:opacity-30"
+                            title="Zoom In (Cmd + Scroll Up)"
+                            onClick={() => setTimelineZoom(Math.min(20.0, +(timelineZoom * 1.25).toFixed(2)))}
+                            disabled={timelineZoom >= 20.0}
                         >
-                            <span>⚡ RHYTHM</span>
+                            <ZoomIn className="w-3.5 h-3.5" />
                         </button>
-                        <button
-                            title="Smooth out bumps & jitter in current curve"
-                            onClick={() => smoothCurrentScrollCurve()}
-                            className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-editor-accent-blue/20 hover:bg-editor-accent-blue text-editor-accent-blue hover:text-white font-mono text-[9px] font-bold transition-all border border-editor-accent-blue/30 ml-1 shrink-0"
+                    </span>
+                    {/* V-zoom slider */}
+                    <div className="flex items-center text-[#808080] gap-1">
+                        <span className="text-[9px] font-mono">V</span>
+                        <div
+                            className="w-12 relative cursor-ew-resize flex items-center"
+                            style={{ height: 16 }}
+                            onPointerDown={e => {
+                                e.currentTarget.setPointerCapture(e.pointerId);
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const startX = e.clientX;
+                                const startV = verticalZoom;
+                                const onMove = (ev: PointerEvent) => {
+                                    const delta = (ev.clientX - startX) / rect.width;
+                                    setVerticalZoom(Math.max(0.4, Math.min(4, +(startV + delta * 3.6).toFixed(2))));
+                                };
+                                const onUp = () => { document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp); };
+                                document.addEventListener('pointermove', onMove);
+                                document.addEventListener('pointerup', onUp);
+                            }}
                         >
-                            <span>✨ SMOOTH</span>
-                        </button>
-                        <span className="border-l border-[#333] pl-2 ml-1 flex items-center gap-2">
-                            <div className="flex items-center text-[#808080]">
-                                <button
-                                    className="p-1 hover:text-[#d9d9d9] disabled:opacity-30"
-                                    title="Zoom Out (Cmd + Scroll Down)"
-                                    onClick={() => setTimelineZoom(Math.max(0.25, +(timelineZoom / 1.25).toFixed(2)))}
-                                    disabled={timelineZoom <= 0.25}
-                                >
-                                    <ZoomOut className="w-3.5 h-3.5" />
-                                </button>
-                                <div
-                                    className="w-14 h-[3px] bg-[#23272c] relative cursor-ew-resize mx-1 rounded-full"
-                                    title={`Horizontal Zoom: ${timelineZoom.toFixed(2)}x (Cmd + Scroll)`}
-                                    onPointerDown={(e) => {
-                                        e.currentTarget.setPointerCapture(e.pointerId);
-                                        const rect = e.currentTarget.getBoundingClientRect();
-                                        const startX = e.clientX;
-                                        const startZoom = timelineZoom;
-                                        const onMove = (ev: PointerEvent) => {
-                                            const delta = (ev.clientX - startX) / rect.width;
-                                            const logMin = Math.log(0.25);
-                                            const logMax = Math.log(20.0);
-                                            const curLog = Math.log(startZoom);
-                                            const nextLog = Math.max(logMin, Math.min(logMax, curLog + delta * (logMax - logMin)));
-                                            setTimelineZoom(+Math.exp(nextLog).toFixed(2));
-                                        };
-                                        const onUp = () => { document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp); };
-                                        document.addEventListener('pointermove', onMove);
-                                        document.addEventListener('pointerup', onUp);
-                                    }}
-                                >
-                                    <div
-                                        className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-[#c98a4d] rounded-full pointer-events-none"
-                                        style={{
-                                            left: `${((Math.log(Math.max(0.25, Math.min(20.0, timelineZoom))) - Math.log(0.25)) / (Math.log(20.0) - Math.log(0.25))) * 100}%`,
-                                            transform: `translate(-50%, -50%)`
-                                        }}
-                                    />
-                                </div>
-                                <button
-                                    className="p-1 hover:text-[#d9d9d9] disabled:opacity-30"
-                                    title="Zoom In (Cmd + Scroll Up)"
-                                    onClick={() => setTimelineZoom(Math.min(20.0, +(timelineZoom * 1.25).toFixed(2)))}
-                                    disabled={timelineZoom >= 20.0}
-                                >
-                                    <ZoomIn className="w-3.5 h-3.5" />
-                                </button>
-                            </div>
-                            <div className="flex items-center text-[#808080] ml-2">
-                                <span className="text-[9px] font-mono mr-0.5">V</span>
-                                <div className="w-12 h-[2px] bg-[#333] relative cursor-ew-resize mx-1"
-                                    onPointerDown={e => {
-                                        e.currentTarget.setPointerCapture(e.pointerId);
-                                        const rect = e.currentTarget.getBoundingClientRect();
-                                        const startX = e.clientX;
-                                        const startV = verticalZoom;
-                                        const onMove = (ev: PointerEvent) => {
-                                            const delta = (ev.clientX - startX) / rect.width;
-                                            setVerticalZoom(Math.max(0.4, Math.min(4, +(startV + delta * 3.6).toFixed(2))));
-                                        };
-                                        const onUp = () => { document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp); };
-                                        document.addEventListener('pointermove', onMove);
-                                        document.addEventListener('pointerup', onUp);
-                                    }}
-                                >
-                                    <div className="absolute top-1/2 -translate-y-1/2 w-2 h-2 bg-[#808080] rounded-sm" style={{ left: `${((verticalZoom - 0.4) / 3.6) * 100}%`, transform: `translate(-50%, -50%)` }}></div>
-                                </div>
-                            </div>
-                        </span>
+                            {/* Track line */}
+                            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[2px] bg-[#3a3a3a] rounded-full pointer-events-none" />
+                            {/* Thumb */}
+                            <div
+                                className="absolute w-3 h-3 bg-white rounded-full shadow pointer-events-none"
+                                style={{
+                                    left: `${((verticalZoom - 0.4) / 3.6) * 100}%`,
+                                    top: '50%',
+                                    transform: 'translate(-50%, -50%)',
+                                }}
+                            />
+                        </div>
                     </div>
                 </div>
-                <div className="absolute left-[60%] -translate-x-1/2 flex items-center space-x-6">
-                    <div className="flex items-center space-x-2 text-[#808080]">
+
+                {/* CENTER: transport + solo — grows/shrinks to fill available space, centered */}
+                <div className="flex-1 flex items-center justify-center gap-4 min-w-0 overflow-hidden">
+                    <div className="flex items-center space-x-2 text-[#808080] shrink-0">
                         <button
                             className="p-1 hover:text-[#d9d9d9] transition-colors"
                             onClick={() => seekTo(0)}
@@ -1146,7 +1167,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     </div>
 
                     {/* Parameter Isolation Solo Selector */}
-                    <div className="flex items-center gap-1 bg-[#181818] border border-[#2e2e2e] rounded px-1.5 py-0.5 text-[9px] font-mono">
+                    <div className="flex items-center gap-1 bg-[#181818] border border-[#2e2e2e] rounded px-1.5 py-0.5 text-[9px] font-mono shrink-0">
                         <SlidersHorizontal className="w-3 h-3 text-editor-accent-purple shrink-0" />
                         <span className="text-[#808080] text-[8px] uppercase font-bold mr-1">Solo:</span>
                         <button
@@ -1181,7 +1202,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         </button>
                     </div>
                 </div>
-                <div className="flex items-center gap-3 pl-4 pr-2">
+
+                {/* RIGHT: LEN + timecode */}
+                <div className="flex items-center gap-3 pl-2 shrink-0">
                     <div className="flex items-center gap-1 text-[10px] text-[#808080]">
                         <span>LEN:</span>
                         <input
@@ -1198,6 +1221,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         {new Date(seqTime * 1000).toISOString().slice(11, 23).replace('.', ':')}
                     </div>
                 </div>
+
             </div>
             <div ref={lanesRef} className="flex-1 overflow-y-auto overflow-x-auto thin-scrollbar relative select-none cursor-col-resize" onMouseDown={handleLanesMouseDown}>
                 <div className="relative" style={{ width: timelineZoom !== 1 ? `${timelineZoom * 100}%` : '100%', minHeight: '100%' }}>
@@ -1391,37 +1415,120 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             >✕</button>
                         )}
                     </div>
-                    <div className="flex-1 relative overflow-hidden bg-amber-500/[0.03] flex items-center">
+                    <div className="flex-1 relative overflow-hidden bg-[#141619] flex items-center">
                         {padSwitchEvents.length === 0 ? (
                             <span className="text-[10px] text-editor-muted italic px-3">Press Numpad [7..0] during recording to log video pad switches...</span>
                         ) : (
-                            <div className="absolute inset-0 w-full h-full pointer-events-auto">
-                                {padSwitchEvents.map((ev, i) => {
-                                    const leftPct = (ev.time / sequenceDuration) * 100;
-                                    const padInfo = videoPads[ev.padIdx];
-                                    const padLabel = padInfo ? `PAD ${padInfo.id}` : `PAD ${ev.padIdx}`;
-                                    return (
-                                        <div
-                                            key={i}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                useStore.getState().setPlayheadPosition(ev.time);
-                                                useStore.getState().setActiveVideoPadIdx(ev.padIdx);
-                                            }}
-                                            onContextMenu={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                removePadSwitchEvent(ev.time);
-                                            }}
-                                            title={`Click to seek (Time: ${ev.time.toFixed(2)}s, ${padLabel}) | Right-click to delete`}
-                                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/60 hover:bg-amber-500 hover:text-black cursor-pointer shadow-sm transition-all z-20 flex items-center gap-1"
-                                            style={{ left: `${leftPct}%` }}
-                                        >
-                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                                            <span>{padLabel}</span>
-                                        </div>
-                                    );
-                                })}
+                            <div className="absolute inset-0 w-full h-full pointer-events-auto flex">
+                                {(() => {
+                                    const sorted = [...padSwitchEvents].sort((a, b) => a.time - b.time);
+                                    const segments: Array<{ startTime: number; endTime: number; padIdx: number; eventTime: number | null }> = [];
+                                    if (sorted[0].time > 0) {
+                                        segments.push({ startTime: 0, endTime: sorted[0].time, padIdx: activeVideoPadIdx, eventTime: null });
+                                    }
+                                    sorted.forEach((ev, i) => {
+                                        const end = i < sorted.length - 1 ? sorted[i + 1].time : sequenceDuration;
+                                        segments.push({ startTime: ev.time, endTime: end, padIdx: ev.padIdx, eventTime: ev.time });
+                                    });
+
+                                    return segments.map((seg, idx) => {
+                                        const leftPct = (seg.startTime / sequenceDuration) * 100;
+                                        const widthPct = Math.max(0.2, ((seg.endTime - seg.startTime) / sequenceDuration) * 100);
+                                        const padInfo = videoPads[seg.padIdx];
+                                        const defaultColors: Record<number, string> = { 7: '#5f7f9e', 8: '#6e9c73', 9: '#a86a5c', 4: '#7a6fa8', 5: '#c98a4d', 6: '#5f9e96', 1: '#9e7a5f', 2: '#7d848c', 3: '#8a9e6e', 0: '#6e7a9e' };
+                                        const padColor = padInfo?.color || (padInfo ? defaultColors[padInfo.id] : undefined) || '#c98a4d';
+                                        const padLabel = padInfo ? `#${padInfo.id} · ${padInfo.name}` : `PAD ${seg.padIdx}`;
+                                        const durSec = seg.endTime - seg.startTime;
+
+                                        return (
+                                            <div
+                                                key={`pad-clip-${idx}`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    useStore.getState().setPlayheadPosition(seg.startTime);
+                                                    useStore.getState().setActiveVideoPadIdx(seg.padIdx);
+                                                }}
+                                                onContextMenu={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    if (seg.eventTime !== null) removePadSwitchEvent(seg.eventTime);
+                                                }}
+                                                onPointerDown={(e) => {
+                                                    if (seg.eventTime === null) return;
+                                                    e.stopPropagation();
+                                                    const targetEl = e.currentTarget as HTMLElement;
+                                                    targetEl.setPointerCapture(e.pointerId);
+                                                    const trackEl = targetEl.parentElement?.parentElement as HTMLElement;
+                                                    const trackRect = trackEl?.getBoundingClientRect() ?? targetEl.getBoundingClientRect();
+                                                    const startX = e.clientX;
+                                                    const origTime = seg.eventTime;
+
+                                                    const onMove = (ev: PointerEvent) => {
+                                                        if (!(ev.buttons & 1)) return;
+                                                        const dx = ev.clientX - startX;
+                                                        const dt = (dx / trackRect.width) * sequenceDuration;
+                                                        const newTime = Math.max(0, Math.min(sequenceDuration - 0.1, +(origTime + dt).toFixed(2)));
+                                                        useStore.getState().removePadSwitchEvent(origTime);
+                                                        useStore.getState().addPadSwitchEvent(newTime, seg.padIdx);
+                                                    };
+                                                    const onUp = () => {
+                                                        targetEl.removeEventListener('pointermove', onMove as any);
+                                                        targetEl.removeEventListener('pointerup', onUp as any);
+                                                    };
+                                                    targetEl.addEventListener('pointermove', onMove as any);
+                                                    targetEl.addEventListener('pointerup', onUp as any);
+                                                }}
+                                                title={`Pad Clip: ${padLabel} (${durSec.toFixed(2)}s) | Drag to move clip | Right-click to delete`}
+                                                className="absolute top-0.5 bottom-0.5 rounded border border-[#23272c] hover:border-white/60 cursor-pointer shadow-xs transition-all z-20 flex items-center justify-between px-2 overflow-hidden group/clip"
+                                                style={{
+                                                    left: `${leftPct}%`,
+                                                    width: `${widthPct}%`,
+                                                    backgroundColor: `${padColor}35`,
+                                                    borderLeft: `3px solid ${padColor}`,
+                                                }}
+                                            >
+                                                <div className="flex items-center gap-1 min-w-0 truncate">
+                                                    <span className="text-[9px] font-mono font-bold px-1 rounded shrink-0" style={{ backgroundColor: `${padColor}40`, color: '#fff' }}>
+                                                        #{padInfo?.id ?? seg.padIdx}
+                                                    </span>
+                                                    <span className="text-[9px] font-mono font-semibold text-[#e2e5e8] truncate">{padInfo?.name || `Pad ${seg.padIdx}`}</span>
+                                                </div>
+                                                <span className="text-[8.5px] font-mono text-[#8a9198] shrink-0 ml-1 opacity-70 group-hover/clip:opacity-100">{durSec.toFixed(1)}s</span>
+
+                                                {/* Resize Edge Handle on left edge if not time 0 */}
+                                                {seg.eventTime !== null && (
+                                                    <div
+                                                        className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-white/40 z-30"
+                                                        onPointerDown={(e) => {
+                                                            e.stopPropagation();
+                                                            const handleEl = e.currentTarget as HTMLElement;
+                                                            handleEl.setPointerCapture(e.pointerId);
+                                                            const trackEl = handleEl.closest('.flex-1') as HTMLElement;
+                                                            const trackRect = trackEl?.getBoundingClientRect() ?? handleEl.getBoundingClientRect();
+                                                            const startX = e.clientX;
+                                                            const origTime = seg.eventTime!;
+
+                                                            const onMove = (ev: PointerEvent) => {
+                                                                if (!(ev.buttons & 1)) return;
+                                                                const dx = ev.clientX - startX;
+                                                                const dt = (dx / trackRect.width) * sequenceDuration;
+                                                                const newTime = Math.max(0, Math.min(sequenceDuration - 0.1, +(origTime + dt).toFixed(2)));
+                                                                useStore.getState().removePadSwitchEvent(origTime);
+                                                                useStore.getState().addPadSwitchEvent(newTime, seg.padIdx);
+                                                            };
+                                                            const onUp = () => {
+                                                                handleEl.removeEventListener('pointermove', onMove as any);
+                                                                handleEl.removeEventListener('pointerup', onUp as any);
+                                                            };
+                                                            handleEl.addEventListener('pointermove', onMove as any);
+                                                            handleEl.addEventListener('pointerup', onUp as any);
+                                                        }}
+                                                    />
+                                                )}
+                                            </div>
+                                        );
+                                    });
+                                })()}
                             </div>
                         )}
                     </div>
@@ -1567,6 +1674,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         }}
                         onPointerDown={(e) => {
                             if (activeTool === 'select') {
+                                // Fix 6: stop propagation so handleLanesMouseDown doesn't also seek playhead
+                                e.stopPropagation();
                                 setSelectedLane('scrollPos');
                                 const targetEl = e.currentTarget as HTMLElement;
                                 const rect = targetEl.getBoundingClientRect();
@@ -1586,10 +1695,13 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     const minY = Math.min(startY, curY);
                                     const maxY = Math.max(startY, curY);
 
+                                    const seqDur = useStore.getState().sequenceDuration;
                                     const currentKfs = useStore.getState().scrollKeyframes;
+                                    const laneH = r.height;
                                     const selected = currentKfs.filter(kf => {
-                                        const kfX = (kf.time / SEQUENCE_DURATION) * r.width;
-                                        const kfY = (1 - kf.value) * r.height;
+                                        // Fix 1: use dynamic sequenceDuration for X, include Y check
+                                        const kfX = (kf.time / seqDur) * r.width;
+                                        const kfY = (1 - kf.value) * laneH;
                                         return kfX >= minX && kfX <= maxX && kfY >= minY && kfY <= maxY;
                                     }).map(kf => ({ laneId: 'scrollPos', position: kf.time, value: kf.value }));
 
@@ -1620,7 +1732,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             if (activeTool === 'eraser') {
                                 const eraseAt = (clientX: number, clientY: number) => {
                                     const rect = target.getBoundingClientRect();
-                                    const clickTime = Math.max(0, Math.min(SEQUENCE_DURATION, ((clientX - rect.left) / rect.width) * SEQUENCE_DURATION));
+                                    const seqDur = useStore.getState().sequenceDuration;
+                                    const clickTime = Math.max(0, Math.min(seqDur, ((clientX - rect.left) / rect.width) * seqDur));
                                     const clickVal = Math.max(0, Math.min(1, 1 - (clientY - rect.top) / rect.height));
 
                                     const kfs = useStore.getState().scrollKeyframes;
@@ -1647,7 +1760,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
                             const addPoint = (clientX: number, clientY: number) => {
                                 const rect = target.getBoundingClientRect();
-                                const rawTime = Math.max(0, Math.min(SEQUENCE_DURATION, ((clientX - rect.left) / rect.width) * SEQUENCE_DURATION));
+                                const seqDur = useStore.getState().sequenceDuration;
+                                const rawTime = Math.max(0, Math.min(seqDur, ((clientX - rect.left) / rect.width) * seqDur));
                                 const time = snapTimeToBeat(rawTime);
                                 const rawVal = Math.max(0, Math.min(1, 1 - (clientY - rect.top) / rect.height));
 
@@ -1878,9 +1992,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             left: `calc(${(kf.time / sequenceDuration) * 100}% - 3px)`,
                                             top: `calc(${(1 - kf.value) * 100}% - 3px)`,
                                             borderColor: isSelected ? '#ffffff' : '#3b82f6',
-                                            borderWidth: isSelected ? '2px' : '1.5px',
-                                            backgroundColor: isSelected ? '#c98a4d' : '#60a5fa',
-                                            boxShadow: isSelected ? '0 0 6px rgba(201, 138, 77, 0.9)' : 'none',
+                                            borderWidth: '1.5px',
+                                            backgroundColor: isSelected ? '#fbbf24' : '#60a5fa',
                                         }}
                                         onMouseDown={(e) => e.stopPropagation()}
                                         onClick={(e) => {
@@ -1915,9 +2028,15 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 setSelectedKeyframes(activeSelection);
                                             }
 
+                                            // Fix 2: capture lane track rect at pointerdown to avoid stale/wrong rect during move
+                                            const trackEl = (e.currentTarget as HTMLElement).closest('[data-lane-track]') as HTMLElement | null
+                                                ?? (e.currentTarget as HTMLElement).parentElement?.parentElement as HTMLElement;
+                                            const trackRect = trackEl?.getBoundingClientRect() ?? (e.currentTarget as HTMLElement).getBoundingClientRect();
+
                                             draggingKfRef.current = {
                                                 startClientX: e.clientX,
                                                 startClientY: e.clientY,
+                                                trackRect,
                                                 origKfs: activeSelection,
                                                 initialScrollKfs: useStore.getState().scrollKeyframes,
                                                 initialParamKfs: useStore.getState().paramKeyframes,
@@ -1925,9 +2044,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         }}
                                         onPointerMove={(e) => {
                                             if (!draggingKfRef.current || !(e.buttons & 1)) return;
-                                            const { startClientX, startClientY, origKfs, initialScrollKfs, initialParamKfs } = draggingKfRef.current as any;
-                                            const container = (e.target as HTMLElement).parentElement!;
-                                            const rect = container.getBoundingClientRect();
+                                            const { startClientX, startClientY, trackRect, origKfs, initialScrollKfs, initialParamKfs } = draggingKfRef.current as any;
+                                            // Fix 2: use captured trackRect instead of live parentElement rect
+                                            const rect = trackRect as DOMRect;
 
                                             const dx = e.clientX - startClientX;
                                             const dy = e.clientY - startClientY;
@@ -1942,8 +2061,11 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 const range = laneCfg.max - laneCfg.min;
                                                 const deltaV = normDeltaValue * range;
 
-                                                const newTime = Math.max(0, Math.min(sequenceDuration, +(orig.position + (isShift ? deltaTime : 0)).toFixed(2)));
-                                                const newValue = Math.max(laneCfg.min, Math.min(laneCfg.max, +(orig.value + (isShift ? 0 : deltaV)).toFixed(3)));
+                                                const applyTimeDelta = isShift ? (Math.abs(dx) >= Math.abs(dy) ? deltaTime : 0) : deltaTime;
+                                                const applyValueDelta = isShift ? (Math.abs(dy) > Math.abs(dx) ? deltaV : 0) : deltaV;
+
+                                                const newTime = Math.max(0, Math.min(sequenceDuration, +(orig.position + applyTimeDelta).toFixed(2)));
+                                                const newValue = Math.max(laneCfg.min, Math.min(laneCfg.max, +(orig.value + applyValueDelta).toFixed(3)));
                                                 return { laneId: orig.laneId, position: newTime, value: newValue };
                                             });
 
@@ -1959,7 +2081,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 setScrollKeyframes(mergedScroll);
                                             }
 
-                                            // Apply to affected parameter lanes
+                                            // Apply to affected parameter lanes — Fix 5: preserve easing/handles
                                             const affectedParamLanes = new Set<string>(origKfs.filter((s: any) => s.laneId !== 'scrollPos').map((s: any) => s.laneId));
                                             affectedParamLanes.forEach((lId: string) => {
                                                 const laneOrigs = origKfs.filter((s: any) => s.laneId === lId);
@@ -1968,7 +2090,17 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 const remainingParam = initialLaneKfs.filter((k: ParamKf) => !Array.from(laneOrigTimes).some((t: any) => Math.abs(k.time - t) < 0.01));
                                                 const updatedParam = updatedSelection.filter((s: any) => s.laneId === lId);
                                                 const mergedParam = remainingParam
-                                                    .concat(updatedParam.map((s: any) => ({ time: s.position, value: s.value, easing: 'linear' })))
+                                                    .concat(updatedParam.map((s: any) => {
+                                                        const origKf = initialLaneKfs.find((k: ParamKf) => Math.abs(k.time - s.position) < 0.015
+                                                            || laneOrigs.some((lo: any) => Math.abs(lo.position - s.position) < 0.015 && Math.abs(k.time - lo.position) < 0.015));
+                                                        return {
+                                                            time: s.position,
+                                                            value: s.value,
+                                                            easing: origKf?.easing ?? 'linear',
+                                                            handleIn: origKf?.handleIn,
+                                                            handleOut: origKf?.handleOut,
+                                                        };
+                                                    }))
                                                     .sort((a: ParamKf, b: ParamKf) => a.time - b.time);
                                                 setParamKeyframes(lId, mergedParam as ParamKf[]);
                                             });
@@ -2036,17 +2168,16 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 }}
                                 onDoubleClick={(e) => {
                                     e.stopPropagation();
-                                    const el = lanesRef.current;
-                                    if (!el) return;
-                                    const rect = el.getBoundingClientRect();
-                                    const x = e.clientX - rect.left + el.scrollLeft - LABEL_W;
-                                    const laneTrackW = lanesWidth * timelineZoom - LABEL_W;
-                                    const t = Math.max(0, Math.min(1, x / laneTrackW)) * sequenceDuration;
+                                    // Fix 4: use lane track element's own rect, not the outer scrollable container
+                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                    const t = Math.max(0, Math.min(sequenceDuration, ((e.clientX - rect.left) / rect.width) * sequenceDuration));
                                     const existing = interpolateParamAt(kfs, t);
                                     addParamKeyframe(lane.id, t, existing ?? currentVal);
                                 }}
                                 onPointerDown={(e) => {
                                     if (activeTool === 'select') {
+                                        // Fix 6: stop propagation so handleLanesMouseDown doesn't also seek playhead
+                                        e.stopPropagation();
                                         setSelectedLane(lane.id);
                                         const targetEl = e.currentTarget as HTMLElement;
                                         const rect = targetEl.getBoundingClientRect();
@@ -2063,11 +2194,17 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
                                             const minX = Math.min(startX, curX);
                                             const maxX = Math.max(startX, curX);
+                                            const minY = Math.min(startY, curY);
+                                            const maxY = Math.max(startY, curY);
 
                                             const currentKfs = (useStore.getState().paramKeyframes[lane.id] ?? []) as ParamKf[];
                                             const selected = currentKfs.filter(kf => {
+                                                // Fix 1: check both X and Y for accurate marquee selection
                                                 const kfX = (kf.time / sequenceDuration) * r.width;
-                                                return kfX >= minX && kfX <= maxX;
+                                                // normalY maps value to VB space; convert to pixel %
+                                                const normYRatio = (1 - (kf.value - lane.min) / (lane.max - lane.min));
+                                                const kfY = normYRatio * r.height;
+                                                return kfX >= minX && kfX <= maxX && kfY >= minY && kfY <= maxY;
                                             }).map(kf => ({ laneId: lane.id, position: kf.time, value: kf.value }));
 
                                             setSelectedKeyframes(selected);
@@ -2097,7 +2234,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     if (activeTool === 'eraser') {
                                         const eraseAt = (clientX: number, clientY: number) => {
                                             const rect = target.getBoundingClientRect();
-                                            const clickTime = Math.max(0, Math.min(SEQUENCE_DURATION, ((clientX - rect.left) / rect.width) * SEQUENCE_DURATION));
+                                            // Fix 3: use sequenceDuration (dynamic) not SEQUENCE_DURATION (hardcoded 10)
+                                            const seqDur = useStore.getState().sequenceDuration;
+                                            const clickTime = Math.max(0, Math.min(seqDur, ((clientX - rect.left) / rect.width) * seqDur));
                                             const clickVal = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - (clientY - rect.top) / rect.height) * (lane.max - lane.min)));
 
                                             const currentKfs = (useStore.getState().paramKeyframes[lane.id] ?? []) as ParamKf[];
@@ -2119,7 +2258,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
                                     useStore.getState().pushHistory();
                                     const rect = target.getBoundingClientRect();
-                                    const rawTime = Math.max(0, Math.min(SEQUENCE_DURATION, ((e.clientX - rect.left) / rect.width) * SEQUENCE_DURATION));
+                                    const seqDurPen = useStore.getState().sequenceDuration;
+                                    // Fix 3: use sequenceDuration not SEQUENCE_DURATION
+                                    const rawTime = Math.max(0, Math.min(seqDurPen, ((e.clientX - rect.left) / rect.width) * seqDurPen));
                                     const time = snapTimeToBeat(rawTime);
                                     const value = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - (e.clientY - rect.top) / rect.height) * (lane.max - lane.min)));
                                     addParamKeyframe(lane.id, time, value);
@@ -2127,7 +2268,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     const onMove = (ev: PointerEvent) => {
                                         if (ev.buttons & 1) {
                                             const r = target.getBoundingClientRect();
-                                            const rt = Math.max(0, Math.min(SEQUENCE_DURATION, ((ev.clientX - r.left) / r.width) * SEQUENCE_DURATION));
+                                            const seqDurMove = useStore.getState().sequenceDuration;
+                                            const rt = Math.max(0, Math.min(seqDurMove, ((ev.clientX - r.left) / r.width) * seqDurMove));
                                             const t = snapTimeToBeat(rt);
                                             const v = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - (ev.clientY - r.top) / r.height) * (lane.max - lane.min)));
                                             addParamKeyframe(lane.id, t, v);
@@ -2282,9 +2424,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             left: `calc(${(kf.time / sequenceDuration) * 100}% - 3px)`,
                                             top: `calc(${normalY(kf.value) / VB_H * 100}% - 3px)`,
                                             borderColor: kfSelected ? '#ffffff' : lane.color,
-                                            borderWidth: kfSelected ? '2px' : '1.5px',
-                                            backgroundColor: kfSelected ? '#c98a4d' : lane.color,
-                                            boxShadow: kfSelected ? '0 0 6px rgba(201, 138, 77, 0.9)' : 'none',
+                                            borderWidth: '1.5px',
+                                            backgroundColor: kfSelected ? '#fbbf24' : lane.color,
                                         }}
                                         onMouseDown={(e) => e.stopPropagation()}
                                         onClick={(e) => {
@@ -2315,10 +2456,17 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 setSelectedKeyframes(activeSelection);
                                             }
 
+                                            // Fix 2: capture lane track rect at pointerdown
+                                            const dotEl = e.currentTarget as HTMLElement;
+                                            // The dot's parent chain: dot -> pointer-events-none div -> lane track div
+                                            const trackEl = dotEl.parentElement?.parentElement as HTMLElement | null;
+                                            const trackRect = trackEl?.getBoundingClientRect() ?? dotEl.getBoundingClientRect();
+
                                             draggingParamKfRef.current = {
                                                 laneId: lane.id,
                                                 startClientX: e.clientX,
                                                 startClientY: e.clientY,
+                                                trackRect,
                                                 origKfs: activeSelection,
                                                 initialScrollKfs: useStore.getState().scrollKeyframes,
                                                 initialParamKfs: useStore.getState().paramKeyframes,
@@ -2326,9 +2474,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         }}
                                         onPointerMove={(e) => {
                                             if (!draggingParamKfRef.current || !(e.buttons & 1)) return;
-                                            const { startClientX, startClientY, origKfs, initialScrollKfs, initialParamKfs } = draggingParamKfRef.current as any;
-                                            const container = (e.target as HTMLElement).parentElement!;
-                                            const rect = container.getBoundingClientRect();
+                                            const { startClientX, startClientY, trackRect, origKfs, initialScrollKfs, initialParamKfs } = draggingParamKfRef.current as any;
+                                            // Fix 2: use captured trackRect
+                                            const rect = trackRect as DOMRect;
 
                                             const dx = e.clientX - startClientX;
                                             const dy = e.clientY - startClientY;
@@ -2343,8 +2491,11 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 const range = laneCfg.max - laneCfg.min;
                                                 const deltaV = normDeltaValue * range;
 
-                                                const newTime = Math.max(0, Math.min(sequenceDuration, +(orig.position + (isShift ? deltaTime : 0)).toFixed(2)));
-                                                const newValue = Math.max(laneCfg.min, Math.min(laneCfg.max, +(orig.value + (isShift ? 0 : deltaV)).toFixed(3)));
+                                                const applyTimeDelta = isShift ? (Math.abs(dx) >= Math.abs(dy) ? deltaTime : 0) : deltaTime;
+                                                const applyValueDelta = isShift ? (Math.abs(dy) > Math.abs(dx) ? deltaV : 0) : deltaV;
+
+                                                const newTime = Math.max(0, Math.min(sequenceDuration, +(orig.position + applyTimeDelta).toFixed(2)));
+                                                const newValue = Math.max(laneCfg.min, Math.min(laneCfg.max, +(orig.value + applyValueDelta).toFixed(3)));
                                                 return { laneId: orig.laneId, position: newTime, value: newValue };
                                             });
 
@@ -2360,7 +2511,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 setScrollKeyframes(mergedScroll);
                                             }
 
-                                            // Apply to affected parameter lanes
+                                            // Apply to affected parameter lanes — Fix 5: preserve easing/handles
                                             const affectedParamLanes = new Set<string>(origKfs.filter((s: any) => s.laneId !== 'scrollPos').map((s: any) => s.laneId));
                                             affectedParamLanes.forEach((lId: string) => {
                                                 const laneOrigs = origKfs.filter((s: any) => s.laneId === lId);
@@ -2369,7 +2520,19 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 const remainingParam = initialLaneKfs.filter((k: ParamKf) => !Array.from(laneOrigTimes).some((t: any) => Math.abs(k.time - t) < 0.01));
                                                 const updatedParam = updatedSelection.filter((s: any) => s.laneId === lId);
                                                 const mergedParam = remainingParam
-                                                    .concat(updatedParam.map((s: any) => ({ time: s.position, value: s.value, easing: 'linear' })))
+                                                    .concat(updatedParam.map((s: any) => {
+                                                        const matchOrig = laneOrigs.find((lo: any) => Math.abs(lo.position - s.position) < 0.02);
+                                                        const origKf = matchOrig
+                                                            ? initialLaneKfs.find((k: ParamKf) => Math.abs(k.time - matchOrig.position) < 0.015)
+                                                            : undefined;
+                                                        return {
+                                                            time: s.position,
+                                                            value: s.value,
+                                                            easing: origKf?.easing ?? 'linear',
+                                                            handleIn: origKf?.handleIn,
+                                                            handleOut: origKf?.handleOut,
+                                                        };
+                                                    }))
                                                     .sort((a: ParamKf, b: ParamKf) => a.time - b.time);
                                                 setParamKeyframes(lId, mergedParam as ParamKf[]);
                                             });
