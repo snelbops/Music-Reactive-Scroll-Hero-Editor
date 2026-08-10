@@ -1,4 +1,4 @@
-import { useCurrentFrame, useVideoConfig, OffthreadVideo, Audio } from 'remotion';
+import { useCurrentFrame, useVideoConfig, OffthreadVideo, Audio, Sequence } from 'remotion';
 import { interpolateScrollAt, type ScrollKf } from '../utils/interpolate';
 
 export interface ScrollHeroRemotionProps {
@@ -56,29 +56,31 @@ export const ScrollHeroRemotion: React.FC<ScrollHeroRemotionProps> = ({
         targetVideoSeconds = currentTimelineTime;
     }
 
-    // Match the player's clamp: Math.max(0, Math.min(v.duration - 0.01, targetTime))
+    // Match the player's clamp: Math.max(0, Math.min(v.duration - 0.033, targetTime))
     targetVideoSeconds = Math.max(0, Math.min(videoDuration - 0.033, targetVideoSeconds));
 
-    // OffthreadVideo renders each Remotion frame independently.
-    // At composition frame N, the video position is: startFrom + N
-    // So to land at targetFrame at composition frame N: startFrom = targetFrame - N
-    const targetVideoFrame = Math.round(targetVideoSeconds * fps);
-    const videoStartFrom = targetVideoFrame - frame;
+    // Target frame in the video asset to display on THIS composition frame
+    const targetVideoFrame = Math.max(0, Math.round(targetVideoSeconds * fps));
     // ─────────────────────────────────────────────────────────────────────────
 
     return (
         <div style={{ width, height, backgroundColor: '#0a0a0f', position: 'relative', overflow: 'hidden' }}>
             {videoUrl ? (
-                <OffthreadVideo
-                    src={videoUrl}
-                    style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'contain',
-                        transform: mirrorVideo ? 'scaleX(-1)' : 'none',
-                    }}
-                    startFrom={videoStartFrom}
-                />
+                /* Sequence from={frame} durationInFrames={1} resets local frame to 0,
+                   allowing startFrom={targetVideoFrame} to accurately seek any frame non-linearly
+                   without ever causing a negative startFrom error. */
+                <Sequence from={frame} durationInFrames={1}>
+                    <OffthreadVideo
+                        src={videoUrl}
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'contain',
+                            transform: mirrorVideo ? 'scaleX(-1)' : 'none',
+                        }}
+                        startFrom={targetVideoFrame}
+                    />
+                </Sequence>
             ) : (
                 <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
                     <p style={{ fontSize: 24, fontFamily: 'sans-serif' }}>Scroll Hero Animation — Frame {frame}</p>
