@@ -25,6 +25,7 @@ interface EditorState {
     isDarkMode: boolean; setIsDarkMode: (dark: boolean) => void;
     isPlaying: boolean; setIsPlaying: (playing: boolean) => void;
     videoUrl: string | null; setVideoUrl: (url: string | null) => void;
+    activeVideoBlob: Blob | null; setActiveVideoBlob: (blob: Blob | null) => void;
     audioUrl: string | null; setAudioUrl: (url: string | null) => void;
     isRecording: boolean; setIsRecording: (rec: boolean) => void;
     recordCountdown: number | null; setRecordCountdown: (n: number | null) => void;
@@ -112,6 +113,7 @@ export const useStore = create<EditorState>((set, get) => {
     },
     isPlaying: false, setIsPlaying: (playing) => set({ isPlaying: playing }),
     videoUrl: null, setVideoUrl: (url) => set({ videoUrl: url }),
+    activeVideoBlob: null, setActiveVideoBlob: (blob) => set({ activeVideoBlob: blob }),
     audioUrl: null, setAudioUrl: (url) => set({ audioUrl: url }),
     isRecording: false, setIsRecording: (rec) => set({ isRecording: rec }),
     recordCountdown: null, setRecordCountdown: (n) => set({ recordCountdown: n }),

@@ -30,6 +30,7 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
 
     const audioUrl = useStore(s => s.audioUrl);
     const videoUrl = useStore(s => s.videoUrl);
+    const activeVideoBlob = useStore(s => s.activeVideoBlob);
 
     const targetStart = exportRange === 'loop' ? loopStart : 0;
     const targetEnd = exportRange === 'loop' ? (loopEnd || sequenceDuration) : sequenceDuration;
@@ -77,15 +78,20 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
             // Priority 5-Step Video Finder (Always favors CURRENT active video)
             let videoBase64: string | null = null;
 
-            // Priority 0 (MOST RELIABLE): Live in-memory blob cache — always the exact active video
-            // This blob is stored in RAM the moment any video is uploaded or pad is switched,
-            // so it's never stale from IndexedDB and never a revoked blob: URL.
-            const cachedBlob = getCachedActiveVideo();
-            if (cachedBlob) {
-                videoBase64 = await blobToDataUrl(cachedBlob);
+            // Priority 0 (MOST RELIABLE): Zustand activeVideoBlob — set directly from File object on upload/pad-switch
+            // This is the exact File the user last uploaded or selected, never a revoked blob URL.
+            const storeBlob = activeVideoBlob;
+            if (storeBlob) {
+                videoBase64 = await blobToDataUrl(storeBlob);
             }
 
-            // Priority 1: Current active video pad slot in IndexedDB
+            // Priority 1 (fallback): in-memory module-level cache
+            if (!videoBase64) {
+                const cachedBlob = getCachedActiveVideo();
+                if (cachedBlob) {
+                    videoBase64 = await blobToDataUrl(cachedBlob);
+                }
+            }
             if (!videoBase64 && activeVideoPadIdx !== undefined && activeVideoPadIdx !== null) {
                 videoBase64 = await getMediaDataUrl(`video-pad-${activeVideoPadIdx}`);
             }

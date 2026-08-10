@@ -32,6 +32,7 @@ export const ScrollHeroRemotion: React.FC<ScrollHeroRemotionProps> = ({
             {videoUrl ? (
                 <Video
                     src={videoUrl}
+                    loop
                     style={{
                         width: '100%',
                         height: '100%',
