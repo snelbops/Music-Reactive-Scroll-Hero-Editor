@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"><style>
+body{margin:0;background:#eceae6;font-family:"IBM Plex Sans",system-ui,sans-serif}
+a{color:#2a78d6}a:hover{color:#1b5aa6}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}
+.dv-tid{font:600 10px "IBM Plex Mono",monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 13px/1.2 "IBM Plex Sans",sans-serif;color:#1a1a1a}
+.dv-opts{display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px "IBM Plex Mono",monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 "IBM Plex Sans",sans-serif;color:rgba(0,0,0,.55)}
+.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:hidden}
+.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}
+.dv-next{margin:22px 0 0;font:12px/1.5 "IBM Plex Sans",sans-serif;color:rgba(0,0,0,.5)}
+.dv-note{margin:0 0 20px;max-width:760px;font:13px/1.6 "IBM Plex Sans",sans-serif;color:rgba(0,0,0,.62)}
+.dv-note b{color:#1a1a1a;font-weight:600}
+</style></helmet>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Scroll Hero Editor — first pass</span></div>
+<p class="dv-note"><b>What I read into your notes.</b> The current build reads as a prototype for three reasons: five saturated accents compete at equal strength, the top bar exposes seven flat export verbs as bare text, and every left-panel row is the same weight so nothing is primary. My fixes: one accent for state (selection, playhead) and a fixed <b>semantic</b> colour per lane type only inside the timeline, exports collapsed behind one primary button plus a menu, labelled tool chips instead of ambiguous glyphs, and lane rows given a real header gutter with type, value and mute/solo. Waveforms keep their amber but drop the glow — the brightness is now in the wave, not a halo behind it. Density is balanced: 28px lane rows, 11–12px labels, mono only for numbers.</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Refined shell — same layout, disciplined palette and hierarchy</div>
+<div class="dv-card" style="width:1240px;background:#0b0c0d">
+  <div style="display:flex;align-items:center;height:36px;padding:0 12px;gap:12px;background:#121417;border-bottom:1px solid #23272c">
+    <span style="font:600 12px/1 'IBM Plex Sans';color:#e2e5e8;letter-spacing:-.01em">Scroll Hero</span>
+    <span style="width:1px;height:16px;background:#23272c"></span>
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 8px;border:1px solid #23272c;border-radius:5px;background:#171a1e">
+      <span style="width:6px;height:6px;border-radius:50%;background:#6e9c73"></span>
+      <span style="font:500 11px/1 'IBM Plex Sans';color:#c3c8cd">anteddai_Young_Max</span>
+      <span style="font:400 10px/1 'IBM Plex Mono';color:#6b7278">saved 2m ago</span>
+    </div>
+    <div style="flex:1"></div>
+    <div style="display:flex;gap:2px;padding:2px;background:#171a1e;border:1px solid #23272c;border-radius:5px">
+      <span style="padding:3px 9px;border-radius:3px;background:#23272c;font:500 11px/1 'IBM Plex Sans';color:#e2e5e8">Design</span>
+      <span style="padding:3px 9px;border-radius:3px;font:500 11px/1 'IBM Plex Sans';color:#7d848c">Deliver</span>
+    </div>
+    <div style="flex:1"></div>
+    <span style="font:400 11px/1 'IBM Plex Sans';color:#9aa1a8">File</span>
+    <span style="font:400 11px/1 'IBM Plex Sans';color:#9aa1a8">Projects</span>
+    <div style="display:flex;align-items:stretch;border:1px solid #a4713c;border-radius:5px;overflow:hidden">
+      <span style="padding:5px 11px;background:#c98a4d;font:600 11px/1 'IBM Plex Sans';color:#17120c">Export video</span>
+      <span style="padding:5px 7px;background:#b57c43;font:600 9px/1.2 'IBM Plex Mono';color:#17120c;border-left:1px solid #a4713c">▾</span>
+    </div>
+    <span style="width:1px;height:16px;background:#23272c"></span>
+    <span style="font:400 11px/1 'IBM Plex Mono';color:#6b7278">?</span>
+  </div>
+
+  <div style="display:flex;height:500px">
+    <div style="width:216px;border-right:1px solid #1a1d21;background:#101215;display:flex;flex-direction:column;overflow:hidden">
+      <div style="display:flex;align-items:center;height:28px;padding:0 10px;gap:8px;border-bottom:1px solid #1a1d21">
+        <span style="font:600 10px/1 'IBM Plex Sans';letter-spacing:.09em;color:#7d848c">SCENE</span>
+        <div style="flex:1"></div>
+        <span style="font:400 10px/1 'IBM Plex Mono';color:#4f555b">7</span>
+      </div>
+      <div style="padding:8px 8px 4px;display:flex;flex-direction:column;gap:2px;flex:1;min-height:0;overflow:auto">
+        <sc-for list="{{ presets }}" as="p" hint-placeholder-count="7">
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:5px;background:#171a1e;border:1px solid #1f2328">
+            <span style="width:22px;height:22px;border-radius:4px;background:#0d0f11;border:1px solid #23272c;flex:none;background-image:repeating-linear-gradient(135deg,#1c2024 0 3px,#0d0f11 3px 6px)"></span>
+            <span style="flex:1;min-width:0">
+              <span style="display:block;font:500 11.5px/1.25 'IBM Plex Sans';color:#dfe3e7">{{ p.name }}</span>
+              <span style="display:block;font:400 10px/1.3 'IBM Plex Sans';color:#6b7278;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.desc }}</span>
+            </span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;align-items:center;height:28px;padding:0 10px;gap:8px;border-top:1px solid #1a1d21;border-bottom:1px solid #1a1d21;margin-top:6px">
+        <span style="font:600 10px/1 'IBM Plex Sans';letter-spacing:.09em;color:#7d848c">MEDIA</span>
+        <div style="flex:1"></div>
+        <span style="font:500 10px/1 'IBM Plex Sans';color:#9aa1a8">＋ Add</span>
+      </div>
+      <div style="padding:8px;display:flex;flex-direction:column;gap:6px">
+        <div style="border:1px solid #23272c;border-radius:6px;background:#15181b;padding:8px;display:flex;flex-direction:column;gap:7px">
+          <div style="display:flex;align-items:center;gap:7px">
+            <span style="width:26px;height:18px;border-radius:3px;background-image:repeating-linear-gradient(135deg,#242a30 0 3px,#0f1114 3px 6px);border:1px solid #262b31;flex:none"></span>
+            <span style="flex:1;min-width:0;font:500 11px/1.2 'IBM Plex Sans';color:#dfe3e7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">anteddai_Young_Max.mp4</span>
+            <span style="font:400 11px/1 'IBM Plex Mono';color:#4f555b">✕</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="height:3px;flex:1;border-radius:2px;background:#242a30;overflow:hidden"><span style="display:block;width:100%;height:3px;background:#6e9c73"></span></span>
+            <span style="font:400 9.5px/1 'IBM Plex Mono';color:#6e9c73">52 frames</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;border:1px solid #23272c;border-radius:6px;background:#15181b;padding:8px">
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <span style="font:600 10px/1 'IBM Plex Sans';letter-spacing:.08em;color:#7d848c">SYNC</span>
+            <div style="flex:1"></div>
+            <span style="font:400 10px/1 'IBM Plex Mono';color:#9aa1a8">1.00×</span>
+          </div>
+          <div style="display:flex;gap:2px;padding:2px;background:#0f1114;border:1px solid #23272c;border-radius:5px">
+            <span style="flex:1;text-align:center;padding:4px 0;border-radius:3px;background:#262b31;font:500 10.5px/1 'IBM Plex Sans';color:#e2e5e8">Fit</span>
+            <span style="flex:1;text-align:center;padding:4px 0;border-radius:3px;font:500 10.5px/1 'IBM Plex Sans';color:#7d848c">Realtime</span>
+            <span style="flex:1;text-align:center;padding:4px 0;border-radius:3px;font:500 10.5px/1 'IBM Plex Sans';color:#7d848c">Loop</span>
+          </div>
+          <div style="position:relative;height:16px;display:flex;align-items:center">
+            <span style="height:2px;flex:1;background:#242a30;border-radius:1px"></span>
+            <span style="position:absolute;left:33%;width:10px;height:10px;border-radius:50%;background:#c3c8cd;border:1px solid #0b0c0d"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex:1;display:flex;flex-direction:column;background:#0b0c0d;min-width:0">
+      <div style="display:flex;align-items:center;height:30px;padding:0 12px;gap:14px;border-bottom:1px solid #1a1d21">
+        <span style="font:400 10.5px/1 'IBM Plex Mono';color:#7d848c">85%</span>
+        <div style="display:flex;gap:2px;padding:2px;background:#141719;border:1px solid #23272c;border-radius:5px">
+          <span style="padding:3px 8px;border-radius:3px;font:500 10.5px/1 'IBM Plex Mono';color:#7d848c">16:9</span>
+          <span style="padding:3px 8px;border-radius:3px;background:#262b31;font:500 10.5px/1 'IBM Plex Mono';color:#e2e5e8">9:16</span>
+          <span style="padding:3px 8px;border-radius:3px;font:500 10.5px/1 'IBM Plex Mono';color:#7d848c">1:1</span>
+          <span style="padding:3px 8px;border-radius:3px;font:500 10.5px/1 'IBM Plex Mono';color:#7d848c">Free</span>
+        </div>
+        <div style="flex:1"></div>
+        <span style="font:400 10.5px/1 'IBM Plex Mono';color:#7d848c">Safe area</span>
+        <span style="font:400 10.5px/1 'IBM Plex Mono';color:#7d848c">Fullscreen</span>
+      </div>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:18px;padding:18px 0">
+        <div style="width:216px;height:384px;border:1px solid #23272c;border-radius:2px;background-image:repeating-linear-gradient(135deg,#191d21 0 5px,#111417 5px 10px);display:flex;align-items:flex-end;justify-content:center;padding-bottom:10px">
+          <span style="font:400 9.5px/1 'IBM Plex Mono';color:#7d848c;background:#0b0c0d;padding:3px 6px;border-radius:3px">frame 41 / 52</span>
+        </div>
+        <div style="height:384px;width:26px;display:flex;flex-direction:column;align-items:center;gap:6px">
+          <span style="font:400 9px/1 'IBM Plex Mono';color:#6b7278">1.0</span>
+          <span style="position:relative;flex:1;width:4px;background:#1d2126;border-radius:2px">
+            <span style="position:absolute;left:0;bottom:0;width:4px;height:95%;background:#5f7f9e;border-radius:2px"></span>
+            <span style="position:absolute;left:-5px;bottom:calc(95% - 6px);width:14px;height:12px;border-radius:3px;background:#c3c8cd;border:1px solid #0b0c0d"></span>
+          </span>
+          <span style="font:400 9px/1 'IBM Plex Mono';color:#6b7278">0.0</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:252px;border-left:1px solid #1a1d21;background:#101215;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;height:28px;padding:0 10px;border-bottom:1px solid #1a1d21;gap:8px">
+        <span style="font:600 10px/1 'IBM Plex Sans';letter-spacing:.09em;color:#7d848c">INSPECTOR</span>
+        <div style="flex:1"></div>
+        <span style="font:400 10px/1 'IBM Plex Mono';color:#4f555b">lane</span>
+      </div>
+      <div style="padding:12px 12px 10px;border-bottom:1px solid #1a1d21;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:7px">
+          <span style="width:8px;height:8px;border-radius:2px;background:#5f7f9e"></span>
+          <span style="font:600 12px/1 'IBM Plex Sans';color:#e2e5e8">Scroll position</span>
+        </div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between">
+          <span style="font:400 10.5px/1 'IBM Plex Sans';color:#7d848c">Value at playhead</span>
+          <span style="font:500 13px/1 'IBM Plex Mono';color:#e2e5e8">0.953</span>
+        </div>
+        <div style="position:relative;height:4px;border-radius:2px;background:#1d2126">
+          <span style="position:absolute;left:0;top:0;height:4px;width:95.3%;background:#5f7f9e;border-radius:2px"></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font:400 9.5px/1 'IBM Plex Mono';color:#5a6067"><span>0</span><span>1</span></div>
+      </div>
+      <div style="padding:12px;display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;align-items:baseline;gap:6px">
+          <span style="font:600 10px/1 'IBM Plex Sans';letter-spacing:.09em;color:#7d848c">SHAPE</span>
+          <span style="font:400 9.5px/1 'IBM Plex Sans';color:#5a6067">replaces automation</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <sc-for list="{{ patterns }}" as="c" hint-placeholder-count="8">
+            <div style="border:1px solid #23272c;border-radius:5px;background:#15181b;padding:6px 6px 4px;display:flex;flex-direction:column;gap:3px">
+              <svg viewBox="0 0 64 26" style="width:100%;height:26px;display:block"><path d="{{ c.d }}" fill="none" stroke="#8fa6bd" stroke-width="1.6"></path></svg>
+              <span style="font:400 9.5px/1 'IBM Plex Sans';color:#8a9198">{{ c.name }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="border-top:1px solid #23272c;background:#0e1013">
+    <div style="display:flex;align-items:center;height:34px;padding:0 10px;gap:10px;border-bottom:1px solid #1a1d21;background:#121417">
+      <div style="display:flex;gap:2px;padding:2px;background:#0f1114;border:1px solid #23272c;border-radius:5px">
+        <span style="padding:4px 9px;border-radius:3px;background:#262b31;font:500 10.5px/1 'IBM Plex Sans';color:#e2e5e8">Select</span>
+        <span style="padding:4px 9px;border-radius:3px;font:500 10.5px/1 'IBM Plex Sans';color:#7d848c">Draw</span>
+        <span style="padding:4px 9px;border-radius:3px;font:500 10.5px/1 'IBM Plex Sans';color:#7d848c">Erase</span>
+      </div>
+      <span style="width:1px;height:16px;background:#23272c"></span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="width:24px;height:20px;border:1px solid #23272c;border-radius:4px;background:#171a1e;display:flex;align-items:center;justify-content:center;font:400 9px/1 'IBM Plex Mono';color:#c3c8cd">■</span>
+        <span style="width:24px;height:20px;border:1px solid #2f3740;border-radius:4px;background:#1d2227;display:flex;align-items:center;justify-content:center;font:400 9px/1 'IBM Plex Mono';color:#e2e5e8">▶</span>
+        <span style="width:24px;height:20px;border:1px solid #23272c;border-radius:4px;background:#171a1e;display:flex;align-items:center;justify-content:center;font:400 9px/1 'IBM Plex Mono';color:#c3c8cd">↺</span>
+        <span style="display:flex;align-items:center;gap:5px;padding:4px 8px;border:1px solid #7a3f37;border-radius:4px;background:#231716">
+          <span style="width:6px;height:6px;border-radius:50%;background:#c2503f"></span>
+          <span style="font:600 10px/1 'IBM Plex Sans';letter-spacing:.06em;color:#d9877a">ARM</span>
+        </span>
+      </div>
+      <span style="width:1px;height:16px;background:#23272c"></span>
+      <span style="font:400 10.5px/1 'IBM Plex Mono';color:#7d848c">Snap · beat</span>
+      <div style="flex:1"></div>
+      <span style="font:400 10.5px/1 'IBM Plex Mono';color:#7d848c">len 10s</span>
+      <span style="font:500 13px/1 'IBM Plex Mono';color:#e2e5e8;letter-spacing:.02em">00:09:577</span>
+    </div>
+    <div style="display:flex;height:26px;border-bottom:1px solid #1a1d21">
+      <div style="width:168px;border-right:1px solid #23272c;display:flex;align-items:center;padding:0 10px;font:600 9.5px/1 'IBM Plex Sans';letter-spacing:.09em;color:#6b7278">LOOP</div>
+      <div style="flex:1;position:relative;background:#121417">
+        <span style="position:absolute;left:0;top:0;bottom:0;width:100%;background:#1a2027;border-left:2px solid #5f7f9e;border-right:2px solid #5f7f9e"></span>
+        <span style="position:absolute;left:8px;top:7px;font:400 9.5px/1 'IBM Plex Mono';color:#8a9198">0.0s — 10.0s</span>
+      </div>
+    </div>
+    <sc-for list="{{ lanes }}" as="l" hint-placeholder-count="5">
+      <div style="display:flex;height:40px;border-bottom:1px solid #171a1d">
+        <div style="width:168px;border-right:1px solid #23272c;background:#101215;display:flex;align-items:center;gap:7px;padding:0 8px 0 10px">
+          <span style="width:3px;height:20px;border-radius:2px;background:#3a4249;flex:none"></span>
+          <span style="flex:1;min-width:0">
+            <span style="display:block;font:500 10.5px/1.2 'IBM Plex Sans';color:#d7dbdf;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ l.name }}</span>
+            <span style="display:block;font:400 9.5px/1.3 'IBM Plex Mono';color:#6b7278">{{ l.meta }}</span>
+          </span>
+          <span style="display:flex;gap:3px">
+            <span style="width:15px;height:15px;border:1px solid #262b31;border-radius:3px;background:#15181b;font:500 8.5px/15px 'IBM Plex Mono';color:#6b7278;text-align:center">M</span>
+            <span style="width:15px;height:15px;border:1px solid #262b31;border-radius:3px;background:#15181b;font:500 8.5px/15px 'IBM Plex Mono';color:#6b7278;text-align:center">S</span>
+          </span>
+        </div>
+        <div style="flex:1;position:relative;background:#0d0f11;overflow:hidden">
+          <svg viewBox="0 0 1000 40" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%"><path d="{{ l.d }}" fill="none" stroke="{{ l.stroke }}" stroke-width="1.4"></path></svg>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</div></div>
+
+<div class="dv-opt" id="1b"><div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Timeline-first layout — one command bar, tabbed inspector, full-width tracks</div>
+<div class="dv-card" style="width:1240px;background:#0b0c0d">
+  <div style="display:flex;align-items:center;height:44px;padding:0 12px;gap:10px;background:#121417;border-bottom:1px solid #23272c">
+    <span style="font:600 12px/1 'IBM Plex Sans';color:#e2e5e8">Scroll Hero</span>
+    <span style="width:1px;height:20px;background:#23272c"></span>
+    <div style="display:flex;gap:2px;padding:2px;background:#0f1114;border:1px solid #23272c;border-radius:5px">
+      <span style="padding:5px 10px;border-radius:3px;background:#262b31;font:500 11px/1 'IBM Plex Sans';color:#e2e5e8">Scene</span>
+      <span style="padding:5px 10px;border-radius:3px;font:500 11px/1 'IBM Plex Sans';color:#7d848c">Automate</span>
+      <span style="padding:5px 10px;border-radius:3px;font:500 11px/1 'IBM Plex Sans';color:#7d848c">Export</span>
+    </div>
+    <span style="width:1px;height:20px;background:#23272c"></span>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="width:26px;height:22px;border:1px solid #23272c;border-radius:4px;background:#171a1e;display:flex;align-items:center;justify-content:center;font:400 9px/1 'IBM Plex Mono';color:#c3c8cd">■</span>
+      <span style="width:26px;height:22px;border:1px solid #2f3740;border-radius:4px;background:#1d2227;display:flex;align-items:center;justify-content:center;font:400 9px/1 'IBM Plex Mono';color:#e2e5e8">▶</span>
+      <span style="width:26px;height:22px;border:1px solid #23272c;border-radius:4px;background:#171a1e;display:flex;align-items:center;justify-content:center;font:400 9px/1 'IBM Plex Mono';color:#c3c8cd">↺</span>
+      <span style="padding:5px 9px;border:1px solid #7a3f37;border-radius:4px;background:#231716;font:600 10px/1 'IBM Plex Sans';letter-spacing:.06em;color:#d9877a">ARM</span>
+    </div>
+    <span style="font:500 15px/1 'IBM Plex Mono';color:#e2e5e8;margin-left:6px">00:09:577</span>
+    <span style="font:400 10.5px/1 'IBM Plex Mono';color:#6b7278">/ 10.000</span>
+    <div style="flex:1"></div>
+    <span style="font:400 11px/1 'IBM Plex Sans';color:#9aa1a8">Snap beat</span>
+    <span style="font:400 11px/1 'IBM Plex Sans';color:#9aa1a8">Loop 0–10s</span>
+    <span style="padding:6px 12px;background:#c98a4d;border-radius:5px;font:600 11px/1 'IBM Plex Sans';color:#17120c">Export ▾</span>
+  </div>
+  <div style="display:flex;height:330px">
+    <div style="width:196px;border-right:1px solid #1a1d21;background:#101215;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;height:26px;padding:0 10px;border-bottom:1px solid #1a1d21;font:600 9.5px/1 'IBM Plex Sans';letter-spacing:.09em;color:#7d848c">SCENE</div>
+      <div style="padding:8px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <sc-for list="{{ presets }}" as="p" hint-placeholder-count="6">
+          <div style="border:1px solid #1f2328;border-radius:5px;background:#15181b;overflow:hidden">
+            <span style="display:block;height:34px;background-image:repeating-linear-gradient(135deg,#1c2024 0 4px,#0d0f11 4px 8px)"></span>
+            <span style="display:block;padding:5px 6px;font:500 10px/1.2 'IBM Plex Sans';color:#d7dbdf;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;background:#08090a;min-width:0">
+      <div style="width:172px;height:306px;border:1px solid #23272c;background-image:repeating-linear-gradient(135deg,#191d21 0 5px,#111417 5px 10px);display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px">
+        <span style="font:400 9px/1 'IBM Plex Mono';color:#7d848c;background:#0b0c0d;padding:3px 5px">9:16 preview</span>
+      </div>
+    </div>
+    <div style="width:268px;border-left:1px solid #1a1d21;background:#101215;display:flex;flex-direction:column">
+      <div style="display:flex;height:28px;border-bottom:1px solid #23272c">
+        <span style="flex:1;text-align:center;line-height:27px;font:500 10.5px/27px 'IBM Plex Sans';color:#e2e5e8;border-bottom:2px solid #c98a4d">Lane</span>
+        <span style="flex:1;text-align:center;font:500 10.5px/27px 'IBM Plex Sans';color:#7d848c">Keyframe</span>
+        <span style="flex:1;text-align:center;font:500 10.5px/27px 'IBM Plex Sans';color:#7d848c">Scene</span>
+      </div>
+      <div style="padding:12px;display:flex;flex-direction:column;gap:11px">
+        <sc-for list="{{ fields }}" as="f" hint-placeholder-count="6">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="flex:1;font:400 11px/1 'IBM Plex Sans';color:#9aa1a8">{{ f.name }}</span>
+            <span style="width:82px;padding:5px 8px;border:1px solid #262b31;border-radius:4px;background:#15181b;font:500 11px/1 'IBM Plex Mono';color:#e2e5e8;text-align:right">{{ f.value }}</span>
+            <span style="width:13px;height:13px;border:1px solid #2f3740;transform:rotate(45deg);border-radius:2px"></span>
+          </div>
+        </sc-for>
+        <div style="height:1px;background:#1a1d21"></div>
+        <span style="font:600 9.5px/1 'IBM Plex Sans';letter-spacing:.09em;color:#7d848c">EASING</span>
+        <div style="display:flex;gap:6px">
+          <sc-for list="{{ easings }}" as="c" hint-placeholder-count="4">
+            <span style="flex:1;border:1px solid #23272c;border-radius:5px;background:#15181b;padding:5px"><svg viewBox="0 0 64 26" style="width:100%;height:22px;display:block"><path d="{{ c.d }}" fill="none" stroke="#8fa6bd" stroke-width="1.6"></path></svg></span>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="border-top:1px solid #23272c;background:#0e1013">
+    <div style="display:flex;height:24px;border-bottom:1px solid #1a1d21;background:#121417">
+      <div style="width:152px;border-right:1px solid #23272c"></div>
+      <div style="flex:1;position:relative">
+        <sc-for list="{{ ticks }}" as="t" hint-placeholder-count="10">
+          <span style="display:inline-block;width:10%;border-left:1px solid #23272c;height:24px;font:400 9px/24px 'IBM Plex Mono';color:#5a6067;padding-left:5px;box-sizing:border-box">{{ t }}</span>
+        </sc-for>
+      </div>
+    </div>
+    <sc-for list="{{ lanes2 }}" as="l" hint-placeholder-count="6">
+      <div style="display:flex;height:44px;border-bottom:1px solid #171a1d">
+        <div style="width:152px;border-right:1px solid #23272c;background:#101215;display:flex;align-items:center;gap:8px;padding:0 10px">
+          <span style="width:7px;height:7px;border-radius:2px;background:#3a4249;flex:none"></span>
+          <span style="flex:1;min-width:0;font:500 10.5px/1.2 'IBM Plex Sans';color:#d7dbdf;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ l.name }}</span>
+          <span style="font:400 9.5px/1 'IBM Plex Mono';color:#6b7278">{{ l.meta }}</span>
+        </div>
+        <div style="flex:1;position:relative;background:#0d0f11">
+          <svg viewBox="0 0 1000 44" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%"><path d="{{ l.d }}" fill="none" stroke="{{ l.stroke }}" stroke-width="1.4"></path></svg>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</div></div>
+
+<div class="dv-opt" id="1c"><div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Surface &amp; accent study — same panel, three treatments</div>
+<div style="display:flex;gap:16px">
+  <sc-for list="{{ themes }}" as="t" hint-placeholder-count="3">
+    <div class="dv-card" style="width:296px;background:#111">
+      <div style="padding:10px 12px;border-bottom:1px solid #23272c;background:#161616">
+        <span style="display:block;font:600 11px/1.3 'IBM Plex Sans';color:#e8e8e8">{{ t.name }}</span>
+        <span style="display:block;font:400 10px/1.4 'IBM Plex Mono';color:#8a8a8a">{{ t.note }}</span>
+      </div>
+      <div style="padding:12px;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;gap:6px">
+          <sc-for list="{{ t.swatches }}" as="s" hint-placeholder-count="5">
+            <span style="flex:1;height:30px;border-radius:4px;border:1px solid rgba(255,255,255,.09);background:{{ s }}"></span>
+          </sc-for>
+        </div>
+        <svg viewBox="0 0 260 54" style="width:100%;height:54px;display:block;border-radius:4px;border:1px solid rgba(255,255,255,.08)"><rect x="0" y="0" width="260" height="54" fill="{{ t.laneBg }}"></rect><path d="{{ wave }}" fill="none" stroke="{{ t.wave }}" stroke-width="1"></path></svg>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="padding:5px 10px;border-radius:4px;font:600 10.5px/1 'IBM Plex Sans';background:{{ t.accent }};color:{{ t.accentFg }}">Export</span>
+          <span style="padding:5px 10px;border-radius:4px;font:500 10.5px/1 'IBM Plex Sans';border:1px solid rgba(255,255,255,.12);color:#cfcfcf">Cancel</span>
+          <div style="flex:1"></div>
+          <span style="font:500 11px/1 'IBM Plex Mono';color:#dcdcdc">0.953</span>
+        </div>
+      </div>
+    </div>
+  </sc-for>
+</div></div>
+
+<div class="dv-opt" id="1d"><div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Timeline track language — one row type per data kind</div>
+<div class="dv-card" style="width:1240px;background:#0b0c0d;padding:0">
+  <sc-for list="{{ trackSpecs }}" as="s" hint-placeholder-count="5">
+    <div style="display:flex;border-bottom:1px solid #171a1d">
+      <div style="width:230px;border-right:1px solid #23272c;background:#101215;padding:10px 12px;display:flex;flex-direction:column;gap:4px">
+        <span style="display:flex;align-items:center;gap:7px">
+          <span style="width:3px;height:14px;border-radius:2px;background:{{ s.stroke }}"></span>
+          <span style="font:600 11px/1.2 'IBM Plex Sans';color:#dfe3e7">{{ s.name }}</span>
+        </span>
+        <span style="font:400 9.5px/1.45 'IBM Plex Sans';color:#6b7278">{{ s.desc }}</span>
+        <span style="font:500 11px/1 'IBM Plex Mono';color:#9aa1a8">{{ s.value }}</span>
+      </div>
+      <div style="flex:1;position:relative;background:#0d0f11;height:88px">
+        <svg viewBox="0 0 1000 88" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%"><path d="{{ s.d }}" fill="none" stroke="{{ s.stroke }}" stroke-width="1.5"></path></svg>
+        <span style="position:absolute;left:62%;top:0;bottom:0;width:1px;background:#c2503f"></span>
+        <span style="position:absolute;left:62%;top:0;width:9px;height:7px;background:#c2503f;transform:translateX(-4px)"></span>
+      </div>
+    </div>
+  </sc-for>
+</div></div>
+
+<div class="dv-opt" id="1e"><div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>Control language — labelled chips instead of ambiguous glyphs</div>
+<div class="dv-card" style="width:600px;background:#0b0c0d;padding:16px;display:flex;flex-direction:column;gap:16px">
+  <div style="display:flex;flex-direction:column;gap:7px">
+    <span style="font:600 9.5px/1 'IBM Plex Sans';letter-spacing:.09em;color:#7d848c">TOOLS · label + mark, never mark alone</span>
+    <div style="display:flex;gap:2px;padding:2px;background:#0f1114;border:1px solid #23272c;border-radius:5px;width:max-content">
+      <span style="padding:5px 10px;border-radius:3px;background:#262b31;font:500 11px/1 'IBM Plex Sans';color:#e2e5e8">Select</span>
+      <span style="padding:5px 10px;border-radius:3px;font:500 11px/1 'IBM Plex Sans';color:#7d848c">Draw</span>
+      <span style="padding:5px 10px;border-radius:3px;font:500 11px/1 'IBM Plex Sans';color:#7d848c">Erase</span>
+      <span style="padding:5px 10px;border-radius:3px;font:500 11px/1 'IBM Plex Sans';color:#7d848c">Slip</span>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:7px">
+    <span style="font:600 9.5px/1 'IBM Plex Sans';letter-spacing:.09em;color:#7d848c">BUTTON WEIGHTS · one primary per screen</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="padding:6px 12px;border-radius:5px;background:#c98a4d;font:600 11px/1 'IBM Plex Sans';color:#17120c">Export video</span>
+      <span style="padding:6px 12px;border-radius:5px;border:1px solid #2f3740;background:#171a1e;font:500 11px/1 'IBM Plex Sans';color:#e2e5e8">Save file</span>
+      <span style="padding:6px 12px;border-radius:5px;font:500 11px/1 'IBM Plex Sans';color:#9aa1a8">Load file</span>
+      <span style="padding:6px 12px;border-radius:5px;border:1px solid #7a3f37;background:#231716;font:600 11px/1 'IBM Plex Sans';color:#d9877a">Arm record</span>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:7px">
+    <span style="font:600 9.5px/1 'IBM Plex Sans';letter-spacing:.09em;color:#7d848c">NUMERIC FIELD · mono, right-aligned, unit greyed</span>
+    <div style="display:flex;gap:8px">
+      <sc-for list="{{ fields }}" as="f" hint-placeholder-count="4">
+        <span style="display:flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid #262b31;border-radius:4px;background:#15181b">
+          <span style="font:400 10px/1 'IBM Plex Sans';color:#7d848c">{{ f.name }}</span>
+          <span style="font:500 11px/1 'IBM Plex Mono';color:#e2e5e8">{{ f.value }}</span>
+        </span>
+      </sc-for>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:7px">
+    <span style="font:600 9.5px/1 'IBM Plex Sans';letter-spacing:.09em;color:#7d848c">LANE COLOUR = DATA KIND · only place colour carries meaning</span>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <sc-for list="{{ trackSpecs }}" as="s" hint-placeholder-count="5">
+        <span style="display:flex;align-items:center;gap:9px">
+          <span style="width:26px;height:8px;border-radius:2px;background:{{ s.stroke }}"></span>
+          <span style="font:500 11px/1 'IBM Plex Sans';color:#d7dbdf;width:132px">{{ s.name }}</span>
+          <span style="font:400 10px/1 'IBM Plex Sans';color:#6b7278">{{ s.desc }}</span>
+        </span>
+      </sc-for>
+    </div>
+  </div>
+</div></div>
+
+</div>
+<p class="dv-next">Try next: "take <a class="dv-oid" href="#1a">1a</a> with the timeline from <a class="dv-oid" href="#1d">1d</a>" · "cooler surfaces, use the middle theme in <a class="dv-oid" href="#1c">1c</a>" · "show <a class="dv-oid" href="#1b">1b</a> in light mode"</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1340}}">
+const rand = (seed) => { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
+
+function wavePath(w, h, n, seed, gain) {
+  const r = rand(seed); const mid = h / 2; let d = `M0 ${mid}`;
+  for (let i = 1; i <= n; i++) {
+    const x = (i / n) * w;
+    const env = 0.35 + 0.65 * Math.abs(Math.sin((i / n) * Math.PI * 3.1));
+    const a = (r() - 0.5) * h * gain * env;
+    d += ` L${x.toFixed(1)} ${(mid + a).toFixed(1)} L${x.toFixed(1)} ${(mid - a * 0.85).toFixed(1)}`;
+  }
+  return d;
+}
+function curveLane(w, h, seed, kind) {
+  const r = rand(seed); let d = `M0 ${h * 0.8}`;
+  if (kind === 'ramp') { for (let i = 1; i <= 24; i++) { const x = (i / 24) * w; const y = h * (0.85 - 0.72 * (i / 24)) + (r() - 0.5) * 2; d += ` L${x.toFixed(1)} ${y.toFixed(1)}`; } return d; }
+  if (kind === 'steps') { let y = h * 0.8; for (let i = 1; i <= 10; i++) { const x = (i / 10) * w; y = h * (0.82 - 0.7 * (i / 10)); d += ` L${x.toFixed(1)} ${(y + 6).toFixed(1)} L${x.toFixed(1)} ${y.toFixed(1)}`; } return d; }
+  if (kind === 'spikes') { let out = `M0 ${h * 0.9}`; for (let i = 1; i <= 18; i++) { const x = (i / 18) * w; out += ` L${(x - 8).toFixed(1)} ${h * 0.9} L${x.toFixed(1)} ${(h * (0.15 + r() * 0.3)).toFixed(1)} L${(x + 8).toFixed(1)} ${h * 0.9}`; } return out; }
+  if (kind === 'flat') return `M0 ${h * 0.5} L${w} ${h * 0.5}`;
+  let out = `M0 ${h * 0.55}`;
+  for (let i = 1; i <= 40; i++) { const x = (i / 40) * w; const y = h * (0.5 + 0.32 * Math.sin((i / 40) * Math.PI * 2.4)); out += ` L${x.toFixed(1)} ${y.toFixed(1)}`; }
+  return out;
+}
+
+class Component extends DCLogic {
+  renderVals() {
+    const AMBER = '#b5763e', STEEL = '#5f7f9e', SAGE = '#6e9c73', SLATE = '#7c8794', CLAY = '#a86a5c';
+    const presets = [
+      { name: 'Orbit', desc: 'Dark bg · white particles' },
+      { name: 'Orbit Light', desc: 'White bg · dark particles' },
+      { name: 'Classic Dark', desc: 'Dark bg · classic particles' },
+      { name: 'Classic Light', desc: 'Light bg · classic particles' },
+      { name: 'Experimental X', desc: 'Unstable · feedback wanted' },
+      { name: 'Light Images', desc: 'White bg · your images' },
+      { name: 'Rain Light', desc: 'White bg · dark particles' },
+    ];
+    const c = (d) => d;
+    const patterns = [
+      { name: 'Linear', d: c('M3 23 L61 4') },
+      { name: 'Ease in', d: c('M3 23 C30 23 46 12 61 4') },
+      { name: 'Ease out', d: c('M3 23 C18 15 34 4 61 4') },
+      { name: 'S-curve', d: c('M3 23 C22 23 42 4 61 4') },
+      { name: 'Two phase', d: c('M3 23 C16 18 20 13 32 13 C44 13 48 6 61 4') },
+      { name: 'Staircase', d: c('M3 23 L18 23 L18 17 L33 17 L33 11 L48 11 L48 5 L61 5') },
+      { name: 'Yo-yo', d: c('M3 20 C14 2 26 2 32 13 C38 24 50 24 61 8') },
+      { name: 'Bounce', d: c('M3 6 C12 24 16 10 24 22 C31 12 36 22 44 22 L61 22') },
+    ];
+    const easings = patterns.slice(0, 4);
+    const lanes = [
+      { name: 'Audio wave', meta: 'track.mp3', d: wavePath(1000, 40, 150, 7, 0.8), stroke: AMBER },
+      { name: 'Video frames', meta: '52 frames', d: curveLane(1000, 40, 11, 'flat'), stroke: SLATE },
+      { name: 'Scroll position', meta: '0.953', d: curveLane(1000, 40, 13, 'ramp'), stroke: STEEL },
+      { name: 'Rotation speed', meta: '0.100', d: curveLane(1000, 40, 17, 'sine'), stroke: SAGE },
+      { name: 'Particle size', meta: '1.400', d: curveLane(1000, 40, 19, 'steps'), stroke: CLAY },
+    ];
+    const lanes2 = [
+      { name: 'Audio', meta: 'wave', d: wavePath(1000, 44, 160, 5, 0.85), stroke: AMBER },
+      { name: 'Frames', meta: '52', d: curveLane(1000, 44, 23, 'flat'), stroke: SLATE },
+      { name: 'Scroll', meta: '0.95', d: curveLane(1000, 44, 29, 'ramp'), stroke: STEEL },
+      { name: 'Rotation', meta: '0.10', d: curveLane(1000, 44, 31, 'sine'), stroke: SAGE },
+      { name: 'Opacity', meta: '1.00', d: curveLane(1000, 44, 37, 'steps'), stroke: STEEL },
+      { name: 'Particles', meta: '2.00', d: curveLane(1000, 44, 41, 'spikes'), stroke: CLAY },
+    ];
+    const trackSpecs = [
+      { name: 'Audio wave', desc: 'Read-only reference. Amplitude fills the row; no glow, no background grid.', value: 'track.mp3 · 10.0s', d: wavePath(1000, 88, 220, 3, 0.85), stroke: AMBER },
+      { name: 'Frame clip', desc: 'Extent block with thumbnail strip. Colour stays neutral — it is media, not data.', value: '52 frames', d: curveLane(1000, 88, 43, 'flat'), stroke: SLATE },
+      { name: 'Automation curve', desc: 'Keyframes on the line, value shown in the gutter, one accent for the whole family.', value: '0.953', d: curveLane(1000, 88, 47, 'ramp'), stroke: STEEL },
+      { name: 'Recorded input', desc: 'Dense captured motion. Thinner stroke so it reads as data, not drawing.', value: 'mouse X', d: curveLane(1000, 88, 53, 'sine'), stroke: SAGE },
+      { name: 'Trigger lane', desc: 'Beat-locked events as ticks from the baseline instead of full curves.', value: '18 hits', d: curveLane(1000, 88, 59, 'spikes'), stroke: CLAY },
+    ];
+    const fields = [
+      { name: 'Zoom', value: '1.000' },
+      { name: 'Position X', value: '0.000' },
+      { name: 'Rotation', value: '0.100' },
+      { name: 'Opacity', value: '1.000' },
+      { name: 'Depth', value: '2.000' },
+      { name: 'Size', value: '1.400' },
+    ];
+    const themes = [
+      { name: 'Graphite', note: 'neutral cool · single warm accent', swatches: ['#0b0c0d', '#101215', '#171a1e', '#23272c', '#c98a4d'], laneBg: '#0d0f11', wave: '#b5763e', accent: '#c98a4d', accentFg: '#17120c' },
+      { name: 'Ink', note: 'blue-black · steel accent', swatches: ['#090b0f', '#0f131a', '#161c25', '#212936', '#7fa0c4'], laneBg: '#0b0e13', wave: '#8ca6c2', accent: '#7fa0c4', accentFg: '#0b0e13' },
+      { name: 'Warm studio', note: 'brown-black · clay accent', swatches: ['#0d0b0a', '#141110', '#1c1816', '#282220', '#c08170'], laneBg: '#100d0c', wave: '#c08170', accent: '#c08170', accentFg: '#160f0d' },
+    ];
+    return {
+      presets, patterns, easings, lanes, lanes2, trackSpecs, fields, themes,
+      wave: wavePath(260, 54, 90, 61, 0.8),
+      ticks: ['0s', '1s', '2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s'],
+    };
+  }
+}
+</script>
+</body>
+</html>

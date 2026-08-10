@@ -289,46 +289,48 @@ function LaneInspector({ laneId }: { laneId: string }) {
     })();
 
     const [min, max] = lane.range;
-    const normalised = (currentValue - min) / (max - min);
+    const normalised = Math.max(0, Math.min(1, (currentValue - min) / (max - min)));
 
     return (
         <div className="flex flex-col gap-4">
             {/* Lane header */}
-            <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full shrink-0" style={{ background: lane.color, boxShadow: `0 0 8px ${lane.color}80` }} />
-                <span className="text-xs font-bold text-editor-fg">{lane.name}</span>
+            <div className="flex items-center gap-2 pb-2 border-b border-[#1a1d21]">
+                <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: lane.color }} />
+                <span className="font-semibold text-xs text-[#e2e5e8]">{lane.name}</span>
             </div>
 
-            {/* Current value */}
-            <div className="glass-panel p-3 rounded space-y-2">
-                <div className="flex justify-between items-center">
-                    <span className="text-xxs text-editor-muted">Current Value</span>
-                    <span className="font-mono text-xs" style={{ color: lane.color }}>{currentValue.toFixed(3)}{lane.unit}</span>
+            {/* Current value readout */}
+            <div className="p-3 border border-[#23272c] rounded-md bg-[#15181b] flex flex-col gap-2">
+                <div className="flex justify-between items-baseline">
+                    <span className="text-[10.5px] text-[#7d848c]">Value at playhead</span>
+                    <span className="font-mono font-medium text-xs text-[#e2e5e8]">{currentValue.toFixed(3)}{lane.unit}</span>
                 </div>
-                <div className="w-full h-1 bg-editor-surface rounded-full overflow-hidden">
+                <div className="w-full h-1 bg-[#1d2126] rounded-full overflow-hidden relative">
                     <div className="h-full rounded-full transition-all" style={{ width: `${normalised * 100}%`, background: lane.color }} />
                 </div>
-                <div className="flex justify-between text-[9px] text-editor-muted">
+                <div className="flex justify-between text-[9.5px] font-mono text-[#5a6067]">
                     <span>{min}</span><span>{max}</span>
                 </div>
             </div>
 
             {/* Scroll pattern presets */}
             {laneId === 'scrollPos' && (
-                <div>
-                    <label className="text-xxs font-bold text-editor-muted uppercase tracking-widest block mb-2">Pattern Presets</label>
-                    <p className="text-[9px] text-editor-muted mb-2 leading-relaxed">Replaces current scroll automation.</p>
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-baseline justify-between">
+                        <span className="text-[10px] font-semibold tracking-wider text-[#7d848c] uppercase">SHAPE</span>
+                        <span className="text-[9.5px] text-[#5a6067]">replaces automation</span>
+                    </div>
                     <div className="grid grid-cols-2 gap-1.5">
                         {SCROLL_PATTERNS.map(preset => (
                             <button
                                 key={preset.id}
                                 onClick={() => useStore.getState().setScrollKeyframes(preset.generate(SEQUENCE_DURATION))}
-                                className="group flex flex-col items-center gap-1 p-2 glass-panel hover:bg-editor-surface-hover rounded transition-colors"
+                                className="group flex flex-col gap-1 p-1.5 border border-[#23272c] bg-[#15181b] hover:bg-[#1f2328] hover:border-[#3a4249] rounded transition-colors text-left"
                             >
-                                <svg viewBox="0 0 60 30" className="w-full h-7" preserveAspectRatio="none">
-                                    <path d={preset.thumb} fill="none" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.7" className="group-hover:opacity-100 transition-opacity" />
+                                <svg viewBox="0 0 64 26" className="w-full h-6" preserveAspectRatio="none">
+                                    <path d={preset.thumb} fill="none" stroke="#8fa6bd" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="group-hover:stroke-[#c98a4d] transition-colors" />
                                 </svg>
-                                <span className="text-[9px] text-editor-muted group-hover:text-editor-fg transition-colors">{preset.label}</span>
+                                <span className="text-[9.5px] text-[#8a9198] group-hover:text-[#e2e5e8] transition-colors">{preset.label}</span>
                             </button>
                         ))}
                     </div>
@@ -338,8 +340,8 @@ function LaneInspector({ laneId }: { laneId: string }) {
             {/* Interpolation mode hint */}
             {laneId !== 'scrollPos' && (
                 <div>
-                    <label className="text-xxs font-bold text-editor-muted uppercase tracking-widest block mb-2">Interpolation</label>
-                    <p className="text-[10px] text-editor-muted leading-relaxed">Click a keyframe dot on this lane to edit its easing.</p>
+                    <span className="text-[10px] font-semibold tracking-wider text-[#7d848c] uppercase block mb-1">Interpolation</span>
+                    <p className="text-[10px] text-[#6b7278] leading-relaxed">Click a keyframe dot on this lane to edit its curve easing.</p>
                 </div>
             )}
         </div>
@@ -358,7 +360,6 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
     const scrollKfs = useStore(s => s.scrollKeyframes);
     const paramKfs = useStore(s => s.paramKeyframes);
 
-    // Determine the active easing — highlight picker button only when all selected kfs share the same easing
     const getEasing = (laneId: string, position: number): string => {
         if (laneId === 'scrollPos') return scrollKfs.find(k => Math.abs(k.time - position) < 0.001)?.easing ?? 'linear';
         return (paramKfs[laneId] ?? []).find(k => Math.abs(k.time - position) < 0.001)?.easing ?? 'linear';
@@ -371,38 +372,38 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
     return (
         <div className="flex flex-col gap-4">
             {/* Keyframe header */}
-            <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full shrink-0" style={{ background: lane.color, boxShadow: `0 0 8px ${lane.color}80` }} />
-                <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-editor-fg">{lane.name}</span>
+            <div className="flex items-center gap-2 pb-2 border-b border-[#1a1d21]">
+                <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: lane.color }} />
+                <div className="flex-1 min-width-0">
+                    <div className="flex items-center justify-between">
+                        <span className="font-semibold text-xs text-[#e2e5e8] truncate">{lane.name}</span>
                         {isMulti && (
-                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full" style={{ background: lane.color + '30', color: lane.color }}>
-                                {selectedCount} selected
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#23272c] text-[#e2e5e8]">
+                                {selectedCount} sel
                             </span>
                         )}
                     </div>
-                    <p className="text-[9px] text-editor-muted font-mono">{isMulti ? 'Shift+click to toggle' : `Keyframe @ ${timeLabel}s`}</p>
+                    <p className="text-[9.5px] text-[#6b7278] font-mono">{isMulti ? 'Shift+click to toggle' : `@ ${timeLabel}s`}</p>
                 </div>
             </div>
 
-            {/* Value display */}
-            <div className="glass-panel p-3 rounded">
+            {/* Value readout */}
+            <div className="p-3 border border-[#23272c] rounded-md bg-[#15181b] flex flex-col gap-2">
                 <div className="flex justify-between items-center">
-                    <span className="text-xxs text-editor-muted">Value</span>
-                    <span className="font-mono text-sm" style={{ color: lane.color }}>{kf.value.toFixed(4)}{lane.unit}</span>
+                    <span className="text-[10.5px] text-[#7d848c]">Value</span>
+                    <span className="font-mono text-xs font-medium" style={{ color: lane.color }}>{kf.value.toFixed(4)}{lane.unit}</span>
                 </div>
-                <div className="flex justify-between items-center mt-1">
-                    <span className="text-xxs text-editor-muted">Position</span>
-                    <span className="font-mono text-xs text-editor-muted">{kf.position.toFixed(3)}s</span>
+                <div className="flex justify-between items-center">
+                    <span className="text-[10.5px] text-[#7d848c]">Position</span>
+                    <span className="font-mono text-xs text-[#7d848c]">{kf.position.toFixed(3)}s</span>
                 </div>
                 {kf.laneId !== 'scrollPos' && !isMulti && (
-                    <div className="mt-2">
-                        <label className="text-xxs text-editor-muted block mb-1">Edit Value</label>
+                    <div className="mt-1 pt-2 border-t border-[#23272c]">
+                        <label className="text-[9.5px] text-[#7d848c] block mb-1 uppercase font-semibold">Edit Value</label>
                         <input
                             key={`${kf.laneId}-${kf.position}`}
                             type="number"
-                            className="w-full bg-editor-surface border border-editor-border rounded px-2 py-1 text-xs font-mono text-editor-fg focus:outline-none focus:border-white/30"
+                            className="w-full bg-[#0d0f11] border border-[#262b31] rounded px-2 py-1 text-xs font-mono text-[#e2e5e8] focus:outline-none focus:border-[#5f7f9e]"
                             defaultValue={kf.value.toFixed(4)}
                             step={(lane.range[1] - lane.range[0]) / 100}
                             min={lane.range[0]}
@@ -421,32 +422,30 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
             </div>
 
             {/* Easing presets */}
-            <div>
-                <div className="flex justify-between items-center mb-2">
-                    <label className="text-xxs font-bold text-editor-muted uppercase tracking-widest">
-                        Easing to Next{isMulti ? ` (${selectedCount})` : ''}
-                    </label>
-                    <span className="text-[9px] text-editor-muted">right-click / Delete to remove</span>
+            <div className="flex flex-col gap-2">
+                <div className="flex justify-between items-baseline">
+                    <span className="text-[10px] font-semibold tracking-wider text-[#7d848c] uppercase">EASING</span>
+                    <span className="text-[9px] text-[#5a6067]">Delete to remove</span>
                 </div>
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className="grid grid-cols-2 gap-1.5">
                     {EASING_PRESETS.map((preset) => {
                         const isActive = preset.id === activeEasing;
                         return (
-                        <button
-                            key={preset.id}
-                            onClick={() => {
-                                applyEasingToAllSelected(preset.id);
-                                setSelectedKeyframe({ ...kf });
-                            }}
-                            className="group flex flex-col items-center gap-1 p-2 glass-panel hover:bg-editor-surface-hover rounded transition-colors"
-                            style={isActive ? { outline: `1px solid ${lane.color}60`, background: `${lane.color}18` } : undefined}
-                            title={preset.label}
-                        >
-                            <svg viewBox="0 0 40 40" className="w-8 h-8" style={{ color: isActive ? lane.color : undefined }}>
-                                <path d={preset.d} fill="none" stroke={isActive ? lane.color : 'rgba(255,255,255,0.5)'} strokeWidth="2.5" strokeLinecap="round" />
-                            </svg>
-                            <span className={`text-[9px] transition-colors ${isActive ? 'text-editor-fg' : 'text-editor-muted group-hover:text-editor-fg'}`}>{preset.label}</span>
-                        </button>
+                            <button
+                                key={preset.id}
+                                onClick={() => {
+                                    applyEasingToAllSelected(preset.id);
+                                    setSelectedKeyframe({ ...kf });
+                                }}
+                                className="group flex flex-col gap-1 p-1.5 border border-[#23272c] bg-[#15181b] hover:bg-[#1f2328] rounded transition-colors text-left"
+                                style={isActive ? { borderColor: '#5f7f9e', background: '#1c222b' } : undefined}
+                                title={preset.label}
+                            >
+                                <svg viewBox="0 0 40 40" className="w-full h-6">
+                                    <path d={preset.d} fill="none" stroke={isActive ? '#8fa6bd' : 'rgba(255,255,255,0.35)'} strokeWidth="2.5" strokeLinecap="round" />
+                                </svg>
+                                <span className={`text-[9.5px] transition-colors ${isActive ? 'text-[#e2e5e8] font-semibold' : 'text-[#8a9198] group-hover:text-[#e2e5e8]'}`}>{preset.label}</span>
+                            </button>
                         );
                     })}
                 </div>
@@ -467,11 +466,12 @@ export default function Inspector({ width = 240 }: { width?: number }) {
     const primaryKeyframe = selectedKeyframes.at(-1) ?? null;
 
     return (
-        <aside className="border-l border-editor-border bg-editor-panel text-editor-fg flex flex-col overflow-y-auto thin-scrollbar" style={{ width }}>
-            <div className="h-10 border-b border-editor-border flex items-center px-4 shrink-0">
-                <span className="text-xxs font-bold text-editor-muted uppercase tracking-widest">Inspector</span>
+        <aside className="border-l border-[#1a1d21] bg-[#101215] text-[#e2e5e8] flex flex-col overflow-y-auto thin-scrollbar" style={{ width }}>
+            <div className="h-7 border-b border-[#1a1d21] flex items-center justify-between px-3 shrink-0">
+                <span className="text-[10px] font-semibold text-[#7d848c] tracking-widest uppercase font-sans">INSPECTOR</span>
+                <span className="font-mono text-[10px] text-[#4f555b]">lane</span>
             </div>
-            <div className="p-4 flex-1">
+            <div className="p-3 flex-1">
                 {primaryKeyframe ? (
                     <KeyframeInspector kf={primaryKeyframe} />
                 ) : selectedLane ? (

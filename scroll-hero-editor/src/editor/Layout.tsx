@@ -1,6 +1,6 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Minimize2, Plus, Film } from 'lucide-react';
+import { Minimize2, Film } from 'lucide-react';
 import studio from '@theatre/studio';
 import LeftPanel from './LeftPanel';
 import Inspector from './Inspector';
@@ -15,7 +15,6 @@ import { saveProject, loadProject, loadWorkingProject, autoSaveWorkingProject, s
 
 export default function Layout() {
     const isDarkMode = useStore(state => state.isDarkMode);
-    const setIsDarkMode = useStore(state => state.setIsDarkMode);
     const isFullscreen = useStore(state => state.isFullscreen);
     const setIsFullscreen = useStore(state => state.setIsFullscreen);
     const activePreset = useStore(state => state.activePreset);
@@ -27,7 +26,6 @@ export default function Layout() {
     const audioUrl = useStore(state => state.audioUrl);
 
     const [isExportingHtml, setIsExportingHtml] = useState(false);
-    const [isLoadError, setIsLoadError] = useState(false);
     const [isExportingLoop, setIsExportingLoop] = useState(false);
     const [showExportLoopModal, setShowExportLoopModal] = useState(false);
     const [showProjectModal, setShowProjectModal] = useState(false);
@@ -149,6 +147,8 @@ export default function Layout() {
     }, [isFullscreen, setIsFullscreen]);
 
 
+    const [showExportMenu, setShowExportMenu] = useState(false);
+
     if (isFullscreen) {
         return (
             <div className="fixed inset-0 z-[9999] bg-editor-bg flex">
@@ -166,63 +166,65 @@ export default function Layout() {
 
     return (
         <div className="flex flex-col h-screen w-full bg-editor-bg text-editor-fg overflow-hidden font-sans select-none text-sm">
-            <header className="h-8 border-b border-editor-border bg-editor-panel text-editor-muted flex items-center px-4 justify-between text-[11px] font-medium tracking-wide shrink-0 font-sans select-none">
-                <span className="text-editor-fg font-semibold tracking-tight">Scroll Hero Editor</span>
+            <header className="h-9 border-b border-[#23272c] bg-[#121417] text-[#9aa1a8] flex items-center px-3 justify-between text-[11px] font-medium shrink-0 font-sans select-none gap-3 z-40">
+                <div className="flex items-center gap-3">
+                    <span className="font-semibold text-xs text-[#e2e5e8] tracking-tight">Scroll Hero</span>
+                    <span className="w-[1px] h-4 bg-[#23272c]" />
+                    <div className="flex items-center gap-2 px-2 py-0.5 border border-[#23272c] rounded bg-[#171a1e] text-[11px]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#6e9c73]" />
+                        <span className="font-medium text-[#c3c8cd]">{mp4Asset?.name ?? 'anteddai_Young_Max'}</span>
+                        <span className="font-mono text-[10px] text-[#6b7278]">saved</span>
+                    </div>
+                </div>
 
-                <div className="flex items-center space-x-4">
+                {/* Mode Switcher */}
+                <div className="flex gap-0.5 p-0.5 bg-[#171a1e] border border-[#23272c] rounded">
+                    <button className="px-2.5 py-0.5 rounded bg-[#23272c] font-medium text-[11px] text-[#e2e5e8]">Design</button>
+                    <button className="px-2.5 py-0.5 rounded font-medium text-[11px] text-[#7d848c] hover:text-[#e2e5e8]">Deliver</button>
+                </div>
+
+                {/* Header Actions */}
+                <div className="flex items-center gap-3 relative">
+                    <button onClick={() => saveProject()} className="hover:text-[#e2e5e8] transition-colors" title="Quick export .shero file">File</button>
+                    <button onClick={() => setShowProjectModal(true)} className="hover:text-[#e2e5e8] transition-colors">Projects</button>
+
+                    {/* Primary Export Button + Dropdown */}
+                    <div className="relative flex items-stretch border border-[#a4713c] rounded overflow-hidden shadow-sm">
+                        <button
+                            onClick={() => setShowVideoExportModal(true)}
+                            className="px-2.5 py-1 bg-[#c98a4d] hover:bg-[#d49658] font-semibold text-[11px] text-[#17120c] transition-colors flex items-center gap-1.5"
+                            title="Render video animation to WebM or MP4"
+                        >
+                            <Film className="w-3 h-3 text-[#17120c]" /> Export video
+                        </button>
+                        <button
+                            onClick={() => setShowExportMenu(v => !v)}
+                            className="px-1.5 py-1 bg-[#b57c43] hover:bg-[#c4874c] font-mono text-[9px] text-[#17120c] border-l border-[#a4713c] transition-colors"
+                        >
+                            ▾
+                        </button>
+
+                        {showExportMenu && (
+                            <div className="absolute right-0 top-full mt-1.5 w-48 bg-[#15181b] border border-[#23272c] rounded-md shadow-2xl py-1 z-50 text-[11px] font-sans">
+                                <button onClick={() => { setShowExportMenu(false); handleExportJson(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#23272c] text-[#dfe3e7]">Export JSON</button>
+                                <button onClick={() => { setShowExportMenu(false); exportCurvesJson(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#23272c] text-[#dfe3e7]">Export Curves</button>
+                                <button onClick={() => { setShowExportMenu(false); isLoop && setShowExportLoopModal(true); }} className={`w-full text-left px-3 py-1.5 hover:bg-[#23272c] ${isLoop ? 'text-[#dfe3e7]' : 'text-gray-500 cursor-not-allowed'}`}>Export Loop Region</button>
+                                <button onClick={() => { setShowExportMenu(false); handleExportHtml(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#23272c] text-[#dfe3e7]">Export Standalone HTML</button>
+                                <div className="my-1 border-t border-[#23272c]" />
+                                <button onClick={() => { setShowExportMenu(false); if (confirm('Start a new project? Any unsaved changes in current project will be cleared.')) startNewProject(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#23272c] text-[#dfe3e7]">New Project</button>
+                                <button onClick={() => { setShowExportMenu(false); loadInputRef.current?.click(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#23272c] text-[#dfe3e7]">Load File (.shero)</button>
+                            </div>
+                        )}
+                    </div>
+
+                    <span className="w-[1px] h-4 bg-[#23272c]" />
                     <button
-                        onClick={() => {
-                            if (confirm('Start a new project? Any unsaved changes in current project will be cleared.')) {
-                                startNewProject();
-                            }
-                        }}
-                        className="px-2 py-0.5 bg-white/10 hover:bg-white/20 text-white font-semibold rounded text-[11px] border border-white/20 transition-all flex items-center gap-1"
-                        title="Clear timeline and start a fresh project"
-                    >
-                        <Plus className="w-3 h-3 text-cyan-400" /> New Project
-                    </button>
-                    <button
-                        onClick={() => setShowProjectModal(true)}
-                        className="px-2 py-0.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 font-semibold rounded text-[11px] border border-cyan-500/30 transition-all flex items-center gap-1"
-                        title="Manage saved projects, load templates, or import/export files"
-                    >
-                        📁 Projects
-                    </button>
-                    <button
-                        onClick={() => setShowVideoExportModal(true)}
-                        className="px-2.5 py-0.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded text-[11px] border border-purple-400/40 shadow-md transition-all flex items-center gap-1"
-                        title="Render animation and audio to WebM or MP4 video file"
-                    >
-                        <Film className="w-3 h-3" /> Export Video
-                    </button>
-                    <span className="cursor-pointer hover:text-editor-fg transition-colors" onClick={() => saveProject()} title="Quick export .shero file">Save File</span>
-                    <span className="cursor-pointer hover:text-editor-fg transition-colors" onClick={() => loadInputRef.current?.click()} title="Quick load .shero file">
-                        {isLoadError ? 'Load failed' : 'Load File'}
-                    </span>
-                    <span className="text-editor-border">|</span>
-                    <span className="cursor-pointer hover:text-editor-fg transition-colors" onClick={handleExportJson}>Export JSON</span>
-                    <span className="cursor-pointer hover:text-editor-fg transition-colors" onClick={exportCurvesJson}>Export Curves</span>
-                    <span
-                        className={`cursor-pointer transition-colors relative ${isLoop ? 'text-cyan-400 hover:text-cyan-300' : 'hover:text-editor-fg opacity-50 cursor-not-allowed'}`}
-                        onClick={() => isLoop && setShowExportLoopModal(true)}
-                        title={isLoop ? `Export loop region ${loopStart.toFixed(2)}s – ${loopEnd.toFixed(2)}s` : 'Enable loop first (L button in timeline)'}
-                    >
-                        {isExportingLoop ? 'Exporting Loop…' : 'Export Loop'}
-                    </span>
-                    <span className="cursor-pointer hover:text-editor-fg transition-colors" onClick={handleExportHtml}>
-                        {isExportingHtml ? 'Exporting…' : 'Export HTML'}
-                    </span>
-                    <button
-                        className="w-5 h-5 rounded-full border border-[#3a3a3c] text-gray-400 hover:text-white hover:border-cyan-400 hover:bg-cyan-400/10 text-[11px] font-bold transition-all flex items-center justify-center"
                         onClick={() => setShowHelp(true)}
+                        className="font-mono text-[#6b7278] hover:text-[#e2e5e8] text-[11px]"
                         title="Keyboard shortcuts & help"
                     >
                         ?
                     </button>
-                    <div className="flex bg-editor-surface p-0.5 rounded gap-1 border border-editor-border">
-                        <button onClick={() => setIsDarkMode(false)} className={`px-2 py-0.5 rounded text-xxs transition-colors ${!isDarkMode ? 'bg-editor-surface-hover text-editor-fg' : 'text-editor-muted hover:text-editor-fg'}`}>L</button>
-                        <button onClick={() => setIsDarkMode(true)} className={`px-2 py-0.5 rounded text-xxs transition-colors ${isDarkMode ? 'bg-editor-surface-hover text-editor-fg' : 'text-editor-muted hover:text-editor-fg'}`}>D</button>
-                    </div>
                 </div>
             </header>
             <input
@@ -233,9 +235,8 @@ export default function Layout() {
                 onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-                    setIsLoadError(false);
                     try { await loadProject(file); }
-                    catch { setIsLoadError(true); setTimeout(() => setIsLoadError(false), 3000); }
+                    catch (err) { alert('Failed to load project file.'); }
                     e.target.value = '';
                 }}
             />

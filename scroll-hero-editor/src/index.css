@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 :root {
@@ -12,17 +13,20 @@
 }
 
 .dark {
-  --theme-bg: #101010;
-  --theme-panel: #1a1a1a;
-  --theme-border: #2a2a2a;
-  --theme-text: #b0b0b0;
-  --theme-muted: #6b7280;
-  --theme-surface: #1e1e1e;
-  --theme-surface-hover: #2d2d2d;
-  --theme-fill: #3b82f6;
+  --theme-bg: #0b0c0d;
+  --theme-panel: #101215;
+  --theme-border: #23272c;
+  --theme-text: #e2e5e8;
+  --theme-muted: #7d848c;
+  --theme-surface: #15181b;
+  --theme-surface-hover: #1f2328;
+  --theme-fill: #5f7f9e;
 }
 
 @theme {
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
   --color-editor-bg: var(--theme-bg);
   --color-editor-panel: var(--theme-panel);
   --color-editor-border: var(--theme-border);
@@ -32,11 +36,13 @@
   --color-editor-surface-hover: var(--theme-surface-hover);
   --color-editor-fill: var(--theme-fill);
 
-  --color-editor-accent-purple: #a855f7;
-  --color-editor-accent-teal: #14b8a6;
-  --color-editor-accent-orange: #f97316;
-  --color-editor-accent-green: #22c55e;
-  --color-editor-accent-blue: #3b82f6;
+  --color-editor-accent-purple: #a86a5c;
+  --color-editor-accent-teal: #6e9c73;
+  --color-editor-accent-orange: #c98a4d;
+  --color-editor-accent-amber: #b5763e;
+  --color-editor-accent-green: #6e9c73;
+  --color-editor-accent-blue: #5f7f9e;
+  --color-editor-accent-slate: #7c8794;
 
   --text-xxs: 10px;
   --text-xs: 12px;
@@ -69,16 +75,16 @@
     border-radius: 2px;
   }
   .dark .thin-scrollbar::-webkit-scrollbar-track {
-    background: #101010;
+    background: #0b0c0d;
   }
   .dark .thin-scrollbar::-webkit-scrollbar-thumb {
-    background: #333;
+    background: #23272c;
   }
   .dark .thin-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #444;
+    background: #3a4249;
   }
   .waveform-bg {
-    background-image: linear-gradient(to right, rgba(249, 115, 22, 0.3) 1px, transparent 1px);
+    background-image: linear-gradient(to right, rgba(181, 118, 62, 0.25) 1px, transparent 1px);
     background-size: 8px 100%;
   }
 }
