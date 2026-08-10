@@ -26,9 +26,12 @@ export async function renderRemotionVideoServer(options: {
         inputProps: options.inputProps,
     });
 
+    const startFrame = options.startFrame || 0;
+    const totalFramesNeeded = Math.max(600, startFrame + options.durationInFrames + 10);
+
     const customComposition = {
         ...composition,
-        durationInFrames: options.durationInFrames,
+        durationInFrames: totalFramesNeeded,
         fps: options.fps,
         width: options.width,
         height: options.height,
@@ -40,7 +43,7 @@ export async function renderRemotionVideoServer(options: {
         codec: 'h264',
         outputLocation: options.outputPath,
         inputProps: options.inputProps,
-        frameRange: [options.startFrame || 0, (options.startFrame || 0) + options.durationInFrames - 1],
+        frameRange: [startFrame, startFrame + options.durationInFrames - 1],
         onProgress: ({ progress }) => {
             options.onProgress?.(progress);
         },
