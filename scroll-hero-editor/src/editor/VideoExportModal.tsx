@@ -15,6 +15,7 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
     const loopStart = useStore(s => s.loopStart);
     const loopEnd = useStore(s => s.loopEnd);
     const isLoopActive = useStore(s => s.isLoop);
+    const activeVideoPadIdx = useStore(s => s.activeVideoPadIdx);
 
     const [exportRange, setExportRange] = useState<'full' | 'loop'>(isLoopActive ? 'loop' : 'full');
     const [exportRatio, setExportRatio] = useState<string>(activeRatio || '16:9');
@@ -59,7 +60,7 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
 
     const handleStartRemotionExport = async () => {
         setIsRemotionExporting(true);
-        setStatusMessage(`Preparing media & rendering 60 FPS MP4 via Remotion (${exportRange === 'loop' ? 'Loop Range' : 'Full Sequence'} ${targetStart.toFixed(1)}s — ${targetEnd.toFixed(1)}s)…`);
+        setStatusMessage(`Preparing video media & rendering 60 FPS MP4 via Remotion (${exportRange === 'loop' ? 'Loop Range' : 'Full Sequence'} ${targetStart.toFixed(1)}s — ${targetEnd.toFixed(1)}s)…`);
 
         try {
             let width = 1920;
@@ -71,25 +72,44 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
             const startFrame = Math.round(targetStart * fps);
             const durationInFrames = Math.round(targetDuration * fps);
 
-            // Locate active DOM video element in viewport container for Tier 1 fallback
-            const container = document.querySelector('div[data-purpose="viewport-container"]') as HTMLElement | null;
-            const activeVideoEl = container?.querySelector('video') as HTMLVideoElement | null;
-
-            // 3-Tier Fallback Chain for Video Base64 Retrieval
+            // 5-Step Bulletproof Video Finder across IndexedDB & DOM
             let videoBase64: string | null = null;
 
-            // Tier 1: Active DOM video element src
-            if (activeVideoEl && activeVideoEl.src) {
-                try {
-                    const r = await fetch(activeVideoEl.src);
-                    if (r.ok) {
-                        const b = await r.blob();
-                        videoBase64 = await blobToDataUrl(b);
-                    }
-                } catch (e) {}
+            // Step 1: IndexedDB active-video
+            videoBase64 = await getMediaDataUrl('active-video');
+
+            // Step 2: IndexedDB active video pad
+            if (!videoBase64) {
+                videoBase64 = await getMediaDataUrl(`video-pad-${activeVideoPadIdx}`);
             }
 
-            // Tier 2: videoUrl from Zustand store
+            // Step 3: IndexedDB all video pad slots 0 to 5
+            if (!videoBase64) {
+                for (let i = 0; i <= 5; i++) {
+                    const padData = await getMediaDataUrl(`video-pad-${i}`);
+                    if (padData) {
+                        videoBase64 = padData;
+                        break;
+                    }
+                }
+            }
+
+            // Step 4: Active DOM video element src if valid
+            if (!videoBase64) {
+                const container = document.querySelector('div[data-purpose="viewport-container"]') as HTMLElement | null;
+                const activeVideoEl = container?.querySelector('video') as HTMLVideoElement | null;
+                if (activeVideoEl && activeVideoEl.src) {
+                    try {
+                        const r = await fetch(activeVideoEl.src);
+                        if (r.ok) {
+                            const b = await r.blob();
+                            videoBase64 = await blobToDataUrl(b);
+                        }
+                    } catch (e) {}
+                }
+            }
+
+            // Step 5: Zustand store videoUrl if valid
             if (!videoBase64 && videoUrl) {
                 try {
                     const r = await fetch(videoUrl);
@@ -100,16 +120,14 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                 } catch (e) {}
             }
 
-            // Tier 3: IndexedDB active-video key
-            if (!videoBase64) {
-                videoBase64 = await getMediaDataUrl('active-video');
-            }
-
-            // 2-Tier Fallback Chain for Audio Base64 Retrieval
+            // 2-Step Bulletproof Audio Finder
             let audioBase64: string | null = null;
 
-            // Tier 1: audioUrl from Zustand store
-            if (audioUrl) {
+            // Step 1: IndexedDB active-audio
+            audioBase64 = await getMediaDataUrl('active-audio');
+
+            // Step 2: Zustand store audioUrl if valid
+            if (!audioBase64 && audioUrl) {
                 try {
                     const r = await fetch(audioUrl);
                     if (r.ok) {
@@ -117,11 +135,6 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                         audioBase64 = await blobToDataUrl(b);
                     }
                 } catch (e) {}
-            }
-
-            // Tier 2: IndexedDB active-audio key
-            if (!audioBase64) {
-                audioBase64 = await getMediaDataUrl('active-audio');
             }
 
             const res = await fetch('/api/export-remotion', {
@@ -156,7 +169,7 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
             URL.revokeObjectURL(url);
 
             setIsRemotionExporting(false);
-            setStatusMessage('Remotion MP4 video export complete! File downloaded.');
+            setStatusMessage('Remotion MP4 video export complete! File downloaded to Downloads folder.');
         } catch (err: any) {
             setIsRemotionExporting(false);
             setStatusMessage(`Remotion Export Error: ${err.message}`);
