@@ -31,6 +31,9 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
     const audioUrl = useStore(s => s.audioUrl);
     const videoUrl = useStore(s => s.videoUrl);
     const activeVideoBlob = useStore(s => s.activeVideoBlob);
+    const scrollKeyframes = useStore(s => s.scrollKeyframes);
+    const videoSyncMode = useStore(s => s.videoSyncMode);
+    const videoSpeedRatio = useStore(s => s.videoSpeedRatio);
 
     const targetStart = exportRange === 'loop' ? loopStart : 0;
     const targetEnd = exportRange === 'loop' ? (loopEnd || sequenceDuration) : sequenceDuration;
@@ -157,6 +160,16 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                 audioBase64 = await getMediaDataUrl('active-audio');
             }
 
+            // Get video duration from the live DOM video element before we convert it
+            let videoDuration: number = sequenceDuration;
+            try {
+                const container = document.querySelector('div[data-purpose="viewport-container"]');
+                const domVideo = (container?.querySelector('video') ?? document.querySelector('video')) as HTMLVideoElement | null;
+                if (domVideo && isFinite(domVideo.duration) && domVideo.duration > 0) {
+                    videoDuration = domVideo.duration;
+                }
+            } catch (_) {}
+
             const res = await fetch('/api/export-remotion', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -173,6 +186,13 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                         audioUrl: audioUrl && !audioUrl.startsWith('blob:') ? audioUrl : undefined,
                         startFrame,
                         mirrorVideo,
+                        // Keyframe animation data — MUST come via inputProps since Remotion
+                        // renders in a separate headless Chrome with no Zustand state
+                        scrollKeyframes,
+                        sequenceDuration,
+                        videoSyncMode,
+                        videoSpeedRatio,
+                        videoDuration,
                     },
                 }),
             });
