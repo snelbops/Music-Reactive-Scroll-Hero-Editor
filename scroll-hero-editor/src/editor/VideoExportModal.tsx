@@ -3,6 +3,7 @@ import { X, Film, Download, StopCircle, Smartphone, Monitor, Square, Sparkles, T
 import { videoExporter } from '../export/exportVideo';
 import { useStore } from '../store/useStore';
 import { getMediaDataUrl, blobToDataUrl } from '../utils/mediaStore';
+import { getCachedActiveVideo } from '../utils/videoCache';
 
 interface VideoExportModalProps {
     onClose: () => void;
@@ -76,8 +77,16 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
             // Priority 5-Step Video Finder (Always favors CURRENT active video)
             let videoBase64: string | null = null;
 
+            // Priority 0 (MOST RELIABLE): Live in-memory blob cache — always the exact active video
+            // This blob is stored in RAM the moment any video is uploaded or pad is switched,
+            // so it's never stale from IndexedDB and never a revoked blob: URL.
+            const cachedBlob = getCachedActiveVideo();
+            if (cachedBlob) {
+                videoBase64 = await blobToDataUrl(cachedBlob);
+            }
+
             // Priority 1: Current active video pad slot in IndexedDB
-            if (activeVideoPadIdx !== undefined && activeVideoPadIdx !== null) {
+            if (!videoBase64 && activeVideoPadIdx !== undefined && activeVideoPadIdx !== null) {
                 videoBase64 = await getMediaDataUrl(`video-pad-${activeVideoPadIdx}`);
             }
 
