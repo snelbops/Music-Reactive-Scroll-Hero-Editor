@@ -11,6 +11,10 @@ function remotionExportPlugin(): Plugin {
       server.middlewares.use('/api/export-remotion', async (req, res, next) => {
         if (req.method !== 'POST') return next();
 
+        // Prevent Node HTTP server socket timeout during Remotion rendering
+        req.setTimeout(300000);
+        res.setTimeout(300000);
+
         let body = '';
         req.on('data', chunk => { body += chunk; });
         req.on('end', async () => {
