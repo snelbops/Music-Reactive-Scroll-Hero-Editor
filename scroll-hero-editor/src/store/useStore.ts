@@ -30,7 +30,7 @@ interface EditorState {
     isRecording: boolean; setIsRecording: (rec: boolean) => void;
     recordCountdown: number | null; setRecordCountdown: (n: number | null) => void;
     recordedEvents: RecordedEvent[]; pushRecordedEvent: (ev: RecordedEvent) => void; clearRecordedEvents: () => void;
-    padSwitchEvents: PadSwitchEvent[]; addPadSwitchEvent: (time: number, padIdx: number) => void; clearPadSwitchEvents: () => void;
+    padSwitchEvents: PadSwitchEvent[]; addPadSwitchEvent: (time: number, padIdx: number) => void; removePadSwitchEvent: (time: number) => void; clearPadSwitchEvents: () => void;
     scrollProgress: number; setScrollProgress: (progress: number) => void;
     activePreset: PresetId; setActivePreset: (preset: PresetId) => void;
     aspectRatio: AspectRatio; setAspectRatio: (ratio: AspectRatio) => void;
@@ -122,6 +122,9 @@ export const useStore = create<EditorState>((set, get) => {
     addPadSwitchEvent: (time, padIdx) => set((s) => ({
         padSwitchEvents: [...s.padSwitchEvents.filter(e => Math.abs(e.time - time) > 0.1), { time, padIdx }].sort((a, b) => a.time - b.time)
     })),
+    removePadSwitchEvent: (time) => set((s) => ({
+        padSwitchEvents: s.padSwitchEvents.filter(e => Math.abs(e.time - time) > 0.05)
+    })),
     clearPadSwitchEvents: () => set({ padSwitchEvents: [] }),
     scrollProgress: 0, setScrollProgress: (progress) => set({ scrollProgress: progress }),
     activePreset: 'video', setActivePreset: (preset) => set({ activePreset: preset }),
@@ -139,10 +142,16 @@ export const useStore = create<EditorState>((set, get) => {
     setMp4Asset: (asset) => set({ mp4Asset: asset, videoUrl: asset ? asset.url : null }),
     removeMp4Asset: () => set({ mp4Asset: null, videoUrl: null, extractedFrames: [], extractionStatus: 'idle' }),
     videoPads: [
-        { id: 7, name: 'Sample Video', url: '/sample.mp4' },
-        { id: 8, name: 'Empty Pad 2', url: '' },
-        { id: 4, name: 'Empty Pad 3', url: '' },
-        { id: 5, name: 'Empty Pad 4', url: '' },
+        { id: 7, name: 'Pad 7', url: '/sample.mp4' },
+        { id: 8, name: 'Pad 8', url: '' },
+        { id: 9, name: 'Pad 9', url: '' },
+        { id: 4, name: 'Pad 4', url: '' },
+        { id: 5, name: 'Pad 5', url: '' },
+        { id: 6, name: 'Pad 6', url: '' },
+        { id: 1, name: 'Pad 1', url: '' },
+        { id: 2, name: 'Pad 2', url: '' },
+        { id: 3, name: 'Pad 3', url: '' },
+        { id: 0, name: 'Pad 0', url: '' },
     ],
     activeVideoPadIdx: 0,
     videoSyncMode: 'fit',
@@ -173,13 +182,17 @@ export const useStore = create<EditorState>((set, get) => {
         set({ scrollKeyframes: newScrollKfs, paramKeyframes: newParamKfs });
     },
     setActiveVideoPadIdx: (idx) => {
-        const pads = get().videoPads;
-        const targetUrl = pads[idx]?.url || get().videoUrl;
+        const s = get();
+        const pads = s.videoPads;
+        const targetUrl = pads[idx]?.url || s.videoUrl;
         set({ activeVideoPadIdx: idx, videoUrl: targetUrl, activePreset: 'video' });
+        if (s.isRecording) {
+            s.addPadSwitchEvent(s.playheadPosition, idx);
+        }
     },
     setVideoPad: (idx, pad) => set((s) => {
         const updated = [...s.videoPads];
-        const padKeyMap = [7, 8, 4, 5];
+        const padKeyMap = [7, 8, 9, 4, 5, 6, 1, 2, 3, 0];
         const padId = padKeyMap[idx] ?? (idx + 1);
         updated[idx] = { id: padId, ...pad };
         return { videoPads: updated, videoUrl: s.activeVideoPadIdx === idx ? pad.url : s.videoUrl, activePreset: 'frames' };

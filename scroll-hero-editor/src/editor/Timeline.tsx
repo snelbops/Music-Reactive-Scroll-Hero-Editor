@@ -1,6 +1,6 @@
 import { useRef, useEffect, useLayoutEffect, useCallback, useState } from 'react';
 import type React from 'react';
-import { Play, Pause, Square, Music, Circle, ZoomIn, ZoomOut, Video, MousePointer2, Repeat, Eraser, Pen, Mouse, SlidersHorizontal, UploadCloud, Magnet, Undo2, Redo2 } from 'lucide-react';
+import { Play, Pause, Square, Music, Circle, ZoomIn, ZoomOut, Video, MousePointer2, Repeat, Eraser, Pen, Mouse, SlidersHorizontal, UploadCloud, Magnet, Undo2, Redo2, Grid } from 'lucide-react';
 import { onChange } from '@theatre/core';
 import { useStore } from '../store/useStore';
 import { saveMediaFile } from '../utils/mediaStore';
@@ -107,6 +107,11 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const clearScrollKeyframes = useStore(s => s.clearScrollKeyframes);
     const updateScrollKeyframeHandle = useStore(s => s.updateScrollKeyframeHandle);
     
+    const padSwitchEvents = useStore(s => s.padSwitchEvents);
+    const clearPadSwitchEvents = useStore(s => s.clearPadSwitchEvents);
+    const removePadSwitchEvent = useStore(s => s.removePadSwitchEvent);
+    const videoPads = useStore(s => s.videoPads);
+
     const paramKeyframes = useStore(s => s.paramKeyframes);
     const addParamKeyframe = useStore(s => s.addParamKeyframe);
     const setParamKeyframes = useStore(s => s.setParamKeyframes);
@@ -127,6 +132,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const canRedo = useStore(s => s._future.length > 0);
     const draggingHandleRef = useRef<{ kfTime: number; side: 'in' | 'out' } | null>(null);
     const draggingParamHandleRef = useRef<{ laneId: string; kfTime: number; side: 'in' | 'out' } | null>(null);
+    const draggingParamKfRef = useRef<any>(null);
+    const [marqueeBox, setMarqueeBox] = useState<{ laneId: string; startX: number; startY: number; currentX: number; currentY: number } | null>(null);
     // Reactive time display — updated by onChange so it refreshes each frame during playback
     const [seqTime, setSeqTime] = useState(() => sheet.sequence.position);
     const [laneHeights, setLaneHeights] = useState<Record<string, number>>({});
@@ -725,7 +732,6 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const scrollHistory = useRef<{ pos: number; val: number }[]>([]);
     // Tracks an in-progress keyframe drag: origTime of the dragged keyframe
     const draggingKfRef = useRef<{ origTime: number; value: number } | null>(null);
-    const draggingParamKfRef = useRef<{ laneId: string; startTime: number; origTime: number; value: number } | null>(null);
 
     const { beats, waveform, isReady } = useKickDrumData(audioUrl);
 
@@ -1345,6 +1351,57 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-blue/40 z-40" onPointerDown={makeLaneDrag('audio')} />
                 </div>
                 )}
+                {(isolatedLane === 'all') && (
+                <div className="flex border-b border-editor-border group relative" style={{ height: 40 }}>
+                    <div className="w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border bg-editor-panel text-editor-fg sticky left-0 z-30 overflow-hidden">
+                        <div className="flex items-center gap-1.5 overflow-hidden">
+                            <Grid className="w-3 h-3 text-amber-400 shrink-0" />
+                            <span className="text-[10px] uppercase font-bold text-amber-400 truncate">Drum Pads</span>
+                        </div>
+                        {padSwitchEvents.length > 0 && (
+                            <button
+                                className="text-[9px] text-[#808080] hover:text-red-400 transition-colors shrink-0 font-bold ml-1"
+                                title="Clear recorded Drum Pad switch events"
+                                onClick={(e) => { e.stopPropagation(); clearPadSwitchEvents(); }}
+                            >✕</button>
+                        )}
+                    </div>
+                    <div className="flex-1 relative overflow-hidden bg-amber-500/[0.03] flex items-center">
+                        {padSwitchEvents.length === 0 ? (
+                            <span className="text-[10px] text-editor-muted italic px-3">Press Numpad [7..0] during recording to log video pad switches...</span>
+                        ) : (
+                            <div className="absolute inset-0 w-full h-full pointer-events-auto">
+                                {padSwitchEvents.map((ev, i) => {
+                                    const leftPct = (ev.time / sequenceDuration) * 100;
+                                    const padInfo = videoPads[ev.padIdx];
+                                    const padLabel = padInfo ? `PAD ${padInfo.id}` : `PAD ${ev.padIdx}`;
+                                    return (
+                                        <div
+                                            key={i}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                useStore.getState().setPlayheadPosition(ev.time);
+                                                useStore.getState().setActiveVideoPadIdx(ev.padIdx);
+                                            }}
+                                            onContextMenu={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                removePadSwitchEvent(ev.time);
+                                            }}
+                                            title={`Click to seek (Time: ${ev.time.toFixed(2)}s, ${padLabel}) | Right-click to delete`}
+                                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/60 hover:bg-amber-500 hover:text-black cursor-pointer shadow-sm transition-all z-20 flex items-center gap-1"
+                                            style={{ left: `${leftPct}%` }}
+                                        >
+                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                                            <span>{padLabel}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+                )}
                 {extractedFrames.length > 0 && (isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('videoFrames') }}>
                     <div className={`w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border sticky left-0 z-30 cursor-pointer transition-colors overflow-hidden ${activePreset === 'frames' ? 'bg-[#2a2a2a] ring-1 ring-inset ring-[#444]' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}>
@@ -1818,19 +1875,60 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     const rect = el.getBoundingClientRect();
                                     const x = e.clientX - rect.left + el.scrollLeft - LABEL_W;
                                     const laneTrackW = lanesWidth * timelineZoom - LABEL_W;
-                                    const t = Math.max(0, Math.min(1, x / laneTrackW)) * SEQUENCE_DURATION;
+                                    const t = Math.max(0, Math.min(1, x / laneTrackW)) * sequenceDuration;
                                     const existing = interpolateParamAt(kfs, t);
                                     addParamKeyframe(lane.id, t, existing ?? currentVal);
                                 }}
                                 onPointerDown={(e) => {
-                                    if (e.shiftKey || (activeTool === 'select' && e.target === e.currentTarget)) {
+                                    if (activeTool === 'select' && e.target === e.currentTarget) {
+                                        setSelectedLane(lane.id);
+                                        const targetEl = e.currentTarget as HTMLElement;
+                                        const rect = targetEl.getBoundingClientRect();
+                                        const startX = e.clientX - rect.left;
+                                        const startY = e.clientY - rect.top;
+                                        setMarqueeBox({ laneId: lane.id, startX, startY, currentX: startX, currentY: startY });
+                                        targetEl.setPointerCapture(e.pointerId);
+
+                                        const onMove = (ev: PointerEvent) => {
+                                            const r = targetEl.getBoundingClientRect();
+                                            const curX = Math.max(0, Math.min(r.width, ev.clientX - r.left));
+                                            const curY = Math.max(0, Math.min(r.height, ev.clientY - r.top));
+                                            setMarqueeBox({ laneId: lane.id, startX, startY, currentX: curX, currentY: curY });
+
+                                            const minX = Math.min(startX, curX);
+                                            const maxX = Math.max(startX, curX);
+                                            const minY = Math.min(startY, curY);
+                                            const maxY = Math.max(startY, curY);
+
+                                            const currentKfs = (useStore.getState().paramKeyframes[lane.id] ?? []) as ParamKf[];
+                                            const selected = currentKfs.filter(kf => {
+                                                const kfX = (kf.time / sequenceDuration) * r.width;
+                                                const kfY = normalY(kf.value) / VB_H * r.height;
+                                                return kfX >= minX && kfX <= maxX && kfY >= minY && kfY <= maxY;
+                                            }).map(kf => ({ laneId: lane.id, position: kf.time, value: kf.value }));
+
+                                            setSelectedKeyframes(selected);
+                                        };
+
+                                        const onUp = () => {
+                                            setMarqueeBox(null);
+                                            targetEl.removeEventListener('pointermove', onMove as any);
+                                            targetEl.removeEventListener('pointerup', onUp as any);
+                                        };
+
+                                        targetEl.addEventListener('pointermove', onMove as any);
+                                        targetEl.addEventListener('pointerup', onUp as any);
+                                        return;
+                                    }
+
+                                    if (e.shiftKey) {
                                         setSelectedLane(lane.id);
                                         handleTrackPointerDown(e);
                                         return;
                                     }
                                     if (activeTool !== 'pen' && activeTool !== 'eraser') return;
                                     e.stopPropagation();
-                                    const target = e.currentTarget;
+                                    const target = e.currentTarget as HTMLElement;
                                     target.setPointerCapture(e.pointerId);
 
                                     if (activeTool === 'eraser') {
@@ -1877,6 +1975,19 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     target.addEventListener('pointerup', onUp as any);
                                 }}
                             >
+                                {/* Marquee Selection Box Overlay */}
+                                {marqueeBox && marqueeBox.laneId === lane.id && (
+                                    <div
+                                        className="absolute border border-editor-accent-purple bg-editor-accent-purple/20 pointer-events-none z-30"
+                                        style={{
+                                            left: Math.min(marqueeBox.startX, marqueeBox.currentX),
+                                            top: Math.min(marqueeBox.startY, marqueeBox.currentY),
+                                            width: Math.abs(marqueeBox.currentX - marqueeBox.startX),
+                                            height: Math.abs(marqueeBox.currentY - marqueeBox.startY),
+                                        }}
+                                    />
+                                )}
+
                                 <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
                                     <defs>
                                         <linearGradient id={`fill-${lane.id}`} x1="0" y1="0" x2="0" y2="1">
@@ -1951,7 +2062,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                     updateParamKeyframeHandle(laneId, kfTime, s, {
                                                         dt: s === 'out' ? Math.max(0, newDt) : Math.min(0, newDt),
                                                         dv: newDv,
-                                                    });
+                                                     });
                                                 }}
                                                 onPointerUp={() => { draggingParamHandleRef.current = null; }}
                                             />
@@ -1996,39 +2107,56 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             e.stopPropagation();
                                             (e.target as HTMLElement).setPointerCapture(e.pointerId);
                                             useStore.getState().pushHistory();
-                                            draggingParamKfRef.current = { laneId: lane.id, startTime: kf.time, origTime: kf.time, value: kf.value };
+
+                                            const isCurrentSelected = selectedKeyframes.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.005);
+                                            const activeSelection = isCurrentSelected && selectedKeyframes.filter(s => s.laneId === lane.id).length > 0
+                                                ? selectedKeyframes.filter(s => s.laneId === lane.id)
+                                                : [{ laneId: lane.id, position: kf.time, value: kf.value }];
+
+                                            if (!isCurrentSelected) {
+                                                setSelectedKeyframes(activeSelection);
+                                            }
+
+                                            draggingParamKfRef.current = {
+                                                laneId: lane.id,
+                                                startClientX: e.clientX,
+                                                startClientY: e.clientY,
+                                                origKfs: activeSelection,
+                                                initialLaneKfs: (paramKeyframes[lane.id] ?? []) as ParamKf[],
+                                            };
                                         }}
                                         onPointerMove={(e) => {
                                             if (!draggingParamKfRef.current || !(e.buttons & 1)) return;
-                                            const { laneId, startTime: st, origTime } = draggingParamKfRef.current;
+                                            const { laneId, startClientX, startClientY, origKfs, initialLaneKfs } = draggingParamKfRef.current;
                                             const container = (e.target as HTMLElement).parentElement!;
                                             const rect = container.getBoundingClientRect();
-                                            const x = e.clientX - rect.left;
-                                            const y = e.clientY - rect.top;
-                                            const newTime = Math.max(0, Math.min(sequenceDuration, (x / rect.width) * sequenceDuration));
-                                            const newValue = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - y / rect.height) * (lane.max - lane.min)));
-                                            const existingKf = (paramKeyframes[laneId] ?? []).find(k => Math.abs(k.time - origTime) < 0.005);
-                                            const { easing: existingEasing = 'linear', handleOut, handleIn } = existingKf ?? {};
-                                            setParamKeyframes(laneId, (paramKeyframes[laneId] ?? [])
-                                                .filter(k => Math.abs(k.time - origTime) > 0.005)
-                                                .concat({ time: newTime, value: newValue, easing: existingEasing, ...(handleOut ? { handleOut } : {}), ...(handleIn ? { handleIn } : {}) })
-                                                .sort((a, b) => a.time - b.time) as ParamKf[]);
-                                            draggingParamKfRef.current = { laneId, startTime: st, origTime: newTime, value: newValue };
+
+                                            const dx = e.clientX - startClientX;
+                                            const dy = e.clientY - startClientY;
+
+                                            const deltaTime = (dx / rect.width) * sequenceDuration;
+                                            const valueRange = lane.max - lane.min;
+                                            const deltaValue = -(dy / rect.height) * valueRange;
+
+                                            const isShift = e.shiftKey;
+
+                                            const updatedSelection = origKfs.map((orig: any) => {
+                                                const newTime = Math.max(0, Math.min(sequenceDuration, +(orig.position + (isShift ? deltaTime : 0)).toFixed(2)));
+                                                const newValue = Math.max(lane.min, Math.min(lane.max, +(orig.value + (isShift ? 0 : deltaValue)).toFixed(3)));
+                                                return { laneId, position: newTime, value: newValue };
+                                            });
+
+                                            const origTimes = new Set<number>(origKfs.map((k: any) => k.position));
+                                            const remainingKfs = initialLaneKfs.filter((k: ParamKf) => !Array.from(origTimes).some((t: number) => Math.abs(k.time - t) < 0.005));
+
+                                            const mergedKfs = remainingKfs
+                                                .concat(updatedSelection.map((s: any) => ({ time: s.position, value: s.value, easing: 'linear' })))
+                                                .sort((a: ParamKf, b: ParamKf) => a.time - b.time);
+
+                                            setParamKeyframes(laneId, mergedKfs as ParamKf[]);
+                                            setSelectedKeyframes(updatedSelection);
                                         }}
                                         onPointerUp={() => {
-                                            if (draggingParamKfRef.current) {
-                                                const { laneId, startTime, origTime, value } = draggingParamKfRef.current;
-                                                const updated = { laneId, position: origTime, value };
-                                                const prev = useStore.getState().selectedKeyframes;
-                                                const hadIt = prev.some(s => s.laneId === laneId && Math.abs(s.position - startTime) < 0.001);
-                                                if (hadIt) {
-                                                    setSelectedKeyframes(prev
-                                                        .filter(s => !(s.laneId === laneId && Math.abs(s.position - startTime) < 0.001))
-                                                        .concat(updated));
-                                                } else {
-                                                    setSelectedKeyframe(updated);
-                                                }
-                                            }
                                             draggingParamKfRef.current = null;
                                         }}
                                         onContextMenu={(e) => {
@@ -2053,9 +2181,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 }}
                             />
                         </div>
-                            </div>
-                            <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-purple/40 z-40" onPointerDown={makeLaneDrag(lane.id)} />
-                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-purple/40 z-40" onPointerDown={makeLaneDrag(lane.id)} />
+                    </div>
+                </div>
                     );
                 })}
 
@@ -2080,8 +2208,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         )}
                     </div>
                 </div>
-                </div>
             </div>
+        </div>
 
             {/* Auto-Rhythm Beat Curve Generator Modal */}
             {showRhythmModal && (

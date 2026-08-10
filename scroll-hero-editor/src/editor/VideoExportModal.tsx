@@ -195,6 +195,7 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                         videoSyncMode,
                         videoSpeedRatio,
                         videoDuration,
+                        padSwitchEvents: useStore.getState().padSwitchEvents,
                     },
                 }),
             });
