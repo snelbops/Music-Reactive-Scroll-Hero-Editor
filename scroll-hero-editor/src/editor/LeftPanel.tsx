@@ -130,28 +130,32 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
     }, []);
 
     return (
-        <aside className="flex flex-col border-r border-editor-border bg-editor-panel text-editor-fg overflow-hidden" style={{ width }}>
+        <aside className="flex flex-col border-r border-[#1a1d21] bg-[#101215] text-[#e2e5e8] overflow-hidden min-w-[200px]" style={{ width }}>
             {/* Top 2-Tab Navigation Bar */}
-            <div className="h-9 border-b border-editor-border flex items-center bg-black/40 shrink-0 p-1 gap-1">
+            <div className="h-9 border-b border-[#1a1d21] flex items-center bg-[#0d0e10] shrink-0 p-1 gap-1">
                 <button
                     onClick={() => setActiveLeftTab('settings')}
-                    className={`flex-1 h-7 rounded text-xxs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${
+                    className={`flex-1 h-7 rounded text-[10px] font-semibold uppercase tracking-wider flex items-center justify-center gap-1 transition-all min-w-0 px-1 ${
                         activeLeftTab === 'settings'
-                            ? 'bg-editor-accent-purple/20 text-editor-accent-purple border border-editor-accent-purple/40 shadow-sm'
-                            : 'text-editor-muted hover:text-editor-fg hover:bg-editor-surface'
+                            ? 'bg-[#23272c] text-[#e2e5e8] border border-[#3a4249] shadow-xs'
+                            : 'text-[#7d848c] hover:text-[#e2e5e8] hover:bg-[#15181b]'
                     }`}
+                    title="Media & Pad Controls"
                 >
-                    <SlidersHorizontal className="w-3 h-3" /> Settings & Media
+                    <SlidersHorizontal className="w-3 h-3 shrink-0" />
+                    <span className="truncate">Media & Sync</span>
                 </button>
                 <button
                     onClick={() => setActiveLeftTab('scene3d')}
-                    className={`flex-1 h-7 rounded text-xxs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${
+                    className={`flex-1 h-7 rounded text-[10px] font-semibold uppercase tracking-wider flex items-center justify-center gap-1 transition-all min-w-0 px-1 ${
                         activeLeftTab === 'scene3d'
-                            ? 'bg-editor-accent-purple/20 text-editor-accent-purple border border-editor-accent-purple/40 shadow-sm'
-                            : 'text-editor-muted hover:text-editor-fg hover:bg-editor-surface'
+                            ? 'bg-[#23272c] text-[#e2e5e8] border border-[#3a4249] shadow-xs'
+                            : 'text-[#7d848c] hover:text-[#e2e5e8] hover:bg-[#15181b]'
                     }`}
+                    title="3D Scene Components"
                 >
-                    <Sparkles className="w-3 h-3" /> 3D Components
+                    <Sparkles className="w-3 h-3 shrink-0" />
+                    <span className="truncate">3D Scene</span>
                 </button>
             </div>
 
@@ -161,21 +165,21 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
             {activeLeftTab === 'settings' && (
                 <>
                     {/* Video Drumpad Launcher (10 Numpad Slots: 7,8,9 / 4,5,6 / 1,2,3 / 0) */}
-                    <section className="rounded border border-editor-border bg-editor-surface overflow-hidden">
+                    <section className="rounded-md border border-[#23272c] bg-[#15181b] overflow-hidden">
                         <button
                             onClick={() => setIsVideoPadsOpen(!isVideoPadsOpen)}
-                            className="w-full flex items-center justify-between px-2.5 py-1.5 text-xxs font-bold text-editor-muted uppercase tracking-wider hover:text-editor-fg transition-colors"
+                            className="w-full flex items-center justify-between px-2.5 py-1.5 text-[10px] font-semibold text-[#7d848c] uppercase tracking-wider hover:text-[#e2e5e8] transition-colors gap-1 min-w-0"
                         >
-                            <div className="flex items-center gap-1.5">
-                                <Grid className="w-3.5 h-3.5 text-editor-accent-purple" />
-                                <span>Video Drumpads</span>
+                            <div className="flex items-center gap-1.5 truncate min-w-0">
+                                <Grid className="w-3.5 h-3.5 text-[#c98a4d] shrink-0" />
+                                <span className="truncate">Video Drumpads</span>
                             </div>
-                            <span className="text-[9px] font-mono text-editor-accent-purple bg-black/40 px-1.5 py-0.5 rounded">Numpad [7..0]</span>
+                            <span className="text-[9.5px] font-mono text-[#8a9198] border border-[#23272c] bg-[#171a1e] px-1.5 py-0.5 rounded shrink-0">Numpad [7..0]</span>
                         </button>
 
                         {isVideoPadsOpen && (
-                            <div className="p-2 space-y-2 border-t border-editor-border">
-                                <div className="grid grid-cols-3 gap-1.5">
+                            <div className="p-1.5 space-y-1.5 border-t border-[#23272c]">
+                                <div className="grid grid-cols-3 gap-1.5 min-w-0">
                                     {videoPads.map((pad, idx) => {
                                         const isActive = activeVideoPadIdx === idx;
                                         const fileInputId = `pad-upload-${idx}`;
@@ -222,12 +226,12 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                                 }}
                                                 onDragOver={(e) => e.preventDefault()}
                                                 onDrop={handlePadDrop}
-                                                className={`p-1.5 rounded border flex flex-col justify-between text-left cursor-pointer transition-all relative group/pad ${
+                                                className={`p-1.5 rounded-md border flex flex-col justify-between text-left cursor-pointer transition-all relative group/pad min-w-0 ${
                                                     isWideZeroPad ? 'col-span-3' : ''
                                                 } ${
                                                     isActive
-                                                        ? 'bg-editor-accent-purple/25 border-editor-accent-purple shadow-[0_0_10px_rgba(168,85,247,0.35)] text-editor-fg font-bold'
-                                                        : 'bg-black/30 border-editor-border text-editor-muted hover:bg-editor-surface-hover hover:text-white'
+                                                        ? 'bg-[#1c222b] border-[#c98a4d] text-[#e2e5e8] font-bold shadow-xs'
+                                                        : 'bg-[#101215] border-[#23272c] text-[#7d848c] hover:bg-[#1a1e23] hover:text-[#e2e5e8] hover:border-[#3a4249]'
                                                 }`}
                                             >
                                                 <input
@@ -238,19 +242,21 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                                     onChange={handlePadFileUpload}
                                                 />
                                                 <div className="flex justify-between items-center w-full mb-1">
-                                                    <span className="text-[9px] font-bold font-mono px-1 rounded bg-black/60 text-editor-accent-purple">PAD {pad.id}</span>
+                                                    <span className={`text-[10px] font-semibold font-mono ${isActive ? 'text-[#c98a4d]' : 'text-[#8a9198]'}`}>
+                                                        PAD {pad.id}
+                                                    </span>
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             document.getElementById(fileInputId)?.click();
                                                         }}
                                                         title="Assign Video File"
-                                                        className="text-[9px] text-editor-muted hover:text-white bg-black/60 hover:bg-editor-accent-purple/50 px-1 rounded transition-colors"
+                                                        className="text-[10px] text-[#7d848c] hover:text-[#e2e5e8] hover:bg-[#23272c] w-4 h-4 flex items-center justify-center rounded transition-colors"
                                                     >
                                                         +
                                                     </button>
                                                 </div>
-                                                <div className="text-[9px] font-medium truncate w-full flex items-center gap-1">
+                                                <div className="text-[9.5px] font-medium truncate w-full flex items-center gap-1 min-w-0">
                                                     <Video className="w-2.5 h-2.5 shrink-0 opacity-70" />
                                                     <span className="truncate">{pad.name || 'Drop Video'}</span>
                                                 </div>
@@ -263,39 +269,39 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                     </section>
 
                     {/* Video Sync & Playback Controls */}
-                    <section className="rounded border border-editor-border bg-editor-surface overflow-hidden">
+                    <section className="rounded-md border border-[#23272c] bg-[#15181b] overflow-hidden">
                         <button
                             onClick={() => setIsVideoControlsOpen(!isVideoControlsOpen)}
-                            className="w-full flex items-center justify-between px-2.5 py-1.5 text-xxs font-bold text-editor-muted uppercase tracking-wider hover:text-editor-fg transition-colors"
+                            className="w-full flex items-center justify-between px-2.5 py-1.5 text-[10px] font-semibold text-[#7d848c] uppercase tracking-wider hover:text-[#e2e5e8] transition-colors"
                         >
-                            <div className="flex items-center gap-1.5">
-                                <Film className="w-3.5 h-3.5 text-cyan-400" />
+                            <div className="flex items-center gap-1.5 truncate">
+                                <Film className="w-3.5 h-3.5 text-[#5f7f9e]" />
                                 <span>Video Sync & Controls</span>
                             </div>
                             {isVideoControlsOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                         </button>
 
                         {isVideoControlsOpen && (
-                            <div className="p-2.5 space-y-2.5 border-t border-editor-border text-xxs">
+                            <div className="p-2.5 space-y-2.5 border-t border-[#23272c] text-xxs">
                                 {/* Sync Mode Selection */}
                                 <div className="space-y-1">
-                                    <span className="text-[9px] text-editor-muted uppercase tracking-wider font-bold">Video Sync Mode</span>
-                                    <div className="grid grid-cols-3 gap-1">
+                                    <span className="text-[9.5px] text-[#7d848c] uppercase tracking-wider font-semibold">Video Sync Mode</span>
+                                    <div className="grid grid-cols-3 gap-1 min-w-0">
                                         {(['fit', 'realtime', 'loop'] as const).map(mode => (
                                             <button
                                                 key={mode}
                                                 onClick={() => setVideoSyncMode(mode)}
-                                                className={`py-1 rounded text-[9px] font-bold uppercase transition-all ${
+                                                className={`py-1 px-1 rounded text-[9.5px] font-semibold uppercase transition-all truncate ${
                                                     videoSyncMode === mode
-                                                        ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50'
-                                                        : 'bg-black/30 border border-editor-border text-editor-muted hover:text-white'
+                                                        ? 'bg-[#1c222b] text-[#5f7f9e] border border-[#5f7f9e]'
+                                                        : 'bg-[#101215] border border-[#23272c] text-[#7d848c] hover:text-[#e2e5e8] hover:bg-[#1f2328]'
                                                 }`}
                                             >
                                                 {mode}
                                             </button>
                                         ))}
                                     </div>
-                                    <p className="text-[8px] text-editor-muted leading-tight mt-1">
+                                    <p className="text-[8.5px] text-[#6b7278] leading-tight mt-1">
                                         {videoSyncMode === 'fit' && '• Fit: Stretches 0-100% of video over sequence duration'}
                                         {videoSyncMode === 'realtime' && '• Realtime: 1 sec timeline = 1 sec video playback'}
                                         {videoSyncMode === 'loop' && '• Loop: Plays at 1x speed, looping automatically'}
@@ -303,10 +309,10 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                 </div>
 
                                 {/* Speed Ratio Multiplier */}
-                                <div className="space-y-1 pt-1 border-t border-editor-border">
-                                    <div className="flex justify-between text-[9px]">
-                                        <span className="text-editor-muted uppercase tracking-wider font-bold">Speed Ratio</span>
-                                        <span className="font-mono text-cyan-400 font-bold">{videoSpeedRatio.toFixed(2)}x</span>
+                                <div className="space-y-1 pt-1 border-t border-[#23272c]">
+                                    <div className="flex justify-between text-[9.5px]">
+                                        <span className="text-[#7d848c] uppercase tracking-wider font-semibold">Speed Ratio</span>
+                                        <span className="font-mono text-[#5f7f9e] font-semibold">{videoSpeedRatio.toFixed(2)}x</span>
                                     </div>
                                     <input
                                         type="range"
@@ -315,11 +321,11 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                         step="0.05"
                                         value={videoSpeedRatio}
                                         onChange={(e) => setVideoSpeedRatio(parseFloat(e.target.value))}
-                                        className="w-full h-1 accent-cyan-400 cursor-pointer"
+                                        className="w-full h-1 accent-[#5f7f9e] cursor-pointer"
                                     />
-                                    <div className="flex justify-between text-[8px] text-editor-muted font-mono">
+                                    <div className="flex justify-between text-[8.5px] text-[#7d848c] font-mono">
                                         <span>0.25x</span>
-                                        <span className="cursor-pointer hover:text-white text-cyan-400 underline" onClick={() => setVideoSpeedRatio(1.0)}>Reset (1.0x)</span>
+                                        <span className="cursor-pointer hover:text-[#e2e5e8] text-[#5f7f9e] underline" onClick={() => setVideoSpeedRatio(1.0)}>Reset (1.0x)</span>
                                         <span>3.00x</span>
                                     </div>
                                 </div>
@@ -333,7 +339,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                             if (!isNaN(r) && r > 0) useStore.getState().remapKeyframesToRatio(r);
                                         }
                                     }}
-                                    className="w-full py-1 text-[9px] bg-editor-accent-purple/20 hover:bg-editor-accent-purple border border-editor-accent-purple/40 text-editor-accent-purple hover:text-white rounded font-mono font-bold transition-all flex items-center justify-center gap-1"
+                                    className="w-full py-1 text-[9.5px] bg-[#1c222b] hover:bg-[#232a35] border border-[#5f7f9e]/40 text-[#5f7f9e] hover:text-[#e2e5e8] rounded font-mono font-semibold transition-all flex items-center justify-center gap-1"
                                 >
                                     ⚡ Remap Keyframe Time Ratio
                                 </button>
@@ -342,30 +348,30 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                     </section>
 
                     {/* Single Video Asset Upload & Frame Extractor */}
-                    <section className="rounded border border-editor-border bg-editor-surface overflow-hidden">
+                    <section className="rounded-md border border-[#23272c] bg-[#15181b] overflow-hidden">
                         <button
                             onClick={() => setIsFrameExtractorOpen(!isFrameExtractorOpen)}
-                            className="w-full flex items-center justify-between px-2.5 py-1.5 text-xxs font-bold text-editor-muted uppercase tracking-wider hover:text-editor-fg transition-colors"
+                            className="w-full flex items-center justify-between px-2.5 py-1.5 text-[10px] font-semibold text-[#7d848c] uppercase tracking-wider hover:text-[#e2e5e8] transition-colors"
                         >
-                            <div className="flex items-center gap-1.5">
-                                <Film className="w-3.5 h-3.5 text-editor-accent-teal" />
+                            <div className="flex items-center gap-1.5 truncate">
+                                <Film className="w-3.5 h-3.5 text-[#6e9c73]" />
                                 <span>Single Asset & Extractor</span>
                             </div>
                             {isFrameExtractorOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                         </button>
 
                         {isFrameExtractorOpen && (
-                            <div className="p-2.5 space-y-2 border-t border-editor-border">
+                            <div className="p-2.5 space-y-2 border-t border-[#23272c]">
                                 <input type="file" accept="video/*" ref={mp4InputRef} className="hidden" onChange={handleMp4Upload} />
-                                <div className="flex items-center gap-2 bg-black/30 p-2 rounded border border-editor-border">
-                                    <Film className="w-4 h-4 text-editor-accent-teal shrink-0" />
+                                <div className="flex items-center gap-2 bg-[#101215] p-2 rounded border border-[#23272c]">
+                                    <Film className="w-4 h-4 text-[#6e9c73] shrink-0" />
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-[10px] font-bold truncate text-editor-fg">{mp4Asset?.name || 'No video selected'}</div>
-                                        <div className="text-[9px] text-editor-muted">Active Master Asset</div>
+                                        <div className="text-[10px] font-semibold truncate text-[#e2e5e8]">{mp4Asset?.name || 'No video selected'}</div>
+                                        <div className="text-[9px] text-[#7d848c]">Active Master Asset</div>
                                     </div>
                                     <button
                                         onClick={() => mp4InputRef.current?.click()}
-                                        className="px-2 py-1 bg-editor-surface border border-editor-border hover:bg-editor-surface-hover rounded text-[9px] text-editor-fg transition-colors"
+                                        className="px-2 py-1 bg-[#1c222b] border border-[#23272c] hover:bg-[#232a35] rounded text-[9.5px] text-[#e2e5e8] transition-colors"
                                     >
                                         Change
                                     </button>
@@ -374,7 +380,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                 <button
                                     onClick={() => handleExtract()}
                                     disabled={extractionStatus === 'extracting'}
-                                    className="w-full py-1.5 bg-editor-accent-teal/20 border border-editor-accent-teal/40 hover:bg-editor-accent-teal/40 text-editor-accent-teal rounded text-xxs font-bold uppercase tracking-wider transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                    className="w-full py-1.5 bg-[#1c2822] border border-[#6e9c73]/40 hover:bg-[#24332b] text-[#6e9c73] rounded text-[10px] font-semibold uppercase tracking-wider transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
                                 >
                                     <Film className="w-3 h-3" />
                                     {extractionStatus === 'extracting' ? `Extracting (${Math.round(extractionProgress * 100)}%)` : 'Extract Frames (FFmpeg)'}
@@ -388,35 +394,35 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
             {/* TAB 2: 3D SCENE COMPONENTS & PRESETS */}
             {activeLeftTab === 'scene3d' && (
                 <>
-                    <section className="rounded border border-editor-border bg-editor-surface overflow-hidden">
+                    <section className="rounded-md border border-[#23272c] bg-[#15181b] overflow-hidden">
                         <button
                             onClick={() => setIsParticleLabOpen(!isParticleLabOpen)}
-                            className="w-full flex items-center justify-between px-2.5 py-1.5 text-xxs font-bold text-editor-muted uppercase tracking-wider hover:text-editor-fg transition-colors"
+                            className="w-full flex items-center justify-between px-2.5 py-1.5 text-[10px] font-semibold text-[#7d848c] uppercase tracking-wider hover:text-[#e2e5e8] transition-colors"
                         >
                             <div className="flex items-center gap-1.5">
-                                <Layers className="w-3.5 h-3.5 text-editor-accent-purple" />
+                                <Layers className="w-3.5 h-3.5 text-[#a86a5c]" />
                                 <span>Particle Lab Presets</span>
                             </div>
                             {isParticleLabOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                         </button>
                         {isParticleLabOpen && (
-                            <div className="p-2 space-y-1 border-t border-editor-border">
+                            <div className="p-2 space-y-1 border-t border-[#23272c]">
                                 {PARTICLE_LAB_PRESETS.map(({ id, label, description }) => (
                                     <button
                                         key={id}
                                         onClick={() => setActivePreset(id)}
                                         className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-left transition-colors ${
                                             activePreset === id
-                                                ? 'bg-editor-accent-purple/20 border border-editor-accent-purple/60 text-editor-fg font-bold'
-                                                : 'bg-black/30 border border-editor-border text-editor-muted hover:bg-editor-surface-hover hover:text-white'
+                                                ? 'bg-[#1c222b] border border-[#5f7f9e] text-[#e2e5e8] font-bold'
+                                                : 'bg-[#101215] border border-[#23272c] text-[#7d848c] hover:bg-[#1f2328] hover:text-[#e2e5e8]'
                                         }`}
                                     >
                                         <span className={`w-2 h-2 rounded-full shrink-0 ${
-                                            id === 'light' ? 'bg-gray-200 border border-gray-400' : 'bg-editor-accent-purple'
+                                            id === 'light' ? 'bg-gray-200 border border-gray-400' : 'bg-[#a86a5c]'
                                         }`} />
                                         <div className="min-w-0">
-                                            <div className="text-xxs font-medium leading-tight">{label}</div>
-                                            <div className="text-[9px] text-editor-muted leading-tight truncate">{description}</div>
+                                            <div className="text-[10px] font-medium leading-tight">{label}</div>
+                                            <div className="text-[9px] text-[#7d848c] leading-tight truncate">{description}</div>
                                         </div>
                                     </button>
                                 ))}
@@ -426,19 +432,19 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
 
                     {/* Light Images Preset Assets */}
                     {activePreset === 'light-images' && (
-                        <section className="rounded border border-editor-border bg-editor-surface p-2.5 space-y-2">
-                            <div className="flex justify-between items-center text-xxs font-bold text-editor-muted uppercase tracking-wider">
+                        <section className="rounded-md border border-[#23272c] bg-[#15181b] p-2.5 space-y-2">
+                            <div className="flex justify-between items-center text-[10px] font-semibold text-[#7d848c] uppercase tracking-wider">
                                 <span>Light Images</span>
                                 <ImageIcon className="w-3.5 h-3.5" />
                             </div>
                             <input type="file" accept="image/*" multiple ref={lightImgInputRef} className="hidden" onChange={handleLightImageUpload} />
                             {lightImages.length === 0 ? (
-                                <div className="rounded border border-editor-border bg-black/30 px-3 py-4 flex flex-col items-center gap-2 text-center">
-                                    <ImageIcon className="w-6 h-6 text-editor-muted" />
-                                    <p className="text-[9px] text-editor-muted leading-tight">No images uploaded</p>
+                                <div className="rounded border border-[#23272c] bg-[#101215] px-3 py-4 flex flex-col items-center gap-2 text-center">
+                                    <ImageIcon className="w-6 h-6 text-[#7d848c]" />
+                                    <p className="text-[9.5px] text-[#7d848c] leading-tight">No images uploaded</p>
                                     <button
                                         onClick={() => lightImgInputRef.current?.click()}
-                                        className="mt-1 flex items-center gap-1 px-2.5 py-1 text-[9px] bg-editor-surface border border-editor-border text-editor-fg rounded hover:bg-editor-surface-hover transition-colors"
+                                        className="mt-1 flex items-center gap-1 px-2.5 py-1 text-[9.5px] bg-[#1c222b] border border-[#23272c] text-[#e2e5e8] rounded hover:bg-[#232a35] transition-colors"
                                     >
                                         <UploadCloud className="w-3 h-3" /> Upload Images
                                     </button>
@@ -451,25 +457,25 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                             onClick={() => setActiveLightImageIdx(idx)}
                                             className={`p-1.5 rounded border flex flex-col items-center justify-between cursor-pointer transition-all relative ${
                                                 activeLightImageIdx === idx
-                                                    ? 'bg-editor-accent-purple/20 border-editor-accent-purple text-editor-fg font-bold'
-                                                    : 'bg-black/30 border-editor-border text-editor-muted hover:bg-editor-surface-hover'
+                                                    ? 'bg-[#1c222b] border-[#5f7f9e] text-[#e2e5e8] font-bold'
+                                                    : 'bg-[#101215] border-[#23272c] text-[#7d848c] hover:bg-[#1f2328]'
                                             }`}
                                         >
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); removeLightImage(img.name); }}
-                                                className="absolute top-1 right-1 p-0.5 rounded bg-black/60 hover:bg-red-500/80 text-white transition-colors"
+                                                className="absolute top-1 right-1 p-0.5 rounded bg-[#101215] hover:bg-red-500/80 text-white transition-colors"
                                             >
                                                 <X className="w-2.5 h-2.5" />
-                                            </button>                                            <img src={img.url} alt={img.name} className="w-full h-12 object-cover rounded mb-1 bg-black/40" />
+                                            </button>                                            <img src={img.url} alt={img.name} className="w-full h-12 object-cover rounded mb-1 bg-[#101215]" />
                                             <span className="text-[8px] truncate w-full text-center">{img.name}</span>
                                         </div>
                                     ))}
                                     <button
                                         onClick={() => lightImgInputRef.current?.click()}
-                                        className="p-1.5 rounded border border-dashed border-editor-border bg-black/20 hover:bg-black/40 flex flex-col items-center justify-center gap-1 text-editor-muted hover:text-white transition-colors h-20"
+                                        className="p-1.5 rounded border border-dashed border-[#23272c] bg-[#101215] hover:bg-[#1f2328] flex flex-col items-center justify-center gap-1 text-[#7d848c] hover:text-[#e2e5e8] transition-colors h-20"
                                     >
                                         <UploadCloud className="w-4 h-4" />
-                                        <span className="text-[8px]">Add Image</span>
+                                        <span className="text-[8.5px]">Add Image</span>
                                     </button>
                                 </div>
                             )}

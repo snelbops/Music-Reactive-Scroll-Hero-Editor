@@ -245,7 +245,7 @@ export default function Layout() {
                 <LeftPanel width={leftW} />
                 <div
                     className="w-1 shrink-0 cursor-col-resize bg-editor-border hover:bg-editor-accent-purple/60 active:bg-editor-accent-purple transition-colors"
-                    onPointerDown={(e) => startDrag(e, setLeftW, leftW, 120, 420, 'x', 1)}
+                    onPointerDown={(e) => startDrag(e, setLeftW, leftW, 200, 420, 'x', 1)}
                 />
                 <Viewport />
                 <div
