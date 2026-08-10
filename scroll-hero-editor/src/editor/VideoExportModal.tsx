@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Film, Download, StopCircle, Smartphone, Monitor, Square, Sparkles, Terminal, Play, CheckCircle, Repeat, Clock } from 'lucide-react';
+import { X, Film, Download, StopCircle, Smartphone, Monitor, Square, Sparkles, Terminal, Play, CheckCircle, Repeat, Clock, FlipHorizontal } from 'lucide-react';
 import { videoExporter } from '../export/exportVideo';
 import { useStore } from '../store/useStore';
 import { getMediaDataUrl, blobToDataUrl } from '../utils/mediaStore';
@@ -20,6 +20,7 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
     const [exportRange, setExportRange] = useState<'full' | 'loop'>(isLoopActive ? 'loop' : 'full');
     const [exportRatio, setExportRatio] = useState<string>(activeRatio || '16:9');
     const [includeParticles, setIncludeParticles] = useState<boolean>(activePreset !== 'video');
+    const [mirrorVideo, setMirrorVideo] = useState<boolean>(false);
     const [isExporting, setIsExporting] = useState(false);
     const [isRemotionExporting, setIsRemotionExporting] = useState(false);
     const [progress, setProgress] = useState(0);
@@ -155,6 +156,8 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                     inputProps: {
                         videoUrl: videoUrl && !videoUrl.startsWith('blob:') ? videoUrl : undefined,
                         audioUrl: audioUrl && !audioUrl.startsWith('blob:') ? audioUrl : undefined,
+                        startFrame,
+                        mirrorVideo,
                     },
                 }),
             });
@@ -327,23 +330,43 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                         </div>
                     </div>
 
-                    {/* Particle Layer Toggle */}
-                    <div className="p-2.5 rounded-lg bg-[#252527] border border-[#3a3a3c] flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-purple-400" />
-                            <span className="text-gray-300 font-semibold">Include 3D Particle Overlay:</span>
+                    {/* Mirror & Particle Toggles */}
+                    <div className="grid grid-cols-2 gap-2">
+                        <div className="p-2.5 rounded-lg bg-[#252527] border border-[#3a3a3c] flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                                <FlipHorizontal className="w-3.5 h-3.5 text-cyan-400" />
+                                <span className="text-gray-300 font-semibold text-[11px]">Mirror Video:</span>
+                            </div>
+                            <button
+                                onClick={() => setMirrorVideo(!mirrorVideo)}
+                                disabled={isExporting || isRemotionExporting}
+                                className={`px-2.5 py-1 rounded text-[10px] font-bold transition-colors ${
+                                    mirrorVideo
+                                        ? 'bg-cyan-600 text-white'
+                                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                                }`}
+                            >
+                                {mirrorVideo ? '🪞 Flipped' : 'Normal'}
+                            </button>
                         </div>
-                        <button
-                            onClick={() => setIncludeParticles(!includeParticles)}
-                            disabled={isExporting || isRemotionExporting}
-                            className={`px-3 py-1 rounded text-xs font-bold transition-colors ${
-                                includeParticles
-                                    ? 'bg-purple-600 text-white'
-                                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                            }`}
-                        >
-                            {includeParticles ? '✨ Particles ON' : '🚫 Clean Video'}
-                        </button>
+
+                        <div className="p-2.5 rounded-lg bg-[#252527] border border-[#3a3a3c] flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                                <span className="text-gray-300 font-semibold text-[11px]">Particles:</span>
+                            </div>
+                            <button
+                                onClick={() => setIncludeParticles(!includeParticles)}
+                                disabled={isExporting || isRemotionExporting}
+                                className={`px-2.5 py-1 rounded text-[10px] font-bold transition-colors ${
+                                    includeParticles
+                                        ? 'bg-purple-600 text-white'
+                                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                                }`}
+                            >
+                                {includeParticles ? '✨ ON' : '🚫 Clean'}
+                            </button>
+                        </div>
                     </div>
 
                     {/* Progress Bar & Status */}

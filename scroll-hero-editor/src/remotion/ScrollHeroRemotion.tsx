@@ -1,27 +1,30 @@
 import { useCurrentFrame, useVideoConfig, Video, Audio } from 'remotion';
 import { useStore } from '../store/useStore';
-import { interpolateScrollAt } from '../utils/interpolate';
 
 export interface ScrollHeroRemotionProps {
     videoUrl?: string;
     audioUrl?: string;
+    startFrame?: number;
+    mirrorVideo?: boolean;
 }
 
-export const ScrollHeroRemotion: React.FC<ScrollHeroRemotionProps> = ({ videoUrl: inputVideoUrl, audioUrl: inputAudioUrl }) => {
+export const ScrollHeroRemotion: React.FC<ScrollHeroRemotionProps> = ({
+    videoUrl: inputVideoUrl,
+    audioUrl: inputAudioUrl,
+    startFrame = 0,
+    mirrorVideo = false,
+}) => {
     const frame = useCurrentFrame();
-    const { fps, width, height } = useVideoConfig();
+    const { width, height } = useVideoConfig();
 
-    const currentTime = frame / fps;
-    const sequenceDuration = useStore((s) => s.sequenceDuration) || 10;
-    const scrollKeyframes = useStore((s) => s.scrollKeyframes);
     const storeVideoUrl = useStore((s) => s.videoUrl);
     const storeAudioUrl = useStore((s) => s.audioUrl);
+    const videoSpeedRatio = useStore((s) => s.videoSpeedRatio) || 1.0;
 
     const videoUrl = inputVideoUrl || storeVideoUrl;
     const audioUrl = inputAudioUrl || storeAudioUrl;
 
-    // Calculate scroll progress curve at current frame timestamp
-    const scrollProgress = interpolateScrollAt(scrollKeyframes, currentTime, sequenceDuration);
+    const videoStartFrame = Math.round(startFrame * videoSpeedRatio);
 
     return (
         <div style={{ width, height, backgroundColor: '#0a0a0f', position: 'relative', overflow: 'hidden' }}>
@@ -29,8 +32,13 @@ export const ScrollHeroRemotion: React.FC<ScrollHeroRemotionProps> = ({ videoUrl
             {videoUrl ? (
                 <Video
                     src={videoUrl}
-                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                    startFrom={Math.round(scrollProgress * 300)}
+                    style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        transform: mirrorVideo ? 'scaleX(-1)' : 'none',
+                    }}
+                    startFrom={videoStartFrame}
                 />
             ) : (
                 <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
@@ -39,7 +47,7 @@ export const ScrollHeroRemotion: React.FC<ScrollHeroRemotionProps> = ({ videoUrl
             )}
 
             {/* Audio Track */}
-            {audioUrl && <Audio src={audioUrl} />}
+            {audioUrl && <Audio src={audioUrl} startFrom={startFrame} />}
         </div>
     );
 };
