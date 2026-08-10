@@ -936,9 +936,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         cssOpacity,
     };
 
-    const trackW = lanesWidth ? lanesWidth * timelineZoom - LABEL_W : 0;
     const seqPos = sheet.sequence.position / SEQUENCE_DURATION;
-    const playheadLeft = lanesWidth ? LABEL_W + seqPos * trackW : LABEL_W;
     const scrollVbH = laneH('scrollPos', 48);
     const scrollPolyline = scrollHistory.current.length > 1
         ? scrollHistory.current.map(p => `${p.pos * VB_W},${(1 - p.val) * scrollVbH}`).join(' ')
@@ -1160,10 +1158,11 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 </div>
             </div>
             <div ref={lanesRef} className="flex-1 overflow-y-auto overflow-x-auto thin-scrollbar relative select-none cursor-col-resize" onMouseDown={handleLanesMouseDown}>
-                <div className="absolute top-0 bottom-0 w-[1px] bg-red-500 z-50 pointer-events-none shadow-[0_0_8px_rgba(239,68,68,0.8)]" style={{ left: `${playheadLeft}px` }}>
-                    <div className="w-3 h-3 bg-red-500 absolute -top-1 -left-[5.5px] rotate-45" />
-                </div>
-                <div style={{ width: timelineZoom !== 1 ? `${timelineZoom * 100}%` : '100%', minHeight: '100%' }}>
+                <div className="relative" style={{ width: timelineZoom !== 1 ? `${timelineZoom * 100}%` : '100%', minHeight: '100%' }}>
+                    {/* Red Playhead Line */}
+                    <div className="absolute top-0 bottom-0 w-[1px] bg-red-500 z-50 pointer-events-none shadow-[0_0_8px_rgba(239,68,68,0.8)]" style={{ left: `calc(120px + (100% - 120px) * ${seqTime / sequenceDuration})` }}>
+                        <div className="w-3 h-3 bg-red-500 absolute -top-1 -left-[5.5px] rotate-45" />
+                    </div>
                 
                 {/* Resizable & Draggable Ableton-Style Loop Region Header */}
                 <div className="h-5 border-b border-editor-border bg-black/60 flex items-center relative text-[9px] font-mono select-none">
