@@ -1262,7 +1262,15 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 width: `${((timeSelection.end - timeSelection.start) / sequenceDuration) * 100}%`
                             }}
                             onPointerDown={handleSelectionDrag}
-                            title="Drag up/down: adjust intensity of all selected keyframes  |  Alt+drag: scale intensity"
+                            onContextMenu={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const parentContainer = e.currentTarget.parentElement!;
+                                const rect = parentContainer.getBoundingClientRect();
+                                const clickTime = Math.max(0, Math.min(sequenceDuration, ((e.clientX - rect.left) / rect.width) * sequenceDuration));
+                                setAudioMenu({ visible: true, x: e.clientX, y: e.clientY, clickTime });
+                            }}
+                            title="Drag up/down: adjust intensity of all selected keyframes  |  Right-click: open menu"
                         >
                             <button
                                 className="absolute top-1 right-1 w-4 h-4 bg-[#101215]/80 hover:bg-[#101215] text-cyan-400 hover:text-white rounded flex items-center justify-center text-[10px] opacity-0 group-hover/sel:opacity-100 transition-opacity pointer-events-auto"
@@ -1879,6 +1887,12 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             if (e.shiftKey) toggleSelectedKeyframe({ laneId: 'scrollPos', position: kf.time, value: kf.value });
                                             else setSelectedKeyframe({ laneId: 'scrollPos', position: kf.time, value: kf.value });
                                         }}
+                                        onContextMenu={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            setSelectedKeyframe({ laneId: 'scrollPos', position: kf.time, value: kf.value });
+                                            setAudioMenu({ visible: true, x: e.clientX, y: e.clientY, clickTime: kf.time });
+                                        }}
                                         onPointerDown={(e) => {
                                             if (activeTool === 'eraser') return;
                                             e.stopPropagation();
@@ -2365,8 +2379,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         onContextMenu={(e) => {
                                             e.preventDefault();
                                             e.stopPropagation();
-                                            useStore.getState().removeParamKeyframe(lane.id, kf.time);
-                                            setSelectedKeyframe(null);
+                                            setSelectedKeyframe({ laneId: lane.id, position: kf.time, value: kf.value });
+                                            setAudioMenu({ visible: true, x: e.clientX, y: e.clientY, clickTime: kf.time });
                                         }}
                                     />
                                 );
