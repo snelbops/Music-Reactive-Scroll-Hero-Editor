@@ -802,8 +802,10 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 setTimelineZoom(nextZoom);
             } else if (e.altKey) {
                 e.preventDefault();
-                const delta = e.deltaY > 0 ? -0.05 : 0.05;
-                setVerticalZoom(Math.max(0.4, Math.min(4, +(verticalZoom + delta).toFixed(2))));
+                const curVZoom = useStore.getState().verticalZoom;
+                const factor = Math.pow(1.0025, -e.deltaY);
+                const nextVZoom = Math.max(0.4, Math.min(4.0, +(curVZoom * factor).toFixed(3)));
+                setVerticalZoom(nextVZoom);
             }
         };
         el.addEventListener('wheel', onWheel, { passive: false });
@@ -986,7 +988,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
     return (
         <footer className="border-t border-editor-border bg-editor-bg flex flex-col z-20" style={{ height }}>
-            <div className="h-9 border-b border-editor-border flex items-center px-4 justify-between bg-editor-panel shrink-0 select-none">
+            <div className="h-9 border-b border-editor-border flex items-center px-4 justify-between bg-editor-panel shrink-0 select-none overflow-x-auto thin-scrollbar min-w-0 gap-3 whitespace-nowrap">
                 <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-2 text-[#808080]">
                         <span className="border-r border-[#333] pr-2 mr-1 flex items-center gap-0.5">
@@ -2062,14 +2064,11 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
                                             const minX = Math.min(startX, curX);
                                             const maxX = Math.max(startX, curX);
-                                            const minY = Math.min(startY, curY);
-                                            const maxY = Math.max(startY, curY);
 
                                             const currentKfs = (useStore.getState().paramKeyframes[lane.id] ?? []) as ParamKf[];
                                             const selected = currentKfs.filter(kf => {
                                                 const kfX = (kf.time / sequenceDuration) * r.width;
-                                                const kfY = normalY(kf.value) / VB_H * r.height;
-                                                return kfX >= minX && kfX <= maxX && kfY >= minY && kfY <= maxY;
+                                                return kfX >= minX && kfX <= maxX;
                                             }).map(kf => ({ laneId: lane.id, position: kf.time, value: kf.value }));
 
                                             setSelectedKeyframes(selected);

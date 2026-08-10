@@ -148,6 +148,7 @@ export default function Layout() {
 
 
     const [showExportMenu, setShowExportMenu] = useState(false);
+    const [showFileMenu, setShowFileMenu] = useState(false);
 
     if (isFullscreen) {
         return (
@@ -177,29 +178,43 @@ export default function Layout() {
                     </div>
                 </div>
 
-                {/* Mode Switcher */}
-                <div className="flex gap-0.5 p-0.5 bg-[#171a1e] border border-[#23272c] rounded">
-                    <button className="px-2.5 py-0.5 rounded bg-[#23272c] font-medium text-[11px] text-[#e2e5e8]">Design</button>
-                    <button className="px-2.5 py-0.5 rounded font-medium text-[11px] text-[#7d848c] hover:text-[#e2e5e8]">Deliver</button>
-                </div>
-
                 {/* Header Actions */}
                 <div className="flex items-center gap-3 relative">
-                    <button onClick={() => saveProject()} className="hover:text-[#e2e5e8] transition-colors" title="Quick export .shero file">File</button>
+                    {/* Functional File Dropdown */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowFileMenu(v => !v)}
+                            className="hover:text-[#e2e5e8] transition-colors flex items-center gap-1 py-1"
+                            title="File operations"
+                        >
+                            File <span className="text-[8px] font-mono">▾</span>
+                        </button>
+                        {showFileMenu && (
+                            <div className="absolute left-0 top-full mt-1 w-44 bg-[#15181b] border border-[#23272c] rounded-md shadow-2xl py-1 z-50 text-[11px] font-sans">
+                                <button onClick={() => { setShowFileMenu(false); if (confirm('Start a new project? Any unsaved changes will be cleared.')) startNewProject(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#23272c] text-[#dfe3e7]">New Project</button>
+                                <button onClick={() => { setShowFileMenu(false); loadInputRef.current?.click(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#23272c] text-[#dfe3e7]">Open File (.shero)</button>
+                                <button onClick={() => { setShowFileMenu(false); saveProject(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#23272c] text-[#dfe3e7]">Save File (.shero)</button>
+                                <div className="my-1 border-t border-[#23272c]" />
+                                <button onClick={() => { setShowFileMenu(false); setShowVideoExportModal(true); }} className="w-full text-left px-3 py-1.5 hover:bg-[#23272c] text-[#c98a4d] font-semibold">Export Video (MP4)</button>
+                            </div>
+                        )}
+                    </div>
+
                     <button onClick={() => setShowProjectModal(true)} className="hover:text-[#e2e5e8] transition-colors">Projects</button>
 
-                    {/* Primary Export Button + Dropdown */}
-                    <div className="relative flex items-stretch border border-[#a4713c] rounded overflow-hidden shadow-sm">
+                    {/* Primary Export Button + Working Dropdown */}
+                    <div className="relative flex items-stretch border border-[#a4713c] rounded shadow-sm">
                         <button
                             onClick={() => setShowVideoExportModal(true)}
-                            className="px-2.5 py-1 bg-[#c98a4d] hover:bg-[#d49658] font-semibold text-[11px] text-[#17120c] transition-colors flex items-center gap-1.5"
+                            className="px-2.5 py-1 bg-[#c98a4d] hover:bg-[#d49658] font-semibold text-[11px] text-[#17120c] rounded-l transition-colors flex items-center gap-1.5"
                             title="Render video animation to WebM or MP4"
                         >
                             <Film className="w-3 h-3 text-[#17120c]" /> Export video
                         </button>
                         <button
                             onClick={() => setShowExportMenu(v => !v)}
-                            className="px-1.5 py-1 bg-[#b57c43] hover:bg-[#c4874c] font-mono text-[9px] text-[#17120c] border-l border-[#a4713c] transition-colors"
+                            className="px-1.5 py-1 bg-[#b57c43] hover:bg-[#c4874c] font-mono text-[9px] text-[#17120c] border-l border-[#a4713c] rounded-r transition-colors"
+                            title="More export options"
                         >
                             ▾
                         </button>
@@ -211,7 +226,7 @@ export default function Layout() {
                                 <button onClick={() => { setShowExportMenu(false); isLoop && setShowExportLoopModal(true); }} className={`w-full text-left px-3 py-1.5 hover:bg-[#23272c] ${isLoop ? 'text-[#dfe3e7]' : 'text-gray-500 cursor-not-allowed'}`}>Export Loop Region</button>
                                 <button onClick={() => { setShowExportMenu(false); handleExportHtml(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#23272c] text-[#dfe3e7]">Export Standalone HTML</button>
                                 <div className="my-1 border-t border-[#23272c]" />
-                                <button onClick={() => { setShowExportMenu(false); if (confirm('Start a new project? Any unsaved changes in current project will be cleared.')) startNewProject(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#23272c] text-[#dfe3e7]">New Project</button>
+                                <button onClick={() => { setShowExportMenu(false); if (confirm('Start a new project? Any unsaved changes will be cleared.')) startNewProject(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#23272c] text-[#dfe3e7]">New Project</button>
                                 <button onClick={() => { setShowExportMenu(false); loadInputRef.current?.click(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#23272c] text-[#dfe3e7]">Load File (.shero)</button>
                             </div>
                         )}
