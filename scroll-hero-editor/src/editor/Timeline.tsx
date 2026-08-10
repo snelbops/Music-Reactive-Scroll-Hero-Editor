@@ -497,13 +497,33 @@ export default function Timeline({ height = 280 }: { height?: number }) {
      * Pointer-drag on the selection overlay.
      * Alt + drag ↑↓  →  scale amplitude (away from min)
      * Shift + drag ↑↓ → translate values up/down
+    /** Select all keyframes across all lanes that fall within [start, end] time range. */
+    const selectKeyframesInRange = (start: number, end: number) => {
+        const kfs: Array<{ laneId: string; position: number; value: number }> = [];
+        const scrollKfs = useStore.getState().scrollKeyframes;
+        scrollKfs.forEach(k => {
+            if (k.time >= start - 0.01 && k.time <= end + 0.01) {
+                kfs.push({ laneId: 'scrollPos', position: k.time, value: k.value });
+            }
+        });
+        const paramKfsMap = useStore.getState().paramKeyframes;
+        Object.entries(paramKfsMap).forEach(([lId, list]) => {
+            (list as ParamKf[]).forEach(k => {
+                if (k.time >= start - 0.01 && k.time <= end + 0.01) {
+                    kfs.push({ laneId: lId, position: k.time, value: k.value });
+                }
+            });
+        });
+        useStore.getState().setSelectedKeyframes(kfs);
+    };
+
+    /**
+     * Pointer-drag on the selection overlay area.
+     * Dragging up/down shifts intensity for all selected keyframes.
+     * Alt + drag up/down scales intensity away from minimum.
      */
     const handleSelectionDrag = (e: React.PointerEvent<HTMLDivElement>) => {
         if (e.button !== 0) return;
-        const isAlt = e.altKey;
-        const isShift = e.shiftKey;
-        if (!isAlt && !isShift) return;
-
         e.stopPropagation();
         e.preventDefault();
         const target = e.currentTarget;
@@ -511,17 +531,20 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
         useStore.getState().pushHistory();
         const startY = e.clientY;
-        const SENSITIVITY = 0.004; // normalised units per pixel
+        const isAlt = e.altKey;
+        let lastNormDelta = 0;
 
         const onMove = (ev: PointerEvent) => {
             const deltaPixels = startY - ev.clientY; // up = positive
-            const normDelta = deltaPixels * SENSITIVITY;
+            const normDelta = deltaPixels * 0.005; // normalised units per pixel
+            const stepDelta = normDelta - lastNormDelta;
+            lastNormDelta = normDelta;
+
             if (isAlt) {
-                // Scale: ratio > 1 = amplify, < 1 = compress
-                const ratio = 1 + normDelta * 2;
+                const ratio = 1 + stepDelta * 2;
                 if (ratio > 0) scaleSelectionKeyframes('__all__', ratio);
-            } else if (isShift) {
-                shiftSelectionKeyframes('__all__', normDelta);
+            } else {
+                shiftSelectionKeyframes('__all__', stepDelta);
             }
         };
 
@@ -533,7 +556,6 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         target.addEventListener('pointerup', onUp as any);
     };
 
-
     const generateRhythmCurve = (mode: 'bounce' | 'stutter' | 'wave' | 'ramp' | 'jumps') => {
         generateRhythmCurveForLane('scrollPos', mode, true);
     };
@@ -543,7 +565,6 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         if (kfs.length < 3) return;
         useStore.getState().pushHistory();
 
-        // 1. Moving average pass over keyframes
         const smoothed = kfs.map((kf, i) => {
             if (i === 0 || i === kfs.length - 1) return kf;
             const prev = kfs[i - 1].value;
@@ -553,7 +574,6 @@ export default function Timeline({ height = 280 }: { height?: number }) {
             return { ...kf, value: val };
         });
 
-        // 2. Thin keyframes within 0.05s of each other that have minimal value variation
         const thinned: typeof kfs = [];
         smoothed.forEach((kf) => {
             const last = thinned[thinned.length - 1];
@@ -562,7 +582,6 @@ export default function Timeline({ height = 280 }: { height?: number }) {
             }
         });
 
-        // 3. Re-add end point if missing
         if (thinned[thinned.length - 1]?.time !== kfs[kfs.length - 1].time) {
             thinned.push(kfs[kfs.length - 1]);
         }
@@ -578,6 +597,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
         if (!e.shiftKey && activeTool !== 'select') {
             useStore.getState().setTimeSelection(null);
+            useStore.getState().setSelectedKeyframes([]);
             return;
         }
 
@@ -594,6 +614,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     useStore.getState().setTimeSelection({ start, end });
                     useStore.getState().setLoopRange(start, end);
                     useStore.getState().setIsLoop(true);
+                    selectKeyframesInRange(start, end);
                 }
             }
         };
@@ -1231,55 +1252,29 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         })()}
                     </div>
                 </div>
-                {/* Visual Time Selection Box Overlay */}
+                {/* Visual Time Selection Box Overlay (Clean & Unobtrusive) */}
                 {timeSelection && (
                     <div className="absolute top-5 bottom-0 left-[120px] right-0 pointer-events-none z-40">
                         <div
-                            className="absolute top-0 bottom-0 bg-cyan-500/15 border-x-2 border-cyan-400 flex flex-col justify-between shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                            className="absolute top-0 bottom-0 bg-cyan-500/10 border-x border-cyan-400/60 pointer-events-auto cursor-ns-resize shadow-[0_0_15px_rgba(6,182,212,0.15)] group/sel"
                             style={{
                                 left: `${(timeSelection.start / sequenceDuration) * 100}%`,
                                 width: `${((timeSelection.end - timeSelection.start) / sequenceDuration) * 100}%`
                             }}
+                            onPointerDown={handleSelectionDrag}
+                            title="Drag up/down: adjust intensity of all selected keyframes  |  Alt+drag: scale intensity"
                         >
-                            {/* Top header bar — buttons */}
-                            <div className="bg-cyan-500 text-black font-mono font-bold text-[8px] px-1.5 py-0.5 self-start rounded-b flex items-center gap-1 shadow pointer-events-auto">
-                                <span>⟵ {timeSelection.start.toFixed(1)}s — {timeSelection.end.toFixed(1)}s ⟶</span>
-                                <div className="flex items-center gap-1 ml-2 font-mono">
-                                    <span className="text-[7px] text-cyan-950 font-bold">SCALE:</span>
-                                    <button
-                                        className="px-1 bg-black/20 hover:bg-black/50 text-black font-bold rounded text-[7px] transition-colors"
-                                        onClick={() => scaleSelectionKeyframes('__all__', 0.75)}
-                                        title="Scale down amplitude by 25% on all lanes"
-                                    >
-                                        -25%
-                                    </button>
-                                    <button
-                                        className="px-1 bg-black/20 hover:bg-black/50 text-black font-bold rounded text-[7px] transition-colors"
-                                        onClick={() => scaleSelectionKeyframes('__all__', 1.25)}
-                                        title="Scale up amplitude by 25% on all lanes"
-                                    >
-                                        +25%
-                                    </button>
-                                    <button
-                                        className="px-1 bg-black/20 hover:bg-black/50 text-black font-bold rounded text-[7px] transition-colors ml-1"
-                                        onClick={() => useStore.getState().setTimeSelection(null)}
-                                        title="Clear selection"
-                                    >
-                                        ✕
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Drag handle strip at bottom — Alt+drag to scale, Shift+drag to shift */}
-                            <div
-                                className="h-5 pointer-events-auto flex items-center justify-center gap-1 cursor-ns-resize select-none rounded-t border-t border-cyan-400/50 bg-cyan-400/10 hover:bg-cyan-400/25 transition-colors group/drag"
-                                onPointerDown={handleSelectionDrag}
-                                title="Alt+drag: scale amplitude ↕  |  Shift+drag: shift values ↑↓"
+                            <button
+                                className="absolute top-1 right-1 w-4 h-4 bg-[#101215]/80 hover:bg-[#101215] text-cyan-400 hover:text-white rounded flex items-center justify-center text-[10px] opacity-0 group-hover/sel:opacity-100 transition-opacity pointer-events-auto"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    useStore.getState().setTimeSelection(null);
+                                    useStore.getState().setSelectedKeyframes([]);
+                                }}
+                                title="Clear selection"
                             >
-                                <span className="text-cyan-400 text-[8px] font-mono opacity-60 group-hover/drag:opacity-100 transition-opacity">
-                                    ⠿ Alt↕scale · Shift↕shift
-                                </span>
-                            </div>
+                                ✕
+                            </button>
                         </div>
                     </div>
                 )}
@@ -1857,20 +1852,21 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     </React.Fragment>
                                 );
                             })}
-                            {/* Keyframe Dots for scrollPos (100% round circles) */}
+                            {/* Keyframe Dots for scrollPos (100% round circles, fixed 6px size) */}
                             {scrollKeyframes.map((kf, i) => {
                                 const isSelected = selectedKeyframes.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.02);
-                                const size = isSelected ? 8 : 6;
                                 return (
                                     <div
                                         key={i}
-                                        className={`absolute rounded-full border-[1.5px] ${activeTool === 'eraser' ? 'cursor-cell' : 'cursor-move'} pointer-events-auto`}
+                                        className={`absolute rounded-full transition-colors ${activeTool === 'eraser' ? 'cursor-cell' : 'cursor-move'} pointer-events-auto`}
                                         style={{
-                                            width: size, height: size,
-                                            left: `calc(${(kf.time / sequenceDuration) * 100}% - ${size/2}px)`,
-                                            top: `calc(${(1 - kf.value) * 100}% - ${size/2}px)`,
-                                            borderColor: isSelected ? '#3b82f6' : '#60a5fa',
-                                            backgroundColor: isSelected ? '#60a5fa' : 'var(--color-editor-bg)',
+                                            width: 6, height: 6,
+                                            left: `calc(${(kf.time / sequenceDuration) * 100}% - 3px)`,
+                                            top: `calc(${(1 - kf.value) * 100}% - 3px)`,
+                                            borderColor: isSelected ? '#ffffff' : '#3b82f6',
+                                            borderWidth: isSelected ? '2px' : '1.5px',
+                                            backgroundColor: isSelected ? '#c98a4d' : '#60a5fa',
+                                            boxShadow: isSelected ? '0 0 6px rgba(201, 138, 77, 0.9)' : 'none',
                                         }}
                                         onMouseDown={(e) => e.stopPropagation()}
                                         onClick={(e) => {
@@ -2257,20 +2253,21 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     </React.Fragment>
                                 );
                             })}
-                            {/* Keyframe Dots for param lane (100% round circles) */}
+                            {/* Keyframe Dots for param lane (100% round circles, fixed 6px size) */}
                             {kfs.map((kf, i) => {
                                 const kfSelected = selectedKeyframes.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.02);
-                                const size = kfSelected ? 8 : 6;
                                 return (
                                     <div
                                         key={i}
-                                        className={`absolute rounded-full border-[1.5px] ${activeTool === 'eraser' ? 'cursor-cell' : 'cursor-move'} pointer-events-auto`}
+                                        className={`absolute rounded-full transition-colors ${activeTool === 'eraser' ? 'cursor-cell' : 'cursor-move'} pointer-events-auto`}
                                         style={{
-                                            width: size, height: size,
-                                            left: `calc(${(kf.time / sequenceDuration) * 100}% - ${size/2}px)`,
-                                            top: `calc(${normalY(kf.value) / VB_H * 100}% - ${size/2}px)`,
-                                            borderColor: lane.color,
-                                            backgroundColor: kfSelected ? lane.color : 'var(--color-editor-bg)',
+                                            width: 6, height: 6,
+                                            left: `calc(${(kf.time / sequenceDuration) * 100}% - 3px)`,
+                                            top: `calc(${normalY(kf.value) / VB_H * 100}% - 3px)`,
+                                            borderColor: kfSelected ? '#ffffff' : lane.color,
+                                            borderWidth: kfSelected ? '2px' : '1.5px',
+                                            backgroundColor: kfSelected ? '#c98a4d' : lane.color,
+                                            boxShadow: kfSelected ? '0 0 6px rgba(201, 138, 77, 0.9)' : 'none',
                                         }}
                                         onMouseDown={(e) => e.stopPropagation()}
                                         onClick={(e) => {
