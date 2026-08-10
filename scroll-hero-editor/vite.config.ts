@@ -22,6 +22,29 @@ function remotionExportPlugin(): Plugin {
             const data = JSON.parse(body);
             const { renderRemotionVideoServer } = await import('./src/server/remotionServer');
 
+            const publicDir = path.resolve(process.cwd(), 'public');
+            if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });
+
+            if (!data.inputProps) data.inputProps = {};
+
+            // Save video buffer to static public folder for Headless Chrome
+            if (data.videoBase64) {
+              const base64Data = data.videoBase64.replace(/^data:video\/\w+;base64,/, '');
+              const videoBuffer = Buffer.from(base64Data, 'base64');
+              const tempVideoPath = path.resolve(publicDir, 'temp-export-video.mp4');
+              fs.writeFileSync(tempVideoPath, videoBuffer);
+              data.inputProps.videoUrl = 'http://localhost:5174/temp-export-video.mp4';
+            }
+
+            // Save audio buffer to static public folder for Headless Chrome
+            if (data.audioBase64) {
+              const base64Data = data.audioBase64.replace(/^data:audio\/\w+;base64,/, '');
+              const audioBuffer = Buffer.from(base64Data, 'base64');
+              const tempAudioPath = path.resolve(publicDir, 'temp-export-audio.mp3');
+              fs.writeFileSync(tempAudioPath, audioBuffer);
+              data.inputProps.audioUrl = 'http://localhost:5174/temp-export-audio.mp3';
+            }
+
             const outDir = path.resolve(process.cwd(), 'out');
             if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
@@ -32,7 +55,8 @@ function remotionExportPlugin(): Plugin {
               fps: data.fps || 60,
               width: data.width || 1920,
               height: data.height || 1080,
-              inputProps: data.inputProps || {},
+              startFrame: data.startFrame || 0,
+              inputProps: data.inputProps,
               outputPath,
             });
 

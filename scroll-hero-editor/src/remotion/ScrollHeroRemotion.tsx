@@ -7,15 +7,18 @@ export interface ScrollHeroRemotionProps {
     audioUrl?: string;
 }
 
-export const ScrollHeroRemotion: React.FC<ScrollHeroRemotionProps> = () => {
+export const ScrollHeroRemotion: React.FC<ScrollHeroRemotionProps> = ({ videoUrl: inputVideoUrl, audioUrl: inputAudioUrl }) => {
     const frame = useCurrentFrame();
     const { fps, width, height } = useVideoConfig();
 
     const currentTime = frame / fps;
     const sequenceDuration = useStore((s) => s.sequenceDuration) || 10;
     const scrollKeyframes = useStore((s) => s.scrollKeyframes);
-    const videoUrl = useStore((s) => s.videoUrl);
-    const audioUrl = useStore((s) => s.audioUrl);
+    const storeVideoUrl = useStore((s) => s.videoUrl);
+    const storeAudioUrl = useStore((s) => s.audioUrl);
+
+    const videoUrl = inputVideoUrl || storeVideoUrl;
+    const audioUrl = inputAudioUrl || storeAudioUrl;
 
     // Calculate scroll progress curve at current frame timestamp
     const scrollProgress = interpolateScrollAt(scrollKeyframes, currentTime, sequenceDuration);

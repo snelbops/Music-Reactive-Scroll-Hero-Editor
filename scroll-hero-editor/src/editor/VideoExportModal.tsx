@@ -58,7 +58,7 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
 
     const handleStartRemotionExport = async () => {
         setIsRemotionExporting(true);
-        setStatusMessage(`Rendering 60 FPS MP4 via Remotion (${exportRange === 'loop' ? 'Loop Range' : 'Full Sequence'} ${targetStart.toFixed(1)}s — ${targetEnd.toFixed(1)}s)…`);
+        setStatusMessage(`Preparing media & rendering 60 FPS MP4 via Remotion (${exportRange === 'loop' ? 'Loop Range' : 'Full Sequence'} ${targetStart.toFixed(1)}s — ${targetEnd.toFixed(1)}s)…`);
 
         try {
             let width = 1920;
@@ -70,6 +70,35 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
             const startFrame = Math.round(targetStart * fps);
             const durationInFrames = Math.round(targetDuration * fps);
 
+            // Convert blob URLs to Base64 so Headless Chrome can load them over static HTTP
+            let videoBase64: string | null = null;
+            if (videoUrl) {
+                try {
+                    const blobRes = await fetch(videoUrl);
+                    const b = await blobRes.blob();
+                    videoBase64 = await new Promise<string>((res, rej) => {
+                        const r = new FileReader();
+                        r.onloadend = () => res(r.result as string);
+                        r.onerror = rej;
+                        r.readAsDataURL(b);
+                    });
+                } catch (e) {}
+            }
+
+            let audioBase64: string | null = null;
+            if (audioUrl) {
+                try {
+                    const blobRes = await fetch(audioUrl);
+                    const b = await blobRes.blob();
+                    audioBase64 = await new Promise<string>((res, rej) => {
+                        const r = new FileReader();
+                        r.onloadend = () => res(r.result as string);
+                        r.onerror = rej;
+                        r.readAsDataURL(b);
+                    });
+                } catch (e) {}
+            }
+
             const res = await fetch('/api/export-remotion', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -79,9 +108,11 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                     height,
                     startFrame,
                     durationInFrames,
+                    videoBase64,
+                    audioBase64,
                     inputProps: {
-                        videoUrl,
-                        audioUrl,
+                        videoUrl: videoUrl && !videoUrl.startsWith('blob:') ? videoUrl : undefined,
+                        audioUrl: audioUrl && !audioUrl.startsWith('blob:') ? audioUrl : undefined,
                     },
                 }),
             });
