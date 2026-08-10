@@ -1212,48 +1212,53 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 </div>
                 {/* Visual Time Selection Box Overlay */}
                 {timeSelection && (
-                    <div
-                        className="absolute top-5 bottom-0 bg-cyan-500/15 border-x-2 border-cyan-400 z-40 pointer-events-none flex flex-col justify-between shadow-[0_0_15px_rgba(6,182,212,0.2)]"
-                        style={{ left: `calc(120px + (100% - 120px) * ${timeSelection.start / sequenceDuration})`, width: `calc((100% - 120px) * ${(timeSelection.end - timeSelection.start) / sequenceDuration})` }}
-                    >
-                        {/* Top header bar — buttons */}
-                        <div className="bg-cyan-500 text-black font-mono font-bold text-[8px] px-1.5 py-0.5 self-start rounded-b flex items-center gap-1 shadow pointer-events-auto">
-                            <span>⟵ {timeSelection.start.toFixed(1)}s — {timeSelection.end.toFixed(1)}s ⟶</span>
-                            <div className="flex items-center gap-1 ml-2 font-mono">
-                                <span className="text-[7px] text-cyan-950 font-bold">SCALE:</span>
-                                <button
-                                    className="px-1 bg-black/20 hover:bg-black/50 text-black font-bold rounded text-[7px] transition-colors"
-                                    onClick={() => scaleSelectionKeyframes('__all__', 0.75)}
-                                    title="Scale down amplitude by 25% on all lanes"
-                                >
-                                    -25%
-                                </button>
-                                <button
-                                    className="px-1 bg-black/20 hover:bg-black/50 text-black font-bold rounded text-[7px] transition-colors"
-                                    onClick={() => scaleSelectionKeyframes('__all__', 1.25)}
-                                    title="Scale up amplitude by 25% on all lanes"
-                                >
-                                    +25%
-                                </button>
-                                <button
-                                    className="px-1 bg-black/20 hover:bg-black/50 text-black font-bold rounded text-[7px] transition-colors ml-1"
-                                    onClick={() => useStore.getState().setTimeSelection(null)}
-                                    title="Clear selection"
-                                >
-                                    ✕
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Drag handle strip at bottom — Alt+drag to scale, Shift+drag to shift */}
+                    <div className="absolute top-5 bottom-0 left-[120px] right-0 pointer-events-none z-40">
                         <div
-                            className="h-5 pointer-events-auto flex items-center justify-center gap-1 cursor-ns-resize select-none rounded-t border-t border-cyan-400/50 bg-cyan-400/10 hover:bg-cyan-400/25 transition-colors group/drag"
-                            onPointerDown={handleSelectionDrag}
-                            title="Alt+drag: scale amplitude ↕  |  Shift+drag: shift values ↑↓"
+                            className="absolute top-0 bottom-0 bg-cyan-500/15 border-x-2 border-cyan-400 flex flex-col justify-between shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                            style={{
+                                left: `${(timeSelection.start / sequenceDuration) * 100}%`,
+                                width: `${((timeSelection.end - timeSelection.start) / sequenceDuration) * 100}%`
+                            }}
                         >
-                            <span className="text-cyan-400 text-[8px] font-mono opacity-60 group-hover/drag:opacity-100 transition-opacity">
-                                ⠿ Alt↕scale · Shift↕shift
-                            </span>
+                            {/* Top header bar — buttons */}
+                            <div className="bg-cyan-500 text-black font-mono font-bold text-[8px] px-1.5 py-0.5 self-start rounded-b flex items-center gap-1 shadow pointer-events-auto">
+                                <span>⟵ {timeSelection.start.toFixed(1)}s — {timeSelection.end.toFixed(1)}s ⟶</span>
+                                <div className="flex items-center gap-1 ml-2 font-mono">
+                                    <span className="text-[7px] text-cyan-950 font-bold">SCALE:</span>
+                                    <button
+                                        className="px-1 bg-black/20 hover:bg-black/50 text-black font-bold rounded text-[7px] transition-colors"
+                                        onClick={() => scaleSelectionKeyframes('__all__', 0.75)}
+                                        title="Scale down amplitude by 25% on all lanes"
+                                    >
+                                        -25%
+                                    </button>
+                                    <button
+                                        className="px-1 bg-black/20 hover:bg-black/50 text-black font-bold rounded text-[7px] transition-colors"
+                                        onClick={() => scaleSelectionKeyframes('__all__', 1.25)}
+                                        title="Scale up amplitude by 25% on all lanes"
+                                    >
+                                        +25%
+                                    </button>
+                                    <button
+                                        className="px-1 bg-black/20 hover:bg-black/50 text-black font-bold rounded text-[7px] transition-colors ml-1"
+                                        onClick={() => useStore.getState().setTimeSelection(null)}
+                                        title="Clear selection"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Drag handle strip at bottom — Alt+drag to scale, Shift+drag to shift */}
+                            <div
+                                className="h-5 pointer-events-auto flex items-center justify-center gap-1 cursor-ns-resize select-none rounded-t border-t border-cyan-400/50 bg-cyan-400/10 hover:bg-cyan-400/25 transition-colors group/drag"
+                                onPointerDown={handleSelectionDrag}
+                                title="Alt+drag: scale amplitude ↕  |  Shift+drag: shift values ↑↓"
+                            >
+                                <span className="text-cyan-400 text-[8px] font-mono opacity-60 group-hover/drag:opacity-100 transition-opacity">
+                                    ⠿ Alt↕scale · Shift↕shift
+                                </span>
+                            </div>
                         </div>
                     </div>
                 )}
