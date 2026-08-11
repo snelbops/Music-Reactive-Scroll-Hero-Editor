@@ -1791,9 +1791,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 handleTrackPointerDown(e);
                                 return;
                             }
-                            if (activeTool !== 'pen' && activeTool !== 'eraser') return;
+                            if (activeTool !== 'pen' && activeTool !== 'draw' && activeTool !== 'line' && activeTool !== 'eraser') return;
                             e.stopPropagation();
-                            const target = e.currentTarget;
+                            const target = e.currentTarget as HTMLElement;
                             target.setPointerCapture(e.pointerId);
 
                             if (activeTool === 'eraser') {
@@ -1814,6 +1814,139 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
                                 const onMove = (ev: PointerEvent) => { if (ev.buttons & 1) eraseAt(ev.clientX, ev.clientY); };
                                 const onUp = () => { target.removeEventListener('pointermove', onMove as any); target.removeEventListener('pointerup', onUp as any); };
+                                target.addEventListener('pointermove', onMove as any);
+                                target.addEventListener('pointerup', onUp as any);
+                                return;
+                            }
+
+                            if (activeTool === 'line') {
+                                useStore.getState().pushHistory();
+                                const rect = target.getBoundingClientRect();
+                                const seqDur = useStore.getState().sequenceDuration;
+                                const startX = e.clientX - rect.left;
+                                const startY = e.clientY - rect.top;
+                                const startTime = snapTimeToBeat(Math.max(0, Math.min(seqDur, (startX / rect.width) * seqDur)));
+                                const startVal = Math.max(0, Math.min(1, 1 - startY / rect.height));
+
+                                setLinePreview({
+                                    laneId: 'scrollPos',
+                                    startX, startY, currentX: startX, currentY: startY,
+                                    startTime, startVal, currentTime: startTime, currentVal: startVal
+                                });
+
+                                const onMove = (ev: PointerEvent) => {
+                                    if (ev.buttons & 1) {
+                                        const r = target.getBoundingClientRect();
+                                        const curX = Math.max(0, Math.min(r.width, ev.clientX - r.left));
+                                        const curY = Math.max(0, Math.min(r.height, ev.clientY - r.top));
+                                        const curTime = snapTimeToBeat(Math.max(0, Math.min(seqDur, (curX / r.width) * seqDur)));
+                                        const curVal = Math.max(0, Math.min(1, 1 - curY / r.height));
+                                        setLinePreview({
+                                            laneId: 'scrollPos',
+                                            startX, startY, currentX: curX, currentY: curY,
+                                            startTime, startVal, currentTime: curTime, currentVal: curVal
+                                        });
+                                    }
+                                };
+
+                                const onUp = (ev: PointerEvent) => {
+                                    setLinePreview(null);
+                                    target.removeEventListener('pointermove', onMove as any);
+                                    target.removeEventListener('pointerup', onUp as any);
+
+                                    const r = target.getBoundingClientRect();
+                                    const curX = Math.max(0, Math.min(r.width, ev.clientX - r.left));
+                                    const curY = Math.max(0, Math.min(r.height, ev.clientY - r.top));
+                                    const curTime = snapTimeToBeat(Math.max(0, Math.min(seqDur, (curX / r.width) * seqDur)));
+                                    const curVal = Math.max(0, Math.min(1, 1 - curY / r.height));
+
+                                    const minT = Math.min(startTime, curTime);
+                                    const maxT = Math.max(startTime, curTime);
+
+                                    const existingKfs = useStore.getState().scrollKeyframes;
+                                    const filtered = existingKfs.filter(k => k.time < minT - 0.001 || k.time > maxT + 0.001);
+                                    const dt = Math.abs(curTime - startTime);
+                                    const handleDt = Math.max(0.1, dt * 0.3);
+                                    const newRamp = [
+                                        ...filtered,
+                                        {
+                                            time: startTime,
+                                            value: startVal,
+                                            easing: 'bezier' as const,
+                                            handleOut: { dt: handleDt, dv: (curVal - startVal) * 0.2 },
+                                        },
+                                        {
+                                            time: curTime,
+                                            value: curVal,
+                                            easing: 'bezier' as const,
+                                            handleIn: { dt: -handleDt, dv: -(curVal - startVal) * 0.2 },
+                                        },
+                                    ].sort((a, b) => a.time - b.time);
+                                    useStore.getState().setScrollKeyframes(newRamp);
+                                    useStore.getState().setSelectedKeyframes([
+                                        { laneId: 'scrollPos', position: startTime, value: startVal },
+                                        { laneId: 'scrollPos', position: curTime, value: curVal },
+                                    ]);
+                                };
+
+                                target.addEventListener('pointermove', onMove as any);
+                                target.addEventListener('pointerup', onUp as any);
+                                return;
+                            }
+
+                            if (activeTool === 'draw') {
+                                useStore.getState().pushHistory();
+                                const rect = target.getBoundingClientRect();
+                                const seqDur = useStore.getState().sequenceDuration;
+                                const rawTime = Math.max(0, Math.min(seqDur, ((e.clientX - rect.left) / rect.width) * seqDur));
+                                const startTime = snapTimeToBeat(rawTime);
+                                const startVal = Math.max(0, Math.min(1, 1 - (e.clientY - rect.top) / rect.height));
+
+                                let strokePoints: { time: number; value: number }[] = [{ time: startTime, value: startVal }];
+                                const currentKfs = useStore.getState().scrollKeyframes;
+                                const nextKfs = [...currentKfs.filter(k => Math.abs(k.time - startTime) > 0.005), { time: startTime, value: startVal, easing: 'linear' as const }].sort((a, b) => a.time - b.time);
+                                useStore.getState().setScrollKeyframes(nextKfs);
+
+                                const onMove = (ev: PointerEvent) => {
+                                    if (ev.buttons & 1) {
+                                        const r = target.getBoundingClientRect();
+                                        const rt = Math.max(0, Math.min(seqDur, ((ev.clientX - r.left) / r.width) * seqDur));
+                                        const t = snapTimeToBeat(rt);
+                                        const v = Math.max(0, Math.min(1, 1 - (ev.clientY - r.top) / r.height));
+
+                                        const last = strokePoints.at(-1);
+                                        if (!last || Math.abs(t - last.time) >= 0.03) {
+                                            const smoothedVal = last ? +(last.value * 0.60 + v * 0.40).toFixed(3) : v;
+                                            strokePoints.push({ time: t, value: smoothedVal });
+                                            const baseKfs = useStore.getState().scrollKeyframes;
+                                            const updated = [...baseKfs.filter(k => Math.abs(k.time - t) > 0.005), { time: t, value: smoothedVal, easing: 'linear' as const }].sort((a, b) => a.time - b.time);
+                                            useStore.getState().setScrollKeyframes(updated);
+                                        }
+                                    }
+                                };
+
+                                const onUp = () => {
+                                    target.removeEventListener('pointermove', onMove as any);
+                                    target.removeEventListener('pointerup', onUp as any);
+
+                                    if (strokePoints.length > 3) {
+                                        const baseKfs = useStore.getState().scrollKeyframes;
+                                        const strokeTimes = new Set(strokePoints.map(p => p.time));
+                                        const smoothedStroke = strokePoints.map((pt, i) => {
+                                            if (i === 0 || i === strokePoints.length - 1) return pt;
+                                            const prev = strokePoints[i - 1].value;
+                                            const curr = pt.value;
+                                            const next = strokePoints[i + 1].value;
+                                            return { time: pt.time, value: +(prev * 0.25 + curr * 0.50 + next * 0.25).toFixed(3), easing: 'linear' as const };
+                                        });
+                                        const finalMerged = [
+                                            ...baseKfs.filter(k => !strokeTimes.has(k.time)),
+                                            ...smoothedStroke,
+                                        ].sort((a, b) => a.time - b.time);
+                                        useStore.getState().setScrollKeyframes(finalMerged);
+                                    }
+                                };
+
                                 target.addEventListener('pointermove', onMove as any);
                                 target.addEventListener('pointerup', onUp as any);
                                 return;
@@ -2379,13 +2512,28 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
                                             const existingKfs = (useStore.getState().paramKeyframes[lane.id] ?? []) as ParamKf[];
                                             const filtered = existingKfs.filter(k => k.time < minT - 0.001 || k.time > maxT + 0.001);
+                                            const dt = Math.abs(curTime - startTime);
+                                            const handleDt = Math.max(0.1, dt * 0.3);
                                             const newRamp = [
                                                 ...filtered,
-                                                { time: startTime, value: startVal, easing: 'linear' as const },
-                                                { time: curTime, value: curVal, easing: 'linear' as const },
+                                                {
+                                                    time: startTime,
+                                                    value: startVal,
+                                                    easing: 'bezier' as const,
+                                                    handleOut: { dt: handleDt, dv: (curVal - startVal) * 0.2 },
+                                                },
+                                                {
+                                                    time: curTime,
+                                                    value: curVal,
+                                                    easing: 'bezier' as const,
+                                                    handleIn: { dt: -handleDt, dv: -(curVal - startVal) * 0.2 },
+                                                },
                                             ].sort((a, b) => a.time - b.time);
                                             useStore.getState().setParamKeyframes(lane.id, newRamp as ParamKf[]);
-                                            setSelectedKeyframe({ laneId: lane.id, position: curTime, value: curVal });
+                                            useStore.getState().setSelectedKeyframes([
+                                                { laneId: lane.id, position: startTime, value: startVal },
+                                                { laneId: lane.id, position: curTime, value: curVal },
+                                            ]);
                                         };
 
                                         target.addEventListener('pointermove', onMove as any);
@@ -2401,8 +2549,11 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         const startTime = snapTimeToBeat(rawTime);
                                         const startVal = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - (e.clientY - rect.top) / rect.height) * (lane.max - lane.min)));
 
-                                        let sampled: { time: number; value: number }[] = [{ time: startTime, value: startVal }];
-                                        addParamKeyframe(lane.id, startTime, startVal);
+                                        let strokePoints: { time: number; value: number }[] = [{ time: startTime, value: startVal }];
+                                        
+                                        const currentKfs = (useStore.getState().paramKeyframes[lane.id] ?? []) as ParamKf[];
+                                        const nextKfs = [...currentKfs.filter(k => Math.abs(k.time - startTime) > 0.005), { time: startTime, value: startVal, easing: 'linear' as const }].sort((a, b) => a.time - b.time);
+                                        useStore.getState().setParamKeyframes(lane.id, nextKfs);
 
                                         const onMove = (ev: PointerEvent) => {
                                             if (ev.buttons & 1) {
@@ -2411,11 +2562,14 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 const t = snapTimeToBeat(rt);
                                                 const v = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - (ev.clientY - r.top) / r.height) * (lane.max - lane.min)));
 
-                                                const last = sampled.at(-1);
-                                                if (!last || Math.abs(t - last.time) >= 0.04 || Math.abs(v - last.value) >= (lane.max - lane.min) * 0.03) {
-                                                    const smoothedVal = last ? +(last.value * 0.70 + v * 0.30).toFixed(3) : v;
-                                                    sampled.push({ time: t, value: smoothedVal });
-                                                    addParamKeyframe(lane.id, t, smoothedVal);
+                                                const last = strokePoints.at(-1);
+                                                if (!last || Math.abs(t - last.time) >= 0.03) {
+                                                    const smoothedVal = last ? +(last.value * 0.60 + v * 0.40).toFixed(3) : v;
+                                                    strokePoints.push({ time: t, value: smoothedVal });
+                                                    
+                                                    const baseKfs = useStore.getState().paramKeyframes[lane.id] ?? [];
+                                                    const updated = [...baseKfs.filter(k => Math.abs(k.time - t) > 0.005), { time: t, value: smoothedVal, easing: 'linear' as const }].sort((a, b) => a.time - b.time);
+                                                    useStore.getState().setParamKeyframes(lane.id, updated);
                                                 }
                                             }
                                         };
@@ -2423,9 +2577,22 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         const onUp = () => {
                                             target.removeEventListener('pointermove', onMove as any);
                                             target.removeEventListener('pointerup', onUp as any);
-                                            if (sampled.length > 0) {
-                                                const lastPt = sampled.at(-1)!;
-                                                setSelectedKeyframe({ laneId: lane.id, position: lastPt.time, value: lastPt.value });
+
+                                            if (strokePoints.length > 3) {
+                                                const baseKfs = useStore.getState().paramKeyframes[lane.id] ?? [];
+                                                const strokeTimes = new Set(strokePoints.map(p => p.time));
+                                                const smoothedStroke = strokePoints.map((pt, i) => {
+                                                    if (i === 0 || i === strokePoints.length - 1) return pt;
+                                                    const prev = strokePoints[i - 1].value;
+                                                    const curr = pt.value;
+                                                    const next = strokePoints[i + 1].value;
+                                                    return { time: pt.time, value: +(prev * 0.25 + curr * 0.50 + next * 0.25).toFixed(3), easing: 'linear' as const };
+                                                });
+                                                const finalMerged = [
+                                                    ...baseKfs.filter(k => !strokeTimes.has(k.time)),
+                                                    ...smoothedStroke,
+                                                ].sort((a, b) => a.time - b.time);
+                                                useStore.getState().setParamKeyframes(lane.id, finalMerged as ParamKf[]);
                                             }
                                         };
 
@@ -2884,12 +3051,12 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     onContextMenu={(e) => { e.preventDefault(); setAudioMenu(null); }}
                 >
                     <div
-                        className="absolute bg-[#1c1c1e] border border-[#3a3a3c] rounded-xl shadow-2xl p-3 w-[330px] max-h-[85vh] overflow-y-auto thin-scrollbar font-sans text-editor-fg space-y-2 text-[11px]"
+                        className="absolute bg-[#1c1c1e] border border-[#3a3a3c] rounded-xl shadow-2xl p-3 w-[330px] max-h-[80vh] overflow-y-auto thin-scrollbar font-sans text-editor-fg space-y-2 text-[11px]"
                         style={{
                             left: Math.max(10, Math.min(window.innerWidth - 345, audioMenu.x)),
-                            top: audioMenu.y + 380 > window.innerHeight
-                                ? Math.max(10, audioMenu.y - 380)
-                                : Math.max(10, audioMenu.y)
+                            top: audioMenu.y > window.innerHeight - 380
+                                ? Math.max(10, audioMenu.y - 420)
+                                : Math.max(10, Math.min(window.innerHeight - 420, audioMenu.y))
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >

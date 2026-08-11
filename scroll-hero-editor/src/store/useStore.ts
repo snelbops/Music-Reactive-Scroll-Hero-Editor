@@ -269,11 +269,20 @@ export const useStore = create<EditorState>((set, get) => {
     clearScrollKeyframes: () => set({ scrollKeyframes: [] }),
     setScrollKeyframes: (kfs) => set({ scrollKeyframes: kfs }),
     updateScrollKeyframeEasing: (time, easing) => set((s) => ({
-        scrollKeyframes: s.scrollKeyframes.map(kf => Math.abs(kf.time - time) < 0.005 ? { ...kf, easing } : kf),
+        scrollKeyframes: s.scrollKeyframes.map(kf =>
+            Math.abs(kf.time - time) < 0.015
+                ? {
+                    ...kf,
+                    easing,
+                    handleIn: easing === 'bezier' ? (kf.handleIn ?? { dt: -0.3, dv: 0 }) : kf.handleIn,
+                    handleOut: easing === 'bezier' ? (kf.handleOut ?? { dt: 0.3, dv: 0 }) : kf.handleOut,
+                  }
+                : kf
+        ),
     })),
     updateScrollKeyframeHandle: (time, side, handle) => set((s) => ({
         scrollKeyframes: s.scrollKeyframes.map(kf =>
-            Math.abs(kf.time - time) < 0.005
+            Math.abs(kf.time - time) < 0.015
                 ? { ...kf, [side === 'in' ? 'handleIn' : 'handleOut']: handle }
                 : kf
         ),
@@ -281,8 +290,8 @@ export const useStore = create<EditorState>((set, get) => {
     paramKeyframes: {},
     addParamKeyframe: (laneId, time, value) => set((s) => {
         const existing = s.paramKeyframes[laneId] ?? [];
-        const prevKf = existing.find(kf => Math.abs(kf.time - time) <= 0.08);
-        const filtered = existing.filter(kf => Math.abs(kf.time - time) > 0.08);
+        const prevKf = existing.find(kf => Math.abs(kf.time - time) <= 0.04);
+        const filtered = existing.filter(kf => Math.abs(kf.time - time) > 0.04);
         const newKf: ParamKf = {
             time,
             value,
@@ -293,17 +302,26 @@ export const useStore = create<EditorState>((set, get) => {
         return { paramKeyframes: { ...s.paramKeyframes, [laneId]: [...filtered, newKf].sort((a, b) => a.time - b.time) } };
     }),
     removeParamKeyframe: (laneId, time) => set((s) => ({
-        paramKeyframes: { ...s.paramKeyframes, [laneId]: (s.paramKeyframes[laneId] ?? []).filter(kf => Math.abs(kf.time - time) > 0.001) },
+        paramKeyframes: { ...s.paramKeyframes, [laneId]: (s.paramKeyframes[laneId] ?? []).filter(kf => Math.abs(kf.time - time) > 0.005) },
     })),
     updateParamKeyframeEasing: (laneId, time, easing) => set((s) => ({
-        paramKeyframes: { ...s.paramKeyframes, [laneId]: (s.paramKeyframes[laneId] ?? []).map(kf => Math.abs(kf.time - time) < 0.001 ? { ...kf, easing } : kf) },
+        paramKeyframes: { ...s.paramKeyframes, [laneId]: (s.paramKeyframes[laneId] ?? []).map(kf =>
+            Math.abs(kf.time - time) < 0.015
+                ? {
+                    ...kf,
+                    easing,
+                    handleIn: easing === 'bezier' ? (kf.handleIn ?? { dt: -0.3, dv: 0 }) : kf.handleIn,
+                    handleOut: easing === 'bezier' ? (kf.handleOut ?? { dt: 0.3, dv: 0 }) : kf.handleOut,
+                  }
+                : kf
+        ) },
     })),
     updateParamKeyframeValue: (laneId, time, value) => set((s) => ({
-        paramKeyframes: { ...s.paramKeyframes, [laneId]: (s.paramKeyframes[laneId] ?? []).map(kf => Math.abs(kf.time - time) < 0.001 ? { ...kf, value } : kf) },
+        paramKeyframes: { ...s.paramKeyframes, [laneId]: (s.paramKeyframes[laneId] ?? []).map(kf => Math.abs(kf.time - time) < 0.015 ? { ...kf, value } : kf) },
     })),
     updateParamKeyframeHandle: (laneId, time, side, handle) => set((s) => ({
         paramKeyframes: { ...s.paramKeyframes, [laneId]: (s.paramKeyframes[laneId] ?? []).map(kf =>
-            Math.abs(kf.time - time) < 0.001 ? { ...kf, [side === 'in' ? 'handleIn' : 'handleOut']: handle } : kf
+            Math.abs(kf.time - time) < 0.015 ? { ...kf, [side === 'in' ? 'handleIn' : 'handleOut']: handle } : kf
         )},
     })),
     setParamKeyframes: (laneId, kfs) => set((s) => ({ paramKeyframes: { ...s.paramKeyframes, [laneId]: kfs } })),
