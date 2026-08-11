@@ -21,11 +21,18 @@ export function useWebMIDI() {
 
             // Note On command (0x90) or Control Change (0xb0)
             if (command === 0x90 && data2 > 0) {
-                // MIDI Pad triggers (Notes 36-39 or 60-63)
+                // MIDI Pad triggers (Notes 35-48 for standard 10 drumpads / Akai LPD8)
                 const padMap: Record<number, number> = {
-                    36: 0, 37: 1, 38: 2, 39: 3, // Standard GM Drum pads
-                    48: 0, 49: 1, 50: 2, 51: 3, // Akai LPD8 Bank A
-                    60: 0, 61: 1, 62: 2, 63: 3, // Middle C octave
+                    45: 0, // Pad 7 (Index 0)
+                    47: 1, // Pad 8 (Index 1)
+                    48: 2, // Pad 9 (Index 2)
+                    40: 3, // Pad 4 (Index 3)
+                    41: 4, // Pad 5 (Index 4)
+                    43: 5, // Pad 6 (Index 5)
+                    36: 6, // Pad 1 (Index 6)
+                    37: 7, // Pad 2 (Index 7)
+                    38: 8, // Pad 3 (Index 8)
+                    35: 9, // Pad 0 (Index 9)
                 };
                 if (data1 in padMap) {
                     useStore.getState().setActiveVideoPadIdx(padMap[data1]);

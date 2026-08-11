@@ -102,25 +102,26 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
         }
 
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) return;
             const code = e.code;
-            const key = e.key;
 
-            const padMap: Record<string, number> = {
-                '7': 0, 'Numpad7': 0, 'Digit7': 0,
-                '8': 1, 'Numpad8': 1, 'Digit8': 1,
-                '9': 2, 'Numpad9': 2, 'Digit9': 2,
-                '4': 3, 'Numpad4': 3, 'Digit4': 3,
-                '5': 4, 'Numpad5': 4, 'Digit5': 4,
-                '6': 5, 'Numpad6': 5, 'Digit6': 5,
-                '1': 6, 'Numpad1': 6, 'Digit1': 6,
-                '2': 7, 'Numpad2': 7, 'Digit2': 7,
-                '3': 8, 'Numpad3': 8, 'Digit3': 8,
-                '0': 9, 'Numpad0': 9, 'Digit0': 9,
+            // Strict Numpad mapping (only physical Numpad keys trigger drumpad switches)
+            const numpadMap: Record<string, number> = {
+                'Numpad7': 0,
+                'Numpad8': 1,
+                'Numpad9': 2,
+                'Numpad4': 3,
+                'Numpad5': 4,
+                'Numpad6': 5,
+                'Numpad1': 6,
+                'Numpad2': 7,
+                'Numpad3': 8,
+                'Numpad0': 9,
             };
 
-            const targetIdx = padMap[code] ?? padMap[key];
+            const targetIdx = numpadMap[code];
             if (targetIdx !== undefined) {
+                e.preventDefault();
                 useStore.getState().setActiveVideoPadIdx(targetIdx);
             }
         };
