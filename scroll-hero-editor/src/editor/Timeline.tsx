@@ -1220,35 +1220,35 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     </div>
 
                     {/* Parameter Isolation Solo Selector */}
-                    <div className="flex items-center gap-1 bg-[#181818] border border-[#2e2e2e] rounded px-1.5 py-0.5 text-[9px] font-mono shrink-0">
+                    <div className="flex items-center gap-1 bg-editor-surface border border-editor-border rounded px-1.5 py-0.5 text-[9px] font-mono shrink-0">
                         <SlidersHorizontal className="w-3 h-3 text-editor-accent-purple shrink-0" />
-                        <span className="text-[#808080] text-[8px] uppercase font-bold mr-1">Solo:</span>
+                        <span className="text-editor-muted text-[8px] uppercase font-bold mr-1">Solo:</span>
                         <button
-                            className={`px-1.5 py-0.5 rounded transition-colors ${isolatedLane === 'all' ? 'bg-editor-accent-purple text-white font-bold' : 'text-gray-400 hover:text-white'}`}
+                            className={`px-1.5 py-0.5 rounded transition-colors ${isolatedLane === 'all' ? 'bg-editor-accent-purple text-white font-bold' : 'text-editor-muted hover:text-editor-fg'}`}
                             onClick={() => setIsolatedLane('all')}
                         >
                             ALL
                         </button>
                         <button
-                            className={`px-1.5 py-0.5 rounded transition-colors ${isolatedLane === 'scrollPos' ? 'bg-editor-accent-purple text-white font-bold' : 'text-gray-400 hover:text-white'}`}
+                            className={`px-1.5 py-0.5 rounded transition-colors ${isolatedLane === 'scrollPos' ? 'bg-editor-accent-purple text-white font-bold' : 'text-editor-muted hover:text-editor-fg'}`}
                             onClick={() => setIsolatedLane('scrollPos')}
                         >
                             SCROLL
                         </button>
                         <button
-                            className={`px-1.5 py-0.5 rounded transition-colors ${isolatedLane === 'rotationSpeed' ? 'bg-teal-500 text-white font-bold' : 'text-gray-400 hover:text-white'}`}
+                            className={`px-1.5 py-0.5 rounded transition-colors ${isolatedLane === 'rotationSpeed' ? 'bg-teal-500 text-white font-bold' : 'text-editor-muted hover:text-editor-fg'}`}
                             onClick={() => setIsolatedLane('rotationSpeed')}
                         >
                             ROTATION
                         </button>
                         <button
-                            className={`px-1.5 py-0.5 rounded transition-colors ${isolatedLane === 'cssOpacity' ? 'bg-blue-500 text-white font-bold' : 'text-gray-400 hover:text-white'}`}
+                            className={`px-1.5 py-0.5 rounded transition-colors ${isolatedLane === 'cssOpacity' ? 'bg-blue-500 text-white font-bold' : 'text-editor-muted hover:text-editor-fg'}`}
                             onClick={() => setIsolatedLane('cssOpacity')}
                         >
                             OPACITY
                         </button>
                         <button
-                            className={`px-1.5 py-0.5 rounded transition-colors ${isolatedLane === 'depth' || isolatedLane === 'size' ? 'bg-green-500 text-white font-bold' : 'text-gray-400 hover:text-white'}`}
+                            className={`px-1.5 py-0.5 rounded transition-colors ${isolatedLane === 'depth' || isolatedLane === 'size' ? 'bg-green-500 text-white font-bold' : 'text-editor-muted hover:text-editor-fg'}`}
                             onClick={() => setIsolatedLane('depth')}
                         >
                             PARTICLES
@@ -1258,7 +1258,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
                 {/* RIGHT: LEN + timecode */}
                 <div className="flex items-center gap-3 pl-2 shrink-0">
-                    <div className="flex items-center gap-1 text-[10px] text-[#808080]">
+                    <div className="flex items-center gap-1 text-[10px] text-editor-muted">
                         <span>LEN:</span>
                         <input
                             type="number"
@@ -1266,11 +1266,11 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             max="300"
                             value={sequenceDuration}
                             onChange={(e) => useStore.getState().setSequenceDuration(parseFloat(e.target.value) || 10)}
-                            className="w-10 bg-[#222] border border-[#333] rounded px-1 text-center font-mono text-[10px] text-editor-accent-purple focus:outline-none focus:border-editor-accent-purple"
+                            className="w-10 bg-editor-surface border border-editor-border rounded px-1 text-center font-mono text-[10px] text-editor-accent-purple focus:outline-none focus:border-editor-accent-purple"
                         />
                         <span>s</span>
                     </div>
-                    <div className="flex items-center text-[#d9d9d9] font-mono text-[11px] font-medium tracking-widest">
+                    <div className="flex items-center text-editor-fg font-mono text-[11px] font-medium tracking-widest">
                         {new Date(seqTime * 1000).toISOString().slice(11, 23).replace('.', ':')}
                     </div>
                 </div>
@@ -1714,13 +1714,13 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 {(isolatedLane === 'all' || isolatedLane === 'scrollPos') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('scrollPos', isolatedLane === 'scrollPos' ? 220 : 100) }}>
                     <div
-                        className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-editor-border sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors overflow-hidden ${isRecording ? 'ring-1 ring-inset ring-red-500/60 bg-red-500/10' : selectedLane === 'scrollPos' ? 'bg-[#2a2a2a]' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}
+                        className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-editor-border sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors overflow-hidden ${isRecording ? 'ring-1 ring-inset ring-red-500/60 bg-red-500/10' : selectedLane === 'scrollPos' ? 'bg-editor-surface-hover border-l-2 border-editor-accent-purple text-editor-fg font-semibold' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}
                         onClick={() => setSelectedLane('scrollPos')}
                     >
                         <div className="flex items-center justify-between w-full">
                             <div className="flex items-center gap-1 overflow-hidden">
                                 <Mouse className="w-2.5 h-2.5 shrink-0 text-[#3b82f6]" />
-                                <span className="text-[10px] uppercase font-normal text-[#d9d9d9] truncate">Scroll POS</span>
+                                <span className="text-[10px] uppercase font-medium text-editor-fg truncate">Scroll POS</span>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
                                 {scrollKeyframes.length > 2 && (
@@ -2227,17 +2227,17 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     return (
                         <div key={lane.id} className="flex border-b border-editor-border group relative" style={{ height: currentLaneHeight }}>
                             <div
-                                className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-editor-border sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors overflow-hidden ${isSelected ? 'bg-[#2a2a2a]' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}
+                                className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-editor-border sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors overflow-hidden ${isSelected ? 'bg-editor-surface-hover border-l-2 border-editor-accent-purple text-editor-fg font-semibold' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}
                                 onClick={() => setSelectedLane(lane.id)}
                             >
                                 <div className="flex items-center justify-between w-full">
                                     <div className="flex items-center gap-1 overflow-hidden">
                                         <SlidersHorizontal className="w-2.5 h-2.5 shrink-0" style={{ color: lane.color }} />
-                                        <span className="text-[10px] uppercase font-normal text-[#d9d9d9] truncate">{lane.label}</span>
+                                        <span className="text-[10px] uppercase font-medium text-editor-fg truncate">{lane.label}</span>
                                     </div>
                                     {kfs.length > 0 && (
                                         <button
-                                            className="text-[9px] text-[#808080] hover:text-[#d9d9d9] transition-colors shrink-0 ml-1"
+                                            className="text-[9px] text-editor-muted hover:text-editor-fg transition-colors shrink-0 ml-1"
                                             title="Clear keyframes"
                                             onClick={(e) => { e.stopPropagation(); useStore.getState().clearParamKeyframes(lane.id); }}
                                         >✕</button>
