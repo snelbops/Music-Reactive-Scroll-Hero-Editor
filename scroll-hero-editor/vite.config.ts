@@ -98,6 +98,7 @@ export default defineConfig({
     exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'],
   },
   server: {
+    allowedHosts: true,
     // Required for SharedArrayBuffer used by ffmpeg WASM
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
