@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useLayoutEffect, useCallback, useState } from 'react';
-import { Play, Pause, Square, Music, Circle, ZoomIn, ZoomOut, Video, MousePointer2, Repeat, Eraser, Pen, Mouse, SlidersHorizontal, UploadCloud, Magnet, Undo2, Redo2, Grid } from 'lucide-react';
+import { Play, Pause, Square, Music, Circle, ZoomIn, ZoomOut, Video, MousePointer2, Repeat, Eraser, Pen, Mouse, SlidersHorizontal, UploadCloud, Magnet, Undo2, Redo2, Grid, Pencil, TrendingUp } from 'lucide-react';
 import { onChange } from '@theatre/core';
 import { useStore } from '../store/useStore';
 import { saveMediaFile } from '../utils/mediaStore';
@@ -121,7 +121,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const verticalZoom = useStore(s => s.verticalZoom);
     const setVerticalZoom = useStore(s => s.setVerticalZoom);
     const [lanesWidth, setLanesWidth] = useState(0);
-    const [activeTool, setActiveTool] = useState<'select' | 'pen' | 'eraser'>('select');
+    const [activeTool, setActiveTool] = useState<'select' | 'pen' | 'draw' | 'line' | 'eraser'>('select');
+    const [linePreview, setLinePreview] = useState<{ laneId: string; startX: number; startY: number; currentX: number; currentY: number; startTime: number; startVal: number; currentTime: number; currentVal: number } | null>(null);
     const [snapToBeat, setSnapToBeat] = useState(false);
     const [isolatedLane, setIsolatedLane] = useState<'all' | 'scrollPos' | 'rotationSpeed' | 'cssOpacity' | 'depth' | 'size'>('all');
     const [showRhythmModal, setShowRhythmModal] = useState(false);
@@ -865,6 +866,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
             // Tools (no meta key)
             if (!meta && (e.key === 'v' || e.key === 'V')) { setActiveTool('select'); return; }
             if (!meta && (e.key === 'p' || e.key === 'P')) { setActiveTool('pen'); return; }
+            if (!meta && (e.key === 'd' || e.key === 'D')) { setActiveTool('draw'); return; }
+            if (!meta && (e.key === 'l' || e.key === 'L')) { setActiveTool('line'); return; }
             if (!meta && (e.key === 'e' || e.key === 'E')) { setActiveTool('eraser'); return; }
             // Delete selected keyframes
             if (e.key !== 'Delete' && e.key !== 'Backspace') return;
@@ -1020,7 +1023,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     <span className="border-r border-[#333] pr-1.5 mr-0.5 flex items-center text-[#808080]">
                         {([
                             { id: 'select' as const, Icon: MousePointer2, title: 'Select (V)' },
-                            { id: 'pen'    as const, Icon: Pen,           title: 'Pen (P)'    },
+                            { id: 'pen'    as const, Icon: Pen,           title: 'Pen / Edit (P)' },
+                            { id: 'draw'   as const, Icon: Pencil,        title: 'Freehand Draw (D)' },
+                            { id: 'line'   as const, Icon: TrendingUp,    title: 'Line Ramp (L)' },
                             { id: 'eraser' as const, Icon: Eraser,        title: 'Eraser (E)' },
                         ]).map(({ id, Icon, title }) => (
                             <button
@@ -2299,7 +2304,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         handleTrackPointerDown(e);
                                         return;
                                     }
-                                    if (activeTool !== 'pen' && activeTool !== 'eraser') return;
+                                    if (activeTool !== 'pen' && activeTool !== 'draw' && activeTool !== 'line' && activeTool !== 'eraser') return;
                                     e.stopPropagation();
                                     const target = e.currentTarget as HTMLElement;
                                     target.setPointerCapture(e.pointerId);
@@ -2307,7 +2312,6 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     if (activeTool === 'eraser') {
                                         const eraseAt = (clientX: number, clientY: number) => {
                                             const rect = target.getBoundingClientRect();
-                                            // Fix 3: use sequenceDuration (dynamic) not SEQUENCE_DURATION (hardcoded 10)
                                             const seqDur = useStore.getState().sequenceDuration;
                                             const clickTime = Math.max(0, Math.min(seqDur, ((clientX - rect.left) / rect.width) * seqDur));
                                             const clickVal = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - (clientY - rect.top) / rect.height) * (lane.max - lane.min)));
@@ -2329,10 +2333,110 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         return;
                                     }
 
+                                    if (activeTool === 'line') {
+                                        useStore.getState().pushHistory();
+                                        const rect = target.getBoundingClientRect();
+                                        const seqDur = useStore.getState().sequenceDuration;
+                                        const startX = e.clientX - rect.left;
+                                        const startY = e.clientY - rect.top;
+                                        const startTime = snapTimeToBeat(Math.max(0, Math.min(seqDur, (startX / rect.width) * seqDur)));
+                                        const startVal = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - startY / rect.height) * (lane.max - lane.min)));
+
+                                        setLinePreview({
+                                            laneId: lane.id,
+                                            startX, startY, currentX: startX, currentY: startY,
+                                            startTime, startVal, currentTime: startTime, currentVal: startVal
+                                        });
+
+                                        const onMove = (ev: PointerEvent) => {
+                                            if (ev.buttons & 1) {
+                                                const r = target.getBoundingClientRect();
+                                                const curX = Math.max(0, Math.min(r.width, ev.clientX - r.left));
+                                                const curY = Math.max(0, Math.min(r.height, ev.clientY - r.top));
+                                                const curTime = snapTimeToBeat(Math.max(0, Math.min(seqDur, (curX / r.width) * seqDur)));
+                                                const curVal = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - curY / r.height) * (lane.max - lane.min)));
+                                                setLinePreview({
+                                                    laneId: lane.id,
+                                                    startX, startY, currentX: curX, currentY: curY,
+                                                    startTime, startVal, currentTime: curTime, currentVal: curVal
+                                                });
+                                            }
+                                        };
+
+                                        const onUp = (ev: PointerEvent) => {
+                                            setLinePreview(null);
+                                            target.removeEventListener('pointermove', onMove as any);
+                                            target.removeEventListener('pointerup', onUp as any);
+
+                                            const r = target.getBoundingClientRect();
+                                            const curX = Math.max(0, Math.min(r.width, ev.clientX - r.left));
+                                            const curY = Math.max(0, Math.min(r.height, ev.clientY - r.top));
+                                            const curTime = snapTimeToBeat(Math.max(0, Math.min(seqDur, (curX / r.width) * seqDur)));
+                                            const curVal = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - curY / r.height) * (lane.max - lane.min)));
+
+                                            const minT = Math.min(startTime, curTime);
+                                            const maxT = Math.max(startTime, curTime);
+
+                                            const existingKfs = (useStore.getState().paramKeyframes[lane.id] ?? []) as ParamKf[];
+                                            const filtered = existingKfs.filter(k => k.time < minT - 0.001 || k.time > maxT + 0.001);
+                                            const newRamp = [
+                                                ...filtered,
+                                                { time: startTime, value: startVal, easing: 'linear' as const },
+                                                { time: curTime, value: curVal, easing: 'linear' as const },
+                                            ].sort((a, b) => a.time - b.time);
+                                            useStore.getState().setParamKeyframes(lane.id, newRamp as ParamKf[]);
+                                            setSelectedKeyframe({ laneId: lane.id, position: curTime, value: curVal });
+                                        };
+
+                                        target.addEventListener('pointermove', onMove as any);
+                                        target.addEventListener('pointerup', onUp as any);
+                                        return;
+                                    }
+
+                                    if (activeTool === 'draw') {
+                                        useStore.getState().pushHistory();
+                                        const rect = target.getBoundingClientRect();
+                                        const seqDur = useStore.getState().sequenceDuration;
+                                        const rawTime = Math.max(0, Math.min(seqDur, ((e.clientX - rect.left) / rect.width) * seqDur));
+                                        const startTime = snapTimeToBeat(rawTime);
+                                        const startVal = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - (e.clientY - rect.top) / rect.height) * (lane.max - lane.min)));
+
+                                        let sampled: { time: number; value: number }[] = [{ time: startTime, value: startVal }];
+                                        addParamKeyframe(lane.id, startTime, startVal);
+
+                                        const onMove = (ev: PointerEvent) => {
+                                            if (ev.buttons & 1) {
+                                                const r = target.getBoundingClientRect();
+                                                const rt = Math.max(0, Math.min(seqDur, ((ev.clientX - r.left) / r.width) * seqDur));
+                                                const t = snapTimeToBeat(rt);
+                                                const v = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - (ev.clientY - r.top) / r.height) * (lane.max - lane.min)));
+
+                                                const last = sampled.at(-1);
+                                                if (!last || Math.abs(t - last.time) >= 0.04 || Math.abs(v - last.value) >= (lane.max - lane.min) * 0.03) {
+                                                    const smoothedVal = last ? +(last.value * 0.70 + v * 0.30).toFixed(3) : v;
+                                                    sampled.push({ time: t, value: smoothedVal });
+                                                    addParamKeyframe(lane.id, t, smoothedVal);
+                                                }
+                                            }
+                                        };
+
+                                        const onUp = () => {
+                                            target.removeEventListener('pointermove', onMove as any);
+                                            target.removeEventListener('pointerup', onUp as any);
+                                            if (sampled.length > 0) {
+                                                const lastPt = sampled.at(-1)!;
+                                                setSelectedKeyframe({ laneId: lane.id, position: lastPt.time, value: lastPt.value });
+                                            }
+                                        };
+
+                                        target.addEventListener('pointermove', onMove as any);
+                                        target.addEventListener('pointerup', onUp as any);
+                                        return;
+                                    }
+
                                     useStore.getState().pushHistory();
                                     const rect = target.getBoundingClientRect();
                                     const seqDurPen = useStore.getState().sequenceDuration;
-                                    // Fix 3: use sequenceDuration not SEQUENCE_DURATION
                                     const rawTime = Math.max(0, Math.min(seqDurPen, ((e.clientX - rect.left) / rect.width) * seqDurPen));
                                     const time = snapTimeToBeat(rawTime);
                                     const value = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - (e.clientY - rect.top) / rect.height) * (lane.max - lane.min)));
@@ -2363,6 +2467,23 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             height: Math.abs(marqueeBox.currentY - marqueeBox.startY),
                                         }}
                                     />
+                                )}
+
+                                {/* Line Tool Live Preview Overlay */}
+                                {linePreview && linePreview.laneId === lane.id && (
+                                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-40" style={{ overflow: 'visible' }}>
+                                        <line
+                                            x1={linePreview.startX}
+                                            y1={linePreview.startY}
+                                            x2={linePreview.currentX}
+                                            y2={linePreview.currentY}
+                                            stroke={lane.color}
+                                            strokeWidth="2"
+                                            strokeDasharray="4 4"
+                                        />
+                                        <circle cx={linePreview.startX} cy={linePreview.startY} r="4" fill={lane.color} />
+                                        <circle cx={linePreview.currentX} cy={linePreview.currentY} r="4" fill="#fbbf24" />
+                                    </svg>
                                 )}
 
                                 <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
