@@ -1953,7 +1953,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     </>
                                 );
                             })()}
-                             {activeTool === 'select' && (() => {
+                            {(() => {
                                  const scaleX = VB_W / sequenceDuration;
                                  const isSingleSel = selectedKeyframes.length === 1;
                                  return scrollKeyframes.map((kf, idx) => {
@@ -1982,7 +1982,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                          </svg>
                          <div className="absolute inset-0 pointer-events-none">
                              {/* Bezier Handle Knobs in HTML for scrollPos */}
-                             {activeTool === 'select' && scrollKeyframes.map((kf, idx) => {
+                             {scrollKeyframes.map((kf, idx) => {
                                  const isKfSelected = selectedKeyframes.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.02);
                                  if (!isKfSelected) return null;
                                  const hasCustomHandle = !!(kf.handleOut || kf.handleIn);
