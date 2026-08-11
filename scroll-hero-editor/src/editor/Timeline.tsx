@@ -2042,7 +2042,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                              })}
                              {/* Keyframe Dots for scrollPos (fixed 6px size, gold highlight on selection) */}
                              {scrollKeyframes.map((kf, i) => {
-                                 const isSelected = selectedKeyframes.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.05);
+                                 const isSelected = selectedKeyframes.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.005);
                                  return (
                                      <div
                                          key={i}
@@ -2066,7 +2066,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             }
                                             const updated = { laneId: 'scrollPos', position: kf.time, value: kf.value };
                                             const currentSel = useStore.getState().selectedKeyframes;
-                                            const isAlreadySelected = currentSel.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.02);
+                                            const isAlreadySelected = currentSel.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.005);
                                             if (e.shiftKey) toggleSelectedKeyframe(updated);
                                             else if (!isAlreadySelected) setSelectedKeyframe(updated);
                                         }}
@@ -2084,7 +2084,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             hasMovedKfRef.current = false;
 
                                             const currentSelected = useStore.getState().selectedKeyframes;
-                                            const isCurrentSelected = currentSelected.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.02);
+                                            const isCurrentSelected = currentSelected.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.005);
                                             const activeSelection = isCurrentSelected && currentSelected.length > 0
                                                 ? currentSelected
                                                 : [{ laneId: 'scrollPos', position: kf.time, value: kf.value }];
@@ -2519,7 +2519,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             })}
                             {/* Keyframe Dots for param lane (18px hit target, gold highlight on selection) */}
                             {kfs.map((kf, i) => {
-                                const kfSelected = selectedKeyframes.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.05);
+                                const kfSelected = selectedKeyframes.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.005);
                                 return (
                                     <div
                                         key={i}
@@ -2544,7 +2544,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             }
                                             const updated = { laneId: lane.id, position: kf.time, value: kf.value };
                                             const currentSel = useStore.getState().selectedKeyframes;
-                                            const isAlreadySelected = currentSel.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.02);
+                                            const isAlreadySelected = currentSel.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.005);
                                             if (e.shiftKey) toggleSelectedKeyframe(updated);
                                             else if (!isAlreadySelected) setSelectedKeyframe(updated);
                                         }}
@@ -2556,7 +2556,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             hasMovedKfRef.current = false;
 
                                             const currentSelected = useStore.getState().selectedKeyframes;
-                                            const isCurrentSelected = currentSelected.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.02);
+                                            const isCurrentSelected = currentSelected.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.005);
                                             const activeSelection = isCurrentSelected && currentSelected.length > 0
                                                 ? currentSelected
                                                 : [{ laneId: lane.id, position: kf.time, value: kf.value }];

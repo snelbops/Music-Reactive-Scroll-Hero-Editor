@@ -252,22 +252,28 @@ export const useStore = create<EditorState>((set, get) => {
     isScrubbing: false, setIsScrubbing: (v) => set({ isScrubbing: v }),
     scrollKeyframes: [],
     addScrollKeyframe: (time, value, rangeStart?) => set((s) => {
+        const existing = s.scrollKeyframes;
+        const prevKf = existing.find(kf => Math.abs(kf.time - time) <= 0.08);
         const filtered = rangeStart !== undefined
-            // Range clear: keep keyframes up-to-and-including rangeStart, plus anything after time.
-            // +0.001 keeps the previous fresh sample (at exactly rangeStart) while deleting old
-            // keyframes strictly between rangeStart and the current position.
-            ? s.scrollKeyframes.filter(kf => kf.time < rangeStart + 0.001 || kf.time > time + 0.001)
-            : s.scrollKeyframes.filter(kf => Math.abs(kf.time - time) > 0.016);
-        return { scrollKeyframes: [...filtered, { time, value }].sort((a, b) => a.time - b.time) };
+            ? existing.filter(kf => kf.time < rangeStart + 0.001 || kf.time > time + 0.001)
+            : existing.filter(kf => Math.abs(kf.time - time) > 0.08);
+        const newKf = {
+            time,
+            value,
+            easing: prevKf?.easing ?? 'linear',
+            handleIn: prevKf?.handleIn,
+            handleOut: prevKf?.handleOut,
+        };
+        return { scrollKeyframes: [...filtered, newKf].sort((a, b) => a.time - b.time) };
     }),
     clearScrollKeyframes: () => set({ scrollKeyframes: [] }),
     setScrollKeyframes: (kfs) => set({ scrollKeyframes: kfs }),
     updateScrollKeyframeEasing: (time, easing) => set((s) => ({
-        scrollKeyframes: s.scrollKeyframes.map(kf => Math.abs(kf.time - time) < 0.001 ? { ...kf, easing } : kf),
+        scrollKeyframes: s.scrollKeyframes.map(kf => Math.abs(kf.time - time) < 0.005 ? { ...kf, easing } : kf),
     })),
     updateScrollKeyframeHandle: (time, side, handle) => set((s) => ({
         scrollKeyframes: s.scrollKeyframes.map(kf =>
-            Math.abs(kf.time - time) < 0.001
+            Math.abs(kf.time - time) < 0.005
                 ? { ...kf, [side === 'in' ? 'handleIn' : 'handleOut']: handle }
                 : kf
         ),
@@ -275,8 +281,16 @@ export const useStore = create<EditorState>((set, get) => {
     paramKeyframes: {},
     addParamKeyframe: (laneId, time, value) => set((s) => {
         const existing = s.paramKeyframes[laneId] ?? [];
-        const filtered = existing.filter(kf => Math.abs(kf.time - time) > 0.016);
-        return { paramKeyframes: { ...s.paramKeyframes, [laneId]: [...filtered, { time, value, easing: 'linear' }].sort((a, b) => a.time - b.time) } };
+        const prevKf = existing.find(kf => Math.abs(kf.time - time) <= 0.08);
+        const filtered = existing.filter(kf => Math.abs(kf.time - time) > 0.08);
+        const newKf: ParamKf = {
+            time,
+            value,
+            easing: prevKf?.easing ?? 'linear',
+            handleIn: prevKf?.handleIn,
+            handleOut: prevKf?.handleOut,
+        };
+        return { paramKeyframes: { ...s.paramKeyframes, [laneId]: [...filtered, newKf].sort((a, b) => a.time - b.time) } };
     }),
     removeParamKeyframe: (laneId, time) => set((s) => ({
         paramKeyframes: { ...s.paramKeyframes, [laneId]: (s.paramKeyframes[laneId] ?? []).filter(kf => Math.abs(kf.time - time) > 0.001) },
