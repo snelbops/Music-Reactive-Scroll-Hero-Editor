@@ -419,6 +419,64 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
                         />
                     </div>
                 )}
+
+                {isMulti && (
+                    <div className="mt-1 pt-2 border-t border-editor-border flex flex-col gap-2">
+                        <label className="text-[9.5px] text-editor-muted block uppercase font-semibold">Batch Edit ({selectedCount} points)</label>
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-editor-muted shrink-0">Set All:</span>
+                            <input
+                                type="number"
+                                placeholder="Value..."
+                                className="w-full bg-editor-surface border border-editor-border rounded px-2 py-1 text-xs font-mono text-editor-fg focus:outline-none focus:border-editor-accent-blue"
+                                step={(lane.range[1] - lane.range[0]) / 100}
+                                min={lane.range[0]}
+                                max={lane.range[1]}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        const v = parseFloat((e.currentTarget as HTMLInputElement).value);
+                                        if (!isNaN(v)) {
+                                            const clamped = Math.max(lane.range[0], Math.min(lane.range[1], v));
+                                            useStore.getState().selectedKeyframes.forEach(item => {
+                                                if (item.laneId !== 'scrollPos') {
+                                                    useStore.getState().updateParamKeyframeValue(item.laneId, item.position, clamped);
+                                                }
+                                            });
+                                            useStore.getState().setSelectedKeyframes(selectedKeyframes.map(s => ({ ...s, value: clamped })));
+                                        }
+                                    }
+                                }}
+                            />
+                        </div>
+                        <div className="flex items-center justify-between gap-1 text-[10px]">
+                            <span className="text-editor-muted">Nudge:</span>
+                            <div className="flex items-center gap-1">
+                                {[-0.1, +0.1, -0.5, +0.5].map((offset) => (
+                                    <button
+                                        key={offset}
+                                        className="px-1.5 py-0.5 rounded bg-editor-surface border border-editor-border text-[9.5px] font-mono text-editor-fg hover:bg-editor-surface-hover hover:border-editor-accent-blue transition-colors"
+                                        onClick={() => {
+                                            const range = lane.range[1] - lane.range[0];
+                                            const scaledOffset = offset * (range <= 1 ? 1 : range <= 5 ? 0.5 : 1);
+                                            useStore.getState().selectedKeyframes.forEach(item => {
+                                                if (item.laneId !== 'scrollPos') {
+                                                    const curKfs = (useStore.getState().paramKeyframes[item.laneId] ?? []);
+                                                    const matchKf = curKfs.find(k => Math.abs(k.time - item.position) < 0.001);
+                                                    if (matchKf) {
+                                                        const newVal = Math.max(lane.range[0], Math.min(lane.range[1], matchKf.value + scaledOffset));
+                                                        useStore.getState().updateParamKeyframeValue(item.laneId, item.position, newVal);
+                                                    }
+                                                }
+                                            });
+                                        }}
+                                    >
+                                        {offset > 0 ? `+${offset}` : offset}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Easing presets */}

@@ -2167,11 +2167,23 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             // Apply to scrollPos
                                             const scrollOrigs = origKfs.filter((s: any) => s.laneId === 'scrollPos');
                                             if (scrollOrigs.length > 0) {
-                                                const scrollOrigTimes = new Set(scrollOrigs.map((k: any) => k.position));
-                                                const remainingScroll = (initialScrollKfs || []).filter((k: any) => !Array.from(scrollOrigTimes).some((t: any) => Math.abs(k.time - t) < 0.01));
+                                                const initialKfs = initialScrollKfs || [];
+                                                const remainingScroll = initialKfs.filter((k: any) =>
+                                                    !scrollOrigs.some((orig: any) => Math.abs(k.time - orig.position) < 0.001)
+                                                );
                                                 const updatedScroll = updatedSelection.filter((s: any) => s.laneId === 'scrollPos');
                                                 const mergedScroll = remainingScroll
-                                                    .concat(updatedScroll.map((s: any) => ({ time: s.position, value: s.value })))
+                                                    .concat(updatedScroll.map((s: any, idx: number) => {
+                                                        const origPos = scrollOrigs[idx]?.position ?? s.position;
+                                                        const origKf = initialKfs.find((k: any) => Math.abs(k.time - origPos) < 0.001);
+                                                        return {
+                                                            time: s.position,
+                                                            value: s.value,
+                                                            easing: origKf?.easing ?? 'linear',
+                                                            handleIn: origKf?.handleIn,
+                                                            handleOut: origKf?.handleOut,
+                                                        };
+                                                    }))
                                                     .sort((a: any, b: any) => a.time - b.time);
                                                 setScrollKeyframes(mergedScroll);
                                             }
@@ -2180,14 +2192,15 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             const affectedParamLanes = new Set<string>(origKfs.filter((s: any) => s.laneId !== 'scrollPos').map((s: any) => s.laneId));
                                             affectedParamLanes.forEach((lId: string) => {
                                                 const laneOrigs = origKfs.filter((s: any) => s.laneId === lId);
-                                                const laneOrigTimes = new Set(laneOrigs.map((k: any) => k.position));
                                                 const initialLaneKfs = ((initialParamKfs || {})[lId] ?? []) as ParamKf[];
-                                                const remainingParam = initialLaneKfs.filter((k: ParamKf) => !Array.from(laneOrigTimes).some((t: any) => Math.abs(k.time - t) < 0.01));
+                                                const remainingParam = initialLaneKfs.filter((k: ParamKf) =>
+                                                    !laneOrigs.some((orig: any) => Math.abs(k.time - orig.position) < 0.001)
+                                                );
                                                 const updatedParam = updatedSelection.filter((s: any) => s.laneId === lId);
                                                 const mergedParam = remainingParam
-                                                    .concat(updatedParam.map((s: any) => {
-                                                        const origKf = initialLaneKfs.find((k: ParamKf) => Math.abs(k.time - s.position) < 0.015
-                                                            || laneOrigs.some((lo: any) => Math.abs(lo.position - s.position) < 0.015 && Math.abs(k.time - lo.position) < 0.015));
+                                                    .concat(updatedParam.map((s: any, idx: number) => {
+                                                        const origPos = laneOrigs[idx]?.position ?? s.position;
+                                                        const origKf = initialLaneKfs.find((k: ParamKf) => Math.abs(k.time - origPos) < 0.001);
                                                         return {
                                                             time: s.position,
                                                             value: s.value,
@@ -2608,11 +2621,23 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             // Apply to scrollPos
                                             const scrollOrigs = origKfs.filter((s: any) => s.laneId === 'scrollPos');
                                             if (scrollOrigs.length > 0) {
-                                                const scrollOrigTimes = new Set(scrollOrigs.map((k: any) => k.position));
-                                                const remainingScroll = (initialScrollKfs || []).filter((k: any) => !Array.from(scrollOrigTimes).some((t: any) => Math.abs(k.time - t) < 0.01));
+                                                const initialKfs = initialScrollKfs || [];
+                                                const remainingScroll = initialKfs.filter((k: any) =>
+                                                    !scrollOrigs.some((orig: any) => Math.abs(k.time - orig.position) < 0.001)
+                                                );
                                                 const updatedScroll = updatedSelection.filter((s: any) => s.laneId === 'scrollPos');
                                                 const mergedScroll = remainingScroll
-                                                    .concat(updatedScroll.map((s: any) => ({ time: s.position, value: s.value })))
+                                                    .concat(updatedScroll.map((s: any, idx: number) => {
+                                                        const origPos = scrollOrigs[idx]?.position ?? s.position;
+                                                        const origKf = initialKfs.find((k: any) => Math.abs(k.time - origPos) < 0.001);
+                                                        return {
+                                                            time: s.position,
+                                                            value: s.value,
+                                                            easing: origKf?.easing ?? 'linear',
+                                                            handleIn: origKf?.handleIn,
+                                                            handleOut: origKf?.handleOut,
+                                                        };
+                                                    }))
                                                     .sort((a: any, b: any) => a.time - b.time);
                                                 setScrollKeyframes(mergedScroll);
                                             }
@@ -2621,16 +2646,15 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             const affectedParamLanes = new Set<string>(origKfs.filter((s: any) => s.laneId !== 'scrollPos').map((s: any) => s.laneId));
                                             affectedParamLanes.forEach((lId: string) => {
                                                 const laneOrigs = origKfs.filter((s: any) => s.laneId === lId);
-                                                const laneOrigTimes = new Set(laneOrigs.map((k: any) => k.position));
                                                 const initialLaneKfs = ((initialParamKfs || {})[lId] ?? []) as ParamKf[];
-                                                const remainingParam = initialLaneKfs.filter((k: ParamKf) => !Array.from(laneOrigTimes).some((t: any) => Math.abs(k.time - t) < 0.01));
+                                                const remainingParam = initialLaneKfs.filter((k: ParamKf) =>
+                                                    !laneOrigs.some((orig: any) => Math.abs(k.time - orig.position) < 0.001)
+                                                );
                                                 const updatedParam = updatedSelection.filter((s: any) => s.laneId === lId);
                                                 const mergedParam = remainingParam
-                                                    .concat(updatedParam.map((s: any) => {
-                                                        const matchOrig = laneOrigs.find((lo: any) => Math.abs(lo.position - s.position) < 0.02);
-                                                        const origKf = matchOrig
-                                                            ? initialLaneKfs.find((k: ParamKf) => Math.abs(k.time - matchOrig.position) < 0.015)
-                                                            : undefined;
+                                                    .concat(updatedParam.map((s: any, idx: number) => {
+                                                        const origPos = laneOrigs[idx]?.position ?? s.position;
+                                                        const origKf = initialLaneKfs.find((k: ParamKf) => Math.abs(k.time - origPos) < 0.001);
                                                         return {
                                                             time: s.position,
                                                             value: s.value,
