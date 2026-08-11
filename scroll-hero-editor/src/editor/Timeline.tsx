@@ -1356,33 +1356,41 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 {timeSelection && (
                     <div className="absolute top-5 bottom-0 left-[120px] right-0 pointer-events-none z-40">
                         <div
-                            className="absolute top-0 bottom-0 bg-cyan-500/10 border-x border-cyan-400/60 pointer-events-auto cursor-ns-resize shadow-[0_0_15px_rgba(6,182,212,0.15)] group/sel"
+                            className="absolute top-0 bottom-0 bg-cyan-500/10 border-x border-cyan-400/60 pointer-events-none shadow-[0_0_15px_rgba(6,182,212,0.15)] group/sel"
                             style={{
                                 left: `${(timeSelection.start / sequenceDuration) * 100}%`,
                                 width: `${((timeSelection.end - timeSelection.start) / sequenceDuration) * 100}%`
                             }}
-                            onPointerDown={handleSelectionDrag}
-                            onContextMenu={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                const parentContainer = e.currentTarget.parentElement!;
-                                const rect = parentContainer.getBoundingClientRect();
-                                const clickTime = Math.max(0, Math.min(sequenceDuration, ((e.clientX - rect.left) / rect.width) * sequenceDuration));
-                                setAudioMenu({ visible: true, x: e.clientX, y: e.clientY, clickTime });
-                            }}
-                            title="Drag up/down: adjust intensity of all selected keyframes  |  Right-click: open menu"
                         >
-                            <button
-                                className="absolute top-1 right-1 w-4 h-4 bg-[#101215]/80 hover:bg-[#101215] text-cyan-400 hover:text-white rounded flex items-center justify-center text-[10px] opacity-0 group-hover/sel:opacity-100 transition-opacity pointer-events-auto"
-                                onClick={(e) => {
+                            {/* Interactive Top Region Bar: Drag up/down to shift intensity of region keyframes, click ✕ to clear */}
+                            <div
+                                className="absolute top-0 left-0 right-0 h-4 bg-cyan-500/30 hover:bg-cyan-500/50 border-b border-cyan-400/60 cursor-ns-resize pointer-events-auto flex items-center justify-between px-1.5 transition-colors"
+                                onPointerDown={handleSelectionDrag}
+                                onContextMenu={(e) => {
+                                    e.preventDefault();
                                     e.stopPropagation();
-                                    useStore.getState().setTimeSelection(null);
-                                    useStore.getState().setSelectedKeyframes([]);
+                                    const parentContainer = e.currentTarget.parentElement!.parentElement!;
+                                    const rect = parentContainer.getBoundingClientRect();
+                                    const clickTime = Math.max(0, Math.min(sequenceDuration, ((e.clientX - rect.left) / rect.width) * sequenceDuration));
+                                    setAudioMenu({ visible: true, x: e.clientX, y: e.clientY, clickTime });
                                 }}
-                                title="Clear selection"
+                                title="Drag top bar up/down: adjust intensity of keyframes in region  |  Right-click: menu"
                             >
-                                ✕
-                            </button>
+                                <span className="text-[8px] font-mono text-cyan-200 font-bold select-none pointer-events-none">
+                                    REGION ({timeSelection.start.toFixed(1)}s - {timeSelection.end.toFixed(1)}s)
+                                </span>
+                                <button
+                                    className="w-3.5 h-3.5 bg-black/60 hover:bg-black text-cyan-300 hover:text-white rounded flex items-center justify-center text-[9px] font-bold pointer-events-auto transition-colors"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        useStore.getState().setTimeSelection(null);
+                                        useStore.getState().setSelectedKeyframes([]);
+                                    }}
+                                    title="Clear selection region"
+                                >
+                                    ✕
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
