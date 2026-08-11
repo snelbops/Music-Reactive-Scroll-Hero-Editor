@@ -132,15 +132,15 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
     }, []);
 
     return (
-        <aside className="flex flex-col border-r border-[#1a1d21] bg-[#101215] text-[#e2e5e8] overflow-hidden min-w-[200px]" style={{ width }}>
+        <aside className="flex flex-col border-r border-editor-border bg-editor-panel text-editor-fg overflow-hidden min-w-[200px]" style={{ width }}>
             {/* Top 2-Tab Navigation Bar */}
-            <div className="h-9 border-b border-[#1a1d21] flex items-center bg-[#0d0e10] shrink-0 p-1 gap-1">
+            <div className="h-9 border-b border-editor-border flex items-center bg-editor-surface shrink-0 p-1 gap-1">
                 <button
                     onClick={() => setActiveLeftTab('settings')}
                     className={`flex-1 h-7 rounded text-[10px] font-semibold uppercase tracking-wider flex items-center justify-center gap-1 transition-all min-w-0 px-1 ${
                         activeLeftTab === 'settings'
-                            ? 'bg-[#23272c] text-[#e2e5e8] border border-[#3a4249] shadow-xs'
-                            : 'text-[#7d848c] hover:text-[#e2e5e8] hover:bg-[#15181b]'
+                            ? 'bg-editor-surface-hover text-editor-fg border border-editor-border shadow-xs'
+                            : 'text-editor-muted hover:text-editor-fg hover:bg-editor-surface-hover'
                     }`}
                     title="Media & Pad Controls"
                 >

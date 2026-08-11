@@ -466,10 +466,10 @@ export default function Inspector({ width = 240 }: { width?: number }) {
     const primaryKeyframe = selectedKeyframes.at(-1) ?? null;
 
     return (
-        <aside className="border-l border-[#1a1d21] bg-[#101215] text-[#e2e5e8] flex flex-col overflow-y-auto thin-scrollbar" style={{ width }}>
-            <div className="h-7 border-b border-[#1a1d21] flex items-center justify-between px-3 shrink-0">
-                <span className="text-[10px] font-semibold text-[#7d848c] tracking-widest uppercase font-sans">INSPECTOR</span>
-                <span className="font-mono text-[10px] text-[#4f555b]">lane</span>
+        <aside className="border-l border-editor-border bg-editor-panel text-editor-fg flex flex-col overflow-y-auto thin-scrollbar" style={{ width }}>
+            <div className="h-7 border-b border-editor-border flex items-center justify-between px-3 shrink-0">
+                <span className="text-[10px] font-semibold text-editor-muted tracking-widest uppercase font-sans">INSPECTOR</span>
+                <span className="font-mono text-[10px] text-editor-muted">lane</span>
             </div>
             <div className="p-3 flex-1">
                 {primaryKeyframe ? (

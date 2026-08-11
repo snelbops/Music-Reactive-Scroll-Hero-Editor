@@ -1,6 +1,6 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Minimize2, Film } from 'lucide-react';
+import { Minimize2, Film, Sun, Moon } from 'lucide-react';
 import studio from '@theatre/studio';
 import LeftPanel from './LeftPanel';
 import Inspector from './Inspector';
@@ -15,6 +15,7 @@ import { saveProject, loadProject, loadWorkingProject, autoSaveWorkingProject, s
 
 export default function Layout() {
     const isDarkMode = useStore(state => state.isDarkMode);
+    const setIsDarkMode = useStore(state => state.setIsDarkMode);
     const isFullscreen = useStore(state => state.isFullscreen);
     const setIsFullscreen = useStore(state => state.setIsFullscreen);
     const activePreset = useStore(state => state.activePreset);
@@ -167,40 +168,50 @@ export default function Layout() {
 
     return (
         <div className="flex flex-col h-screen w-full bg-editor-bg text-editor-fg overflow-hidden font-sans select-none text-sm">
-            <header className="h-9 border-b border-[#23272c] bg-[#121417] text-[#9aa1a8] flex items-center px-3 justify-between text-[11px] font-medium shrink-0 font-sans select-none gap-3 z-40">
+            <header className="h-9 border-b border-editor-border bg-editor-panel text-editor-muted flex items-center px-3 justify-between text-[11px] font-medium shrink-0 font-sans select-none gap-3 z-40">
                 <div className="flex items-center gap-3">
-                    <span className="font-semibold text-xs text-[#e2e5e8] tracking-tight">Scroll Hero</span>
-                    <span className="w-[1px] h-4 bg-[#23272c]" />
-                    <div className="flex items-center gap-2 px-2 py-0.5 border border-[#23272c] rounded bg-[#171a1e] text-[11px]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#6e9c73]" />
-                        <span className="font-medium text-[#c3c8cd]">{mp4Asset?.name ?? 'anteddai_Young_Max'}</span>
-                        <span className="font-mono text-[10px] text-[#6b7278]">saved</span>
+                    <span className="font-semibold text-xs text-editor-fg tracking-tight">Scroll Hero</span>
+                    <span className="w-[1px] h-4 bg-editor-border" />
+                    <div className="flex items-center gap-2 px-2 py-0.5 border border-editor-border rounded bg-editor-surface text-[11px]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-editor-accent-green" />
+                        <span className="font-medium text-editor-fg">{mp4Asset?.name ?? 'anteddai_Young_Max'}</span>
+                        <span className="font-mono text-[10px] text-editor-muted">saved</span>
                     </div>
                 </div>
 
                 {/* Header Actions */}
                 <div className="flex items-center gap-3 relative">
+                    {/* Theme Toggle Button */}
+                    <button
+                        onClick={() => setIsDarkMode(!isDarkMode)}
+                        className="px-2 py-0.5 rounded border border-editor-border bg-editor-surface hover:bg-editor-surface-hover text-editor-fg transition-colors flex items-center gap-1.5 font-medium"
+                        title={isDarkMode ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
+                    >
+                        {isDarkMode ? <Sun className="w-3 h-3 text-amber-400" /> : <Moon className="w-3 h-3 text-indigo-500" />}
+                        <span className="text-[10px] font-mono uppercase">{isDarkMode ? 'Light' : 'Dark'}</span>
+                    </button>
+
                     {/* Functional File Dropdown */}
                     <div className="relative">
                         <button
                             onClick={() => setShowFileMenu(v => !v)}
-                            className="hover:text-[#e2e5e8] transition-colors flex items-center gap-1 py-1"
+                            className="hover:text-editor-fg transition-colors flex items-center gap-1 py-1"
                             title="File operations"
                         >
                             File <span className="text-[8px] font-mono">▾</span>
                         </button>
                         {showFileMenu && (
-                            <div className="absolute left-0 top-full mt-1 w-44 bg-[#15181b] border border-[#23272c] rounded-md shadow-2xl py-1 z-50 text-[11px] font-sans">
-                                <button onClick={() => { setShowFileMenu(false); if (confirm('Start a new project? Any unsaved changes will be cleared.')) startNewProject(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#23272c] text-[#dfe3e7]">New Project</button>
-                                <button onClick={() => { setShowFileMenu(false); loadInputRef.current?.click(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#23272c] text-[#dfe3e7]">Open File (.shero)</button>
-                                <button onClick={() => { setShowFileMenu(false); saveProject(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#23272c] text-[#dfe3e7]">Save File (.shero)</button>
-                                <div className="my-1 border-t border-[#23272c]" />
-                                <button onClick={() => { setShowFileMenu(false); setShowVideoExportModal(true); }} className="w-full text-left px-3 py-1.5 hover:bg-[#23272c] text-[#c98a4d] font-semibold">Export Video (MP4)</button>
+                            <div className="absolute left-0 top-full mt-1 w-44 bg-editor-panel border border-editor-border rounded-md shadow-2xl py-1 z-50 text-[11px] font-sans">
+                                <button onClick={() => { setShowFileMenu(false); if (confirm('Start a new project? Any unsaved changes will be cleared.')) startNewProject(); }} className="w-full text-left px-3 py-1.5 hover:bg-editor-surface-hover text-editor-fg">New Project</button>
+                                <button onClick={() => { setShowFileMenu(false); loadInputRef.current?.click(); }} className="w-full text-left px-3 py-1.5 hover:bg-editor-surface-hover text-editor-fg">Open File (.shero)</button>
+                                <button onClick={() => { setShowFileMenu(false); saveProject(); }} className="w-full text-left px-3 py-1.5 hover:bg-editor-surface-hover text-editor-fg">Save File (.shero)</button>
+                                <div className="my-1 border-t border-editor-border" />
+                                <button onClick={() => { setShowFileMenu(false); setShowVideoExportModal(true); }} className="w-full text-left px-3 py-1.5 hover:bg-editor-surface-hover text-editor-accent-orange font-semibold">Export Video (MP4)</button>
                             </div>
                         )}
                     </div>
 
-                    <button onClick={() => setShowProjectModal(true)} className="hover:text-[#e2e5e8] transition-colors">Projects</button>
+                    <button onClick={() => setShowProjectModal(true)} className="hover:text-editor-fg transition-colors">Projects</button>
 
                     {/* Primary Export Button + Working Dropdown */}
                     <div className="relative flex items-stretch border border-[#a4713c] rounded shadow-sm">

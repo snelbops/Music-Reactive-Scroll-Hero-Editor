@@ -117,13 +117,15 @@ interface EditorState {
 }
 
 export const useStore = create<EditorState>((set, get) => {
-    // Initialize dark mode from localStorage or default to false (light mode)
-    const savedDarkMode = typeof window !== 'undefined' ? localStorage.getItem('editor-dark-mode') === 'true' : false;
+    // Initialize dark mode from localStorage — default to TRUE (dark mode)
+    const savedDarkMode = typeof window !== 'undefined' ? localStorage.getItem('editor-dark-mode') !== 'false' : true;
     return {
     isDarkMode: savedDarkMode, setIsDarkMode: (dark) => {
         set({ isDarkMode: dark });
-        localStorage.setItem('editor-dark-mode', String(dark));
-        document.documentElement.classList.toggle('dark', dark);
+        try { localStorage.setItem('editor-dark-mode', String(dark)); } catch (_) {}
+        if (typeof document !== 'undefined') {
+            document.documentElement.classList.toggle('dark', dark);
+        }
     },
     isPlaying: false, setIsPlaying: (playing) => set({ isPlaying: playing }),
     videoUrl: null, setVideoUrl: (url) => set({ videoUrl: url }),
