@@ -130,6 +130,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const audioUploadInputRef = useRef<HTMLInputElement>(null);
     const canUndo = useStore(s => s._past.length > 0);
     const canRedo = useStore(s => s._future.length > 0);
+    const timelineRootRef = useRef<HTMLElement>(null);
+    const hasMovedKfRef = useRef<boolean>(false);
     const draggingHandleRef = useRef<{ kfTime: number; side: 'in' | 'out' } | null>(null);
     const draggingParamHandleRef = useRef<{ laneId: string; kfTime: number; side: 'in' | 'out' } | null>(null);
     const draggingParamKfRef = useRef<any>(null);
@@ -782,78 +784,37 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         zoomAnchorRef.current = null;
     }, [timelineZoom]);
 
-    // Ctrl+scroll / Meta+scroll = smooth continuous horizontal zoom at mouse position, Alt+scroll = vertical zoom
+    // Cmd+scroll / Meta+scroll / Ctrl+scroll = Horizontal Zoom, Alt+scroll / Option+scroll = Vertical Zoom
     useEffect(() => {
-        const el = lanesRef.current;
+        const el = timelineRootRef.current || lanesRef.current;
         if (!el) return;
         const onWheel = (e: WheelEvent) => {
             if (e.metaKey || e.ctrlKey) {
                 e.preventDefault();
-                // Record mouse anchor position relative to timeline container
-                const rect = el.getBoundingClientRect();
-                const mouseXInContainer = e.clientX - rect.left;
-                const contentX = el.scrollLeft + mouseXInContainer;
-                const currentTrackWidth = el.scrollWidth - LABEL_W;
-                if (currentTrackWidth > 0 && mouseXInContainer >= 0 && mouseXInContainer <= rect.width) {
-                    const ratio = Math.max(0, Math.min(1, (contentX - LABEL_W) / currentTrackWidth));
-                    zoomAnchorRef.current = { mouseXInContainer, ratio };
+                const lanesEl = lanesRef.current;
+                if (lanesEl) {
+                    const rect = lanesEl.getBoundingClientRect();
+                    const mouseXInContainer = e.clientX - rect.left;
+                    const contentX = lanesEl.scrollLeft + mouseXInContainer;
+                    const currentTrackWidth = lanesEl.scrollWidth - LABEL_W;
+                    if (currentTrackWidth > 0 && mouseXInContainer >= 0 && mouseXInContainer <= rect.width) {
+                        const ratio = Math.max(0, Math.min(1, (contentX - LABEL_W) / currentTrackWidth));
+                        zoomAnchorRef.current = { mouseXInContainer, ratio };
+                    }
                 }
 
                 const curZoom = useStore.getState().timelineZoom;
-                const factor = Math.pow(1.0025, -e.deltaY);
+                const delta = -e.deltaY;
+                const factor = Math.pow(1.0025, delta);
                 const nextZoom = Math.max(0.25, Math.min(20.0, +(curZoom * factor).toFixed(3)));
-                setTimelineZoom(nextZoom);
+                useStore.getState().setTimelineZoom(nextZoom);
             } else if (e.altKey) {
                 e.preventDefault();
                 const curVZoom = useStore.getState().verticalZoom;
-                const factor = Math.pow(1.0025, -e.deltaY);
+                const delta = -e.deltaY;
+                const factor = Math.pow(1.0025, delta);
                 const nextVZoom = Math.max(0.4, Math.min(4.0, +(curVZoom * factor).toFixed(3)));
-                setVerticalZoom(nextVZoom);
-            }
-        };
-        el.addEventListener('wheel', onWheel, { passive: false });
-        return () => el.removeEventListener('wheel', onWheel);
-    }, []);
-
-    // Restore playhead position and timeline scroll position on mount
-    useEffect(() => {
-        const savedPos = useStore.getState().playheadPosition;
-        if (typeof savedPos === 'number' && savedPos > 0) {
-            sheet.sequence.position = savedPos;
-            useStore.getState().applyParamKeyframesAt(savedPos);
-        }
-        const savedScroll = useStore.getState().timelineScrollLeft;
-        if (typeof savedScroll === 'number' && lanesRef.current && savedScroll > 0) {
-            lanesRef.current.scrollLeft = savedScroll;
-        }
-    }, []);
-
-    // Scroll position listener — keep store updated for auto-save
-    useEffect(() => {
-        const el = lanesRef.current;
-        if (!el) return;
-        const onScroll = () => {
-            useStore.getState().setTimelineScrollLeft(el.scrollLeft);
-        };
-        el.addEventListener('scroll', onScroll, { passive: true });
-        return () => el.removeEventListener('scroll', onScroll);
-    }, []);
-
-    // Option+scroll for Vertical Expand, Cmd+scroll for Horizontal Zoom
-    useEffect(() => {
-        const el = lanesRef.current;
-        if (!el) return;
-        const onWheel = (e: WheelEvent) => {
-            if (e.altKey) {
-                e.preventDefault();
-                const curV = useStore.getState().verticalZoom;
-                const delta = -e.deltaY * 0.005;
-                useStore.getState().setVerticalZoom(Math.max(0.5, Math.min(3.5, +(curV + delta).toFixed(2))));
-            } else if (e.metaKey || e.ctrlKey) {
-                e.preventDefault();
-                const curH = useStore.getState().timelineZoom;
-                const delta = -e.deltaY * 0.01;
-                useStore.getState().setTimelineZoom(Math.max(0.5, Math.min(20, +(curH + delta).toFixed(2))));
+                useStore.getState().setVerticalZoom(nextVZoom);
             }
         };
         el.addEventListener('wheel', onWheel, { passive: false });
@@ -1034,7 +995,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const waveformBgPath = buildWaveformSvgPath(scrollVbH, 500);
 
     return (
-        <footer className="border-t border-editor-border bg-editor-bg flex flex-col z-20" style={{ height }}>
+        <footer ref={timelineRootRef} className="border-t border-editor-border bg-editor-bg flex flex-col z-20" style={{ height }}>
             <div className="h-9 border-b border-editor-border flex items-center px-2 bg-editor-panel shrink-0 select-none gap-1 min-w-0">
                 {/* LEFT: tools, rhythm, zoom */}
                 <div className="flex items-center gap-1 shrink-0">
@@ -2097,15 +2058,20 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         onMouseDown={(e) => e.stopPropagation()}
                                         onClick={(e) => {
                                             e.stopPropagation();
+                                            if (hasMovedKfRef.current) {
+                                                hasMovedKfRef.current = false;
+                                                return;
+                                            }
                                             if (activeTool === 'eraser') {
                                                 useStore.getState().pushHistory();
                                                 useStore.getState().setScrollKeyframes(scrollKeyframes.filter(k => Math.abs(k.time - kf.time) > 0.005));
                                                 return;
                                             }
+                                            const updated = { laneId: 'scrollPos', position: kf.time, value: kf.value };
                                             const currentSel = useStore.getState().selectedKeyframes;
-                                            const isAlreadySelected = currentSel.length > 1 && currentSel.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.02);
-                                            if (e.shiftKey) toggleSelectedKeyframe({ laneId: 'scrollPos', position: kf.time, value: kf.value });
-                                            else if (!isAlreadySelected) setSelectedKeyframe({ laneId: 'scrollPos', position: kf.time, value: kf.value });
+                                            const isAlreadySelected = currentSel.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.02);
+                                            if (e.shiftKey) toggleSelectedKeyframe(updated);
+                                            else if (!isAlreadySelected) setSelectedKeyframe(updated);
                                         }}
                                         onContextMenu={(e) => {
                                             e.preventDefault();
@@ -2118,6 +2084,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             e.stopPropagation();
                                             (e.target as HTMLElement).setPointerCapture(e.pointerId);
                                             useStore.getState().pushHistory();
+                                            hasMovedKfRef.current = false;
 
                                             const currentSelected = useStore.getState().selectedKeyframes;
                                             const isCurrentSelected = currentSelected.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.02);
@@ -2129,7 +2096,6 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 setSelectedKeyframes(activeSelection);
                                             }
 
-                                            // Fix 2: capture lane track rect at pointerdown to avoid stale/wrong rect during move
                                             const trackEl = (e.currentTarget as HTMLElement).closest('[data-lane-track]') as HTMLElement | null
                                                 ?? (e.currentTarget as HTMLElement).parentElement?.parentElement as HTMLElement;
                                             const trackRect = trackEl?.getBoundingClientRect() ?? (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -2146,11 +2112,14 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         onPointerMove={(e) => {
                                             if (!draggingKfRef.current || !(e.buttons & 1)) return;
                                             const { startClientX, startClientY, trackRect, origKfs, initialScrollKfs, initialParamKfs } = draggingKfRef.current as any;
-                                            // Fix 2: use captured trackRect instead of live parentElement rect
                                             const rect = trackRect as DOMRect;
 
                                             const dx = e.clientX - startClientX;
                                             const dy = e.clientY - startClientY;
+
+                                            if (Math.hypot(dx, dy) > 2) {
+                                                hasMovedKfRef.current = true;
+                                            }
 
                                             const deltaTime = (dx / rect.width) * sequenceDuration;
                                             const normDeltaValue = -(dy / rect.height);
@@ -2559,6 +2528,10 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         onMouseDown={(e) => e.stopPropagation()}
                                         onClick={(e) => {
                                             e.stopPropagation();
+                                            if (hasMovedKfRef.current) {
+                                                hasMovedKfRef.current = false;
+                                                return;
+                                            }
                                             if (activeTool === 'eraser') {
                                                 useStore.getState().pushHistory();
                                                 useStore.getState().removeParamKeyframe(lane.id, kf.time);
@@ -2567,7 +2540,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             }
                                             const updated = { laneId: lane.id, position: kf.time, value: kf.value };
                                             const currentSel = useStore.getState().selectedKeyframes;
-                                            const isAlreadySelected = currentSel.length > 1 && currentSel.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.02);
+                                            const isAlreadySelected = currentSel.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.02);
                                             if (e.shiftKey) toggleSelectedKeyframe(updated);
                                             else if (!isAlreadySelected) setSelectedKeyframe(updated);
                                         }}
@@ -2576,6 +2549,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             e.stopPropagation();
                                             (e.target as HTMLElement).setPointerCapture(e.pointerId);
                                             useStore.getState().pushHistory();
+                                            hasMovedKfRef.current = false;
 
                                             const currentSelected = useStore.getState().selectedKeyframes;
                                             const isCurrentSelected = currentSelected.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.02);
@@ -2587,9 +2561,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 setSelectedKeyframes(activeSelection);
                                             }
 
-                                            // Fix 2: capture lane track rect at pointerdown
                                             const dotEl = e.currentTarget as HTMLElement;
-                                            // The dot's parent chain: dot -> pointer-events-none div -> lane track div
                                             const trackEl = dotEl.parentElement?.parentElement as HTMLElement | null;
                                             const trackRect = trackEl?.getBoundingClientRect() ?? dotEl.getBoundingClientRect();
 
@@ -2606,11 +2578,14 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         onPointerMove={(e) => {
                                             if (!draggingParamKfRef.current || !(e.buttons & 1)) return;
                                             const { startClientX, startClientY, trackRect, origKfs, initialScrollKfs, initialParamKfs } = draggingParamKfRef.current as any;
-                                            // Fix 2: use captured trackRect
                                             const rect = trackRect as DOMRect;
 
                                             const dx = e.clientX - startClientX;
                                             const dy = e.clientY - startClientY;
+
+                                            if (Math.hypot(dx, dy) > 2) {
+                                                hasMovedKfRef.current = true;
+                                            }
 
                                             const deltaTime = (dx / rect.width) * sequenceDuration;
                                             const normDeltaValue = -(dy / rect.height);
