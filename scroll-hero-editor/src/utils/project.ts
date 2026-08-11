@@ -256,7 +256,7 @@ export async function loadWorkingProject(): Promise<boolean> {
         const raw = localStorage.getItem(LOCAL_STORAGE_KEY_CURRENT);
         if (!raw) return false;
         const data = JSON.parse(raw) as ProjectData;
-        if (data && data.scrollKeyframes && data.scrollKeyframes.length > 0) {
+        if (data && (data.version !== undefined || data.name || data.scrollKeyframes)) {
             applyProjectDataToStore(data);
 
             // Restore persistent audio and video files from IndexedDB

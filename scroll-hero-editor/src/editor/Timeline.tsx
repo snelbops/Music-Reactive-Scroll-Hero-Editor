@@ -1976,103 +1976,108 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     </>
                                 );
                             })()}
-                            {activeTool === 'select' && (() => {
-                                const scaleX = VB_W / sequenceDuration;
-                                return scrollKeyframes.map((kf, idx) => {
-                                    const isKfSelected = selectedKeyframes.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.02);
-                                    if (!isKfSelected) return null;
-                                    const kx = kf.time * scaleX;
-                                    const ky = (1 - kf.value) * scrollVbH;
-                                    const hasNext = idx < scrollKeyframes.length - 1;
-                                    const hasPrev = idx > 0;
-                                    const outDt = hasNext ? (kf.handleOut?.dt ?? (scrollKeyframes[idx + 1].time - kf.time) / 3) : 0;
-                                    const outDv = hasNext ? (kf.handleOut?.dv ?? 0) : 0;
-                                    const inDt  = hasPrev ? (kf.handleIn?.dt  ?? -(kf.time - scrollKeyframes[idx - 1].time) / 3) : 0;
-                                    const inDv  = hasPrev ? (kf.handleIn?.dv  ?? 0) : 0;
-                                    const hox = kx + outDt * scaleX, hoy = ky - outDv * scrollVbH;
-                                    const hix = kx + inDt  * scaleX, hiy = ky - inDv  * scrollVbH;
-                                    return (
-                                        <g key={idx}>
-                                            {hasNext && <line x1={kx} y1={ky} x2={hox} y2={hoy} stroke="#3b82f6" strokeWidth="1" vectorEffect="non-scaling-stroke"/>}
-                                            {hasPrev && <line x1={kx} y1={ky} x2={hix} y2={hiy} stroke="#3b82f6" strokeWidth="1" vectorEffect="non-scaling-stroke"/>}
-                                        </g>
-                                    );
-                                });
-                            })()}
-                        </svg>
-                        <div className="absolute inset-0 pointer-events-none">
-                            {/* Bezier Handle Knobs in HTML for scrollPos (100% round circles) */}
-                            {activeTool === 'select' && scrollKeyframes.map((kf, idx) => {
-                                const isKfSelected = selectedKeyframes.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.02);
-                                if (!isKfSelected) return null;
-                                const scaleX = VB_W / sequenceDuration;
-                                const kx = kf.time * scaleX;
-                                const ky = (1 - kf.value) * scrollVbH;
-                                const hasNext = idx < scrollKeyframes.length - 1;
-                                const hasPrev = idx > 0;
-                                const outDt = hasNext ? (kf.handleOut?.dt ?? (scrollKeyframes[idx + 1].time - kf.time) / 3) : 0;
-                                const outDv = hasNext ? (kf.handleOut?.dv ?? 0) : 0;
-                                const inDt  = hasPrev ? (kf.handleIn?.dt  ?? -(kf.time - scrollKeyframes[idx - 1].time) / 3) : 0;
-                                const inDv  = hasPrev ? (kf.handleIn?.dv  ?? 0) : 0;
-                                const hox = kx + outDt * scaleX, hoy = ky - outDv * scrollVbH;
-                                const hix = kx + inDt  * scaleX, hiy = ky - inDv  * scrollVbH;
+                             {activeTool === 'select' && (() => {
+                                 const scaleX = VB_W / sequenceDuration;
+                                 const isSingleSel = selectedKeyframes.length === 1;
+                                 return scrollKeyframes.map((kf, idx) => {
+                                     const isKfSelected = selectedKeyframes.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.02);
+                                     if (!isKfSelected) return null;
+                                     const hasCustomHandle = !!(kf.handleOut || kf.handleIn);
+                                     if (!isSingleSel && !hasCustomHandle) return null;
+                                     const kx = kf.time * scaleX;
+                                     const ky = (1 - kf.value) * scrollVbH;
+                                     const hasNext = idx < scrollKeyframes.length - 1;
+                                     const hasPrev = idx > 0;
+                                     const outDt = hasNext ? (kf.handleOut?.dt ?? (scrollKeyframes[idx + 1].time - kf.time) / 3) : 0;
+                                     const outDv = hasNext ? (kf.handleOut?.dv ?? 0) : 0;
+                                     const inDt  = hasPrev ? (kf.handleIn?.dt  ?? -(kf.time - scrollKeyframes[idx - 1].time) / 3) : 0;
+                                     const inDv  = hasPrev ? (kf.handleIn?.dv  ?? 0) : 0;
+                                     const hox = kx + outDt * scaleX, hoy = ky - outDv * scrollVbH;
+                                     const hix = kx + inDt  * scaleX, hiy = ky - inDv  * scrollVbH;
+                                     return (
+                                         <g key={idx}>
+                                             {hasNext && <line x1={kx} y1={ky} x2={hox} y2={hoy} stroke="#3b82f6" strokeWidth="1" vectorEffect="non-scaling-stroke"/>}
+                                             {hasPrev && <line x1={kx} y1={ky} x2={hix} y2={hiy} stroke="#3b82f6" strokeWidth="1" vectorEffect="non-scaling-stroke"/>}
+                                         </g>
+                                     );
+                                 });
+                             })()}
+                         </svg>
+                         <div className="absolute inset-0 pointer-events-none">
+                             {/* Bezier Handle Knobs in HTML for scrollPos */}
+                             {activeTool === 'select' && scrollKeyframes.map((kf, idx) => {
+                                 const isKfSelected = selectedKeyframes.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.02);
+                                 if (!isKfSelected) return null;
+                                 const hasCustomHandle = !!(kf.handleOut || kf.handleIn);
+                                 if (selectedKeyframes.length > 1 && !hasCustomHandle) return null;
+                                 const scaleX = VB_W / sequenceDuration;
+                                 const kx = kf.time * scaleX;
+                                 const ky = (1 - kf.value) * scrollVbH;
+                                 const hasNext = idx < scrollKeyframes.length - 1;
+                                 const hasPrev = idx > 0;
+                                 const outDt = hasNext ? (kf.handleOut?.dt ?? (scrollKeyframes[idx + 1].time - kf.time) / 3) : 0;
+                                 const outDv = hasNext ? (kf.handleOut?.dv ?? 0) : 0;
+                                 const inDt  = hasPrev ? (kf.handleIn?.dt  ?? -(kf.time - scrollKeyframes[idx - 1].time) / 3) : 0;
+                                 const inDv  = hasPrev ? (kf.handleIn?.dv  ?? 0) : 0;
+                                 const hox = kx + outDt * scaleX, hoy = ky - outDv * scrollVbH;
+                                 const hix = kx + inDt  * scaleX, hiy = ky - inDv  * scrollVbH;
 
-                                const renderHandleDiv = (hx: number, hy: number, side: 'in' | 'out') => (
-                                    <div
-                                        key={side}
-                                        className="absolute w-2.5 h-2.5 rounded-full bg-[#3b82f6] border border-white -translate-x-1/2 -translate-y-1/2 cursor-move pointer-events-auto z-40"
-                                        style={{
-                                            left: `${(hx / VB_W) * 100}%`,
-                                            top: `${(hy / scrollVbH) * 100}%`,
-                                        }}
-                                        onMouseDown={(e) => e.stopPropagation()}
-                                        onPointerDown={(e) => {
-                                            e.stopPropagation();
-                                            (e.target as HTMLElement).setPointerCapture(e.pointerId);
-                                            draggingHandleRef.current = { kfTime: kf.time, side };
-                                        }}
-                                        onPointerMove={(e) => {
-                                            if (!draggingHandleRef.current || !(e.buttons & 1)) return;
-                                            const { kfTime: t, side: s } = draggingHandleRef.current;
-                                            const ref = scrollKeyframes.find(k => Math.abs(k.time - t) < 0.02);
-                                            if (!ref) return;
-                                            const container = (e.target as HTMLElement).parentElement!;
-                                            const rect = container.getBoundingClientRect();
-                                            const svgX = ((e.clientX - rect.left) / rect.width) * VB_W;
-                                            const svgY = ((e.clientY - rect.top) / rect.height) * scrollVbH;
-                                            const newDt = (svgX - ref.time * scaleX) / scaleX;
-                                            const newDv = -((svgY - (1 - ref.value) * scrollVbH) / scrollVbH);
-                                            updateScrollKeyframeHandle(t, s, {
-                                                dt: s === 'out' ? Math.max(0, newDt) : Math.min(0, newDt),
-                                                dv: newDv,
-                                            });
-                                        }}
-                                        onPointerUp={() => { draggingHandleRef.current = null; }}
-                                    />
-                                );
+                                 const renderHandleDiv = (hx: number, hy: number, side: 'in' | 'out') => (
+                                     <div
+                                         key={side}
+                                         className="absolute w-2 h-2 rounded-full bg-[#3b82f6] border border-white -translate-x-1/2 -translate-y-1/2 cursor-move pointer-events-auto z-40"
+                                         style={{
+                                             left: `${(hx / VB_W) * 100}%`,
+                                             top: `${(hy / scrollVbH) * 100}%`,
+                                         }}
+                                         onMouseDown={(e) => e.stopPropagation()}
+                                         onPointerDown={(e) => {
+                                             e.stopPropagation();
+                                             (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                                             draggingHandleRef.current = { kfTime: kf.time, side };
+                                         }}
+                                         onPointerMove={(e) => {
+                                             if (!draggingHandleRef.current || !(e.buttons & 1)) return;
+                                             const { kfTime: t, side: s } = draggingHandleRef.current;
+                                             const ref = scrollKeyframes.find(k => Math.abs(k.time - t) < 0.02);
+                                             if (!ref) return;
+                                             const container = (e.target as HTMLElement).parentElement!;
+                                             const rect = container.getBoundingClientRect();
+                                             const svgX = ((e.clientX - rect.left) / rect.width) * VB_W;
+                                             const svgY = ((e.clientY - rect.top) / rect.height) * scrollVbH;
+                                             const newDt = (svgX - ref.time * scaleX) / scaleX;
+                                             const newDv = -((svgY - (1 - ref.value) * scrollVbH) / scrollVbH);
+                                             updateScrollKeyframeHandle(t, s, {
+                                                 dt: s === 'out' ? Math.max(0, newDt) : Math.min(0, newDt),
+                                                 dv: newDv,
+                                             });
+                                         }}
+                                         onPointerUp={() => { draggingHandleRef.current = null; }}
+                                     />
+                                 );
 
-                                return (
-                                    <React.Fragment key={`scroll-handle-knobs-${idx}`}>
-                                        {hasNext && renderHandleDiv(hox, hoy, 'out')}
-                                        {hasPrev && renderHandleDiv(hix, hiy, 'in')}
-                                    </React.Fragment>
-                                );
-                            })}
-                            {/* Keyframe Dots for scrollPos (100% round circles, fixed 6px size) */}
-                            {scrollKeyframes.map((kf, i) => {
-                                const isSelected = selectedKeyframes.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.02);
-                                return (
-                                    <div
-                                        key={i}
-                                        className={`absolute rounded-full transition-colors ${activeTool === 'eraser' ? 'cursor-cell' : 'cursor-move'} pointer-events-auto`}
-                                        style={{
-                                            width: 6, height: 6,
-                                            left: `calc(${(kf.time / sequenceDuration) * 100}% - 3px)`,
-                                            top: `calc(${(1 - kf.value) * 100}% - 3px)`,
-                                            borderColor: isSelected ? '#ffffff' : '#3b82f6',
-                                            borderWidth: isSelected ? '1.5px' : '1px',
-                                            backgroundColor: isSelected ? '#0a0b0e' : '#3b82f6',
-                                        }}
+                                 return (
+                                     <React.Fragment key={`scroll-handle-knobs-${idx}`}>
+                                         {hasNext && renderHandleDiv(hox, hoy, 'out')}
+                                         {hasPrev && renderHandleDiv(hix, hiy, 'in')}
+                                     </React.Fragment>
+                                 );
+                             })}
+                             {/* Keyframe Dots for scrollPos (fixed 6px size, gold highlight on selection) */}
+                             {scrollKeyframes.map((kf, i) => {
+                                 const isSelected = selectedKeyframes.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.02);
+                                 return (
+                                     <div
+                                         key={i}
+                                         className={`absolute rounded-full transition-colors ${activeTool === 'eraser' ? 'cursor-cell' : 'cursor-move'} pointer-events-auto`}
+                                         style={{
+                                             width: 6, height: 6,
+                                             left: `calc(${(kf.time / sequenceDuration) * 100}% - 3px)`,
+                                             top: `calc(${(1 - kf.value) * 100}% - 3px)`,
+                                             borderColor: isSelected ? '#ffffff' : '#3b82f6',
+                                             borderWidth: '1px',
+                                             backgroundColor: isSelected ? '#fbbf24' : '#3b82f6',
+                                         }}
                                         onMouseDown={(e) => e.stopPropagation()}
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -2404,34 +2409,41 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             />
                                     );
                                 })}
-                                {activeTool === 'select' && kfs.map((kf, idx) => {
-                                    const isKfSelected = selectedKeyframes.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.02);
-                                    if (!isKfSelected) return null;
-                                    const scaleX = VB_W / sequenceDuration;
-                                    const valueRange = lane.max - lane.min;
-                                    const kx = kf.time * scaleX;
-                                    const ky = normalY(kf.value);
-                                    const hasNext = idx < kfs.length - 1;
-                                    const hasPrev = idx > 0;
-                                    const outDt = hasNext ? (kf.handleOut?.dt ?? (kfs[idx+1].time - kf.time) / 3) : 0;
-                                    const outDv = hasNext ? (kf.handleOut?.dv ?? 0) : 0;
-                                    const inDt  = hasPrev ? (kf.handleIn?.dt  ?? -(kf.time - kfs[idx-1].time) / 3) : 0;
-                                    const inDv  = hasPrev ? (kf.handleIn?.dv  ?? 0) : 0;
-                                    const hox = kx + outDt * scaleX, hoy = ky - (outDv / valueRange) * VB_H;
-                                    const hix = kx + inDt  * scaleX, hiy = ky - (inDv  / valueRange) * VB_H;
-                                    return (
-                                        <g key={`h-${idx}`}>
-                                            {hasNext && <line x1={kx} y1={ky} x2={hox} y2={hoy} stroke={lane.color} strokeWidth="1" vectorEffect="non-scaling-stroke"/>}
-                                            {hasPrev && <line x1={kx} y1={ky} x2={hix} y2={hiy} stroke={lane.color} strokeWidth="1" vectorEffect="non-scaling-stroke"/>}
-                                        </g>
-                                    );
-                                })}
+                                {activeTool === 'select' && (() => {
+                                    const isSingleSel = selectedKeyframes.length === 1;
+                                    return kfs.map((kf, idx) => {
+                                        const isKfSelected = selectedKeyframes.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.02);
+                                        if (!isKfSelected) return null;
+                                        const hasCustomHandle = !!(kf.handleOut || kf.handleIn);
+                                        if (!isSingleSel && !hasCustomHandle) return null;
+                                        const scaleX = VB_W / sequenceDuration;
+                                        const valueRange = lane.max - lane.min;
+                                        const kx = kf.time * scaleX;
+                                        const ky = normalY(kf.value);
+                                        const hasNext = idx < kfs.length - 1;
+                                        const hasPrev = idx > 0;
+                                        const outDt = hasNext ? (kf.handleOut?.dt ?? (kfs[idx+1].time - kf.time) / 3) : 0;
+                                        const outDv = hasNext ? (kf.handleOut?.dv ?? 0) : 0;
+                                        const inDt  = hasPrev ? (kf.handleIn?.dt  ?? -(kf.time - kfs[idx-1].time) / 3) : 0;
+                                        const inDv  = hasPrev ? (kf.handleIn?.dv  ?? 0) : 0;
+                                        const hox = kx + outDt * scaleX, hoy = ky - (outDv / valueRange) * VB_H;
+                                        const hix = kx + inDt  * scaleX, hiy = ky - (inDv  / valueRange) * VB_H;
+                                        return (
+                                            <g key={`h-${idx}`}>
+                                                {hasNext && <line x1={kx} y1={ky} x2={hox} y2={hoy} stroke={lane.color} strokeWidth="1" vectorEffect="non-scaling-stroke"/>}
+                                                {hasPrev && <line x1={kx} y1={ky} x2={hix} y2={hiy} stroke={lane.color} strokeWidth="1" vectorEffect="non-scaling-stroke"/>}
+                                            </g>
+                                        );
+                                    });
+                                })()}
                         </svg>
                         <div className="absolute inset-0 pointer-events-none">
-                            {/* Bezier Handle Knobs in HTML for param lane (100% round circles) */}
+                            {/* Bezier Handle Knobs in HTML for param lane */}
                             {activeTool === 'select' && kfs.map((kf, idx) => {
                                 const isKfSelected = selectedKeyframes.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.02);
                                 if (!isKfSelected) return null;
+                                const hasCustomHandle = !!(kf.handleOut || kf.handleIn);
+                                if (selectedKeyframes.length > 1 && !hasCustomHandle) return null;
                                 const scaleX = VB_W / sequenceDuration;
                                 const valueRange = lane.max - lane.min;
                                 const kx = kf.time * scaleX;
@@ -2448,7 +2460,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 const renderParamHandleDiv = (hx: number, hy: number, side: 'in' | 'out') => (
                                     <div
                                         key={side}
-                                        className="absolute w-2.5 h-2.5 rounded-full border border-white -translate-x-1/2 -translate-y-1/2 cursor-move pointer-events-auto z-40"
+                                        className="absolute w-2 h-2 rounded-full border border-white -translate-x-1/2 -translate-y-1/2 cursor-move pointer-events-auto z-40"
                                         style={{
                                             backgroundColor: lane.color,
                                             left: `${(hx / VB_W) * 100}%`,
@@ -2490,7 +2502,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     </React.Fragment>
                                 );
                             })}
-                            {/* Keyframe Dots for param lane (100% round circles, fixed 6px size) */}
+                            {/* Keyframe Dots for param lane (fixed 6px size, gold highlight on selection) */}
                             {kfs.map((kf, i) => {
                                 const kfSelected = selectedKeyframes.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.02);
                                 return (
@@ -2502,8 +2514,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             left: `calc(${(kf.time / sequenceDuration) * 100}% - 3px)`,
                                             top: `calc(${normalY(kf.value) / VB_H * 100}% - 3px)`,
                                             borderColor: kfSelected ? '#ffffff' : lane.color,
-                                            borderWidth: kfSelected ? '1.5px' : '1px',
-                                            backgroundColor: kfSelected ? '#0a0b0e' : lane.color,
+                                            borderWidth: '1px',
+                                            backgroundColor: kfSelected ? '#fbbf24' : lane.color,
                                         }}
                                         onMouseDown={(e) => e.stopPropagation()}
                                         onClick={(e) => {
