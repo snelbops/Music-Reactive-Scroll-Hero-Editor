@@ -1358,7 +1358,10 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
                 {(isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('audio') }}>
-                    <div className="w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border bg-editor-panel text-editor-fg sticky left-0 z-30 overflow-hidden">
+                    <div
+                        className={`w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border sticky left-0 z-30 overflow-hidden cursor-pointer transition-colors ${selectedLane === 'audio' ? 'bg-editor-surface-hover border-l-2 border-editor-accent-blue text-editor-fg font-semibold' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}
+                        onClick={() => setSelectedLane('audio')}
+                    >
                         <div className="flex items-center gap-1.5 overflow-hidden">
                             <Music className="w-2.5 h-2.5 text-editor-accent-blue shrink-0" />
                             <span className="text-[10px] uppercase font-normal text-[#d9d9d9] truncate">Audio Wave</span>
@@ -1373,12 +1376,16 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     </div>
                     <div
                         className="flex-1 relative overflow-hidden flex items-center cursor-context-menu"
-                        onPointerDown={(e) => handleTrackPointerDown(e)}
+                        onPointerDown={(e) => {
+                            setSelectedLane('audio');
+                            handleTrackPointerDown(e);
+                        }}
                         onContextMenu={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
+                            setSelectedLane('audio');
                             const rect = e.currentTarget.getBoundingClientRect();
-                            const clickTime = ((e.clientX - rect.left) / rect.width) * sequenceDuration;
+                            const clickTime = Math.max(0, Math.min(sequenceDuration, ((e.clientX - rect.left) / rect.width) * sequenceDuration));
                             setAudioMenu({ visible: true, x: e.clientX, y: e.clientY, clickTime });
                         }}
                     >
