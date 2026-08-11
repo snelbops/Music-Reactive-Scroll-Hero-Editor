@@ -61,6 +61,8 @@ interface EditorState {
     setVideoPad: (idx: number, pad: { name: string; url: string; color?: string }) => void;
     setVideoPadColor: (idx: number, color: string) => void;
     swapVideoPads: (idxA: number, idxB: number) => void;
+    videoNaturalDimensions: { width: number; height: number } | null;
+    setVideoNaturalDimensions: (dims: { width: number; height: number } | null) => void;
     videoSyncMode: 'fit' | 'realtime' | 'loop'; setVideoSyncMode: (mode: 'fit' | 'realtime' | 'loop') => void;
     videoSpeedRatio: number; setVideoSpeedRatio: (ratio: number) => void;
     remapKeyframesToRatio: (ratio: number) => void;
@@ -227,7 +229,7 @@ export const useStore = create<EditorState>((set, get) => {
         }
         return { videoPads: updated };
     }),
-    swapVideoPads: (idxA, idxB) => set((s) => {
+    swapVideoPads: (idxA: number, idxB: number) => set((s) => {
         if (idxA === idxB || idxA < 0 || idxB < 0 || idxA >= s.videoPads.length || idxB >= s.videoPads.length) return s;
         get().pushHistory();
         const updated = [...s.videoPads];
@@ -240,6 +242,8 @@ export const useStore = create<EditorState>((set, get) => {
         else if (s.activeVideoPadIdx === idxB) newActiveIdx = idxA;
         return { videoPads: updated, activeVideoPadIdx: newActiveIdx };
     }),
+    videoNaturalDimensions: null,
+    setVideoNaturalDimensions: (dims) => set({ videoNaturalDimensions: dims }),
     extractedFrames: [], setExtractedFrames: (frames) => set({ extractedFrames: frames }),
     extractionProgress: 0, setExtractionProgress: (p) => set({ extractionProgress: p }),
     extractionStatus: 'idle', setExtractionStatus: (s) => set({ extractionStatus: s }),

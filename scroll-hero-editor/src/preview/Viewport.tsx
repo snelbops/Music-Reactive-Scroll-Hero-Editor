@@ -44,31 +44,14 @@ export default function Viewport() {
     const trackRef = useRef<HTMLDivElement>(null);
     const previewRef = useRef<HTMLDivElement>(null);
 
-    const [viewportZoom, setViewportZoom] = useState<'85' | '100' | '50' | '75' | '125' | '150'>('85');
-    const [nativeVideoRatio, setNativeVideoRatio] = useState<number | null>(16 / 9);
-    const [nativeDimensions, setNativeDimensions] = useState<{ width: number; height: number } | null>(null);
+    const [viewportZoom, setViewportZoom] = useState<'85' | '100' | '50' | '75' | '125' | '150'>('100');
+    const videoNaturalDimensions = useStore(s => s.videoNaturalDimensions);
 
-    const activeVideoPadIdx = useStore(s => s.activeVideoPadIdx);
-    const videoPads = useStore(s => s.videoPads);
-    const videoUrl = useStore(s => s.videoUrl);
-
-    useEffect(() => {
-        if (aspectRatio !== 'native') return;
-        const activeUrl = videoPads[activeVideoPadIdx]?.url || videoUrl;
-        if (!activeUrl) return;
-        const vid = document.createElement('video');
-        vid.src = activeUrl;
-        vid.onloadedmetadata = () => {
-            if (vid.videoWidth && vid.videoHeight) {
-                setNativeVideoRatio(vid.videoWidth / vid.videoHeight);
-                setNativeDimensions({ width: vid.videoWidth, height: vid.videoHeight });
-            }
-        };
-    }, [aspectRatio, activeVideoPadIdx, videoPads, videoUrl]);
-
-    const effectiveRatio = aspectRatio === 'native'
-        ? (nativeVideoRatio ?? 16 / 9)
-        : RATIO_VALUES[aspectRatio];
+    const effectiveRatio = aspectRatio === 'free'
+        ? null
+        : (aspectRatio === 'native'
+            ? (videoNaturalDimensions ? videoNaturalDimensions.width / videoNaturalDimensions.height : (16 / 9))
+            : RATIO_VALUES[aspectRatio]);
 
     const zoomScale = parseFloat(viewportZoom) / 100;
 
@@ -211,11 +194,11 @@ export default function Viewport() {
                     className={`relative overflow-hidden transition-all duration-200 ${isRecording ? 'ring-2 ring-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.15)]' : ''}`}
                     style={{
                         aspectRatio: effectiveRatio ?? undefined,
-                        width: aspectRatio === 'native' && nativeDimensions ? `${nativeDimensions.width * zoomScale}px` : (effectiveRatio ? 'auto' : '100%'),
-                        height: aspectRatio === 'native' && nativeDimensions ? `${nativeDimensions.height * zoomScale}px` : '100%',
+                        width: effectiveRatio ? 'auto' : '100%',
+                        height: '100%',
                         maxWidth: '100%',
                         maxHeight: '100%',
-                        transform: aspectRatio === 'native' ? undefined : `scale(${zoomScale})`,
+                        transform: zoomScale === 1 ? undefined : `scale(${zoomScale})`,
                         transformOrigin: 'center center',
                         opacity: cssOpacity,
                     }}

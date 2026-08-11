@@ -11,6 +11,7 @@ export default function ScrollyVideoPlayer() {
     const videoSpeedRatio = useStore((state) => state.videoSpeedRatio);
     const videoRef = useRef<HTMLVideoElement>(null);
 
+    const setVideoNaturalDimensions = useStore((state) => state.setVideoNaturalDimensions);
     const activePad = videoPads[activeVideoPadIdx];
     const currentUrl = activePad?.url || videoUrl || '/sample.mp4';
 
@@ -39,7 +40,7 @@ export default function ScrollyVideoPlayer() {
     if (!currentUrl) return null;
 
     return (
-        <div className="absolute inset-0 w-full h-full pointer-events-none overflow-hidden flex items-center justify-center bg-black">
+        <div className="absolute inset-0 w-full h-full pointer-events-none overflow-hidden flex items-center justify-center bg-transparent">
             <video
                 ref={videoRef}
                 key={currentUrl}
@@ -48,11 +49,16 @@ export default function ScrollyVideoPlayer() {
                 muted
                 playsInline
                 data-purpose="active-video-element"
-                className="w-full h-full object-contain pointer-events-none"
+                className="w-full h-full object-cover pointer-events-none"
                 onLoadedMetadata={() => {
                     const v = videoRef.current;
-                    if (v && v.duration) {
-                        v.currentTime = Math.max(0, Math.min(v.duration - 0.01, useStore.getState().scrollProgress * v.duration));
+                    if (v) {
+                        if (v.videoWidth && v.videoHeight) {
+                            setVideoNaturalDimensions({ width: v.videoWidth, height: v.videoHeight });
+                        }
+                        if (v.duration) {
+                            v.currentTime = Math.max(0, Math.min(v.duration - 0.01, useStore.getState().scrollProgress * v.duration));
+                        }
                     }
                 }}
                 onSeeked={() => {
