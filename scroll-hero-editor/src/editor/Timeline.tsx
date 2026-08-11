@@ -2042,18 +2042,15 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                              })}
                              {/* Keyframe Dots for scrollPos (fixed 6px size, gold highlight on selection) */}
                              {scrollKeyframes.map((kf, i) => {
-                                 const isSelected = selectedKeyframes.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.02);
+                                 const isSelected = selectedKeyframes.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.05);
                                  return (
                                      <div
                                          key={i}
-                                         className={`absolute rounded-full transition-colors ${activeTool === 'eraser' ? 'cursor-cell' : 'cursor-move'} pointer-events-auto`}
+                                         className={`absolute flex items-center justify-center -translate-x-1/2 -translate-y-1/2 ${activeTool === 'eraser' ? 'cursor-cell' : 'cursor-move'} pointer-events-auto z-30`}
                                          style={{
-                                             width: 6, height: 6,
-                                             left: `calc(${(kf.time / sequenceDuration) * 100}% - 3px)`,
-                                             top: `calc(${(1 - kf.value) * 100}% - 3px)`,
-                                             borderColor: isSelected ? '#ffffff' : '#3b82f6',
-                                             borderWidth: '1px',
-                                             backgroundColor: isSelected ? '#fbbf24' : '#3b82f6',
+                                             width: 18, height: 18,
+                                             left: `${(kf.time / sequenceDuration) * 100}%`,
+                                             top: `${(1 - kf.value) * 100}%`,
                                          }}
                                         onMouseDown={(e) => e.stopPropagation()}
                                         onClick={(e) => {
@@ -2193,7 +2190,17 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             setSelectedKeyframes(updatedSelection);
                                         }}
                                         onPointerUp={() => { draggingKfRef.current = null; }}
-                                    />
+                                    >
+                                        <div
+                                            className="rounded-full border transition-colors shadow-sm pointer-events-none"
+                                            style={{
+                                                width: isSelected ? 8 : 6,
+                                                height: isSelected ? 8 : 6,
+                                                borderColor: isSelected ? '#ffffff' : '#3b82f6',
+                                                backgroundColor: isSelected ? '#fbbf24' : '#3b82f6',
+                                            }}
+                                        />
+                                    </div>
                                 );
                             })}
                             <div
@@ -2510,20 +2517,17 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     </React.Fragment>
                                 );
                             })}
-                            {/* Keyframe Dots for param lane (fixed 6px size, gold highlight on selection) */}
+                            {/* Keyframe Dots for param lane (18px hit target, gold highlight on selection) */}
                             {kfs.map((kf, i) => {
-                                const kfSelected = selectedKeyframes.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.02);
+                                const kfSelected = selectedKeyframes.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.05);
                                 return (
                                     <div
                                         key={i}
-                                        className={`absolute rounded-full transition-colors ${activeTool === 'eraser' ? 'cursor-cell' : 'cursor-move'} pointer-events-auto`}
+                                        className={`absolute flex items-center justify-center -translate-x-1/2 -translate-y-1/2 ${activeTool === 'eraser' ? 'cursor-cell' : 'cursor-move'} pointer-events-auto z-30`}
                                         style={{
-                                            width: 6, height: 6,
-                                            left: `calc(${(kf.time / sequenceDuration) * 100}% - 3px)`,
-                                            top: `calc(${normalY(kf.value) / VB_H * 100}% - 3px)`,
-                                            borderColor: kfSelected ? '#ffffff' : lane.color,
-                                            borderWidth: '1px',
-                                            backgroundColor: kfSelected ? '#fbbf24' : lane.color,
+                                            width: 18, height: 18,
+                                            left: `${(kf.time / sequenceDuration) * 100}%`,
+                                            top: `${(normalY(kf.value) / VB_H) * 100}%`,
                                         }}
                                         onMouseDown={(e) => e.stopPropagation()}
                                         onClick={(e) => {
@@ -2667,7 +2671,17 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             setSelectedKeyframe({ laneId: lane.id, position: kf.time, value: kf.value });
                                             setAudioMenu({ visible: true, x: e.clientX, y: e.clientY, clickTime: kf.time });
                                         }}
-                                    />
+                                    >
+                                        <div
+                                            className="rounded-full border transition-colors shadow-sm pointer-events-none"
+                                            style={{
+                                                width: kfSelected ? 8 : 6,
+                                                height: kfSelected ? 8 : 6,
+                                                borderColor: kfSelected ? '#ffffff' : lane.color,
+                                                backgroundColor: kfSelected ? '#fbbf24' : lane.color,
+                                            }}
+                                        />
+                                    </div>
                                 );
                             })}
                             {/* Live playhead dot */}
