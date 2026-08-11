@@ -1308,12 +1308,12 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     </div>
                 
                 {/* Resizable & Draggable Ableton-Style Loop Region Header */}
-                <div className="h-5 border-b border-editor-border bg-black/60 flex items-center relative text-[9px] font-mono select-none">
+                <div className="h-5 border-b border-editor-border bg-editor-surface flex items-center relative text-[9px] font-mono select-none">
                     <div className="w-[120px] shrink-0 px-2 flex items-center gap-1 border-r border-editor-border bg-editor-panel text-editor-muted">
                         <Repeat className="w-2.5 h-2.5 text-editor-accent-purple" />
                         <span className="uppercase text-[8px] tracking-wider">Loop Region</span>
                     </div>
-                    <div className="flex-1 relative h-full bg-[#111] cursor-pointer" ref={loopTrackRef} onClick={handleLoopTrackClick}>
+                    <div className="flex-1 relative h-full bg-editor-surface cursor-pointer" ref={loopTrackRef} onClick={handleLoopTrackClick}>
                         {(() => {
                             const lStart = loopStart;
                             const lEnd = loopEnd || sequenceDuration;
@@ -1501,7 +1501,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             >✕</button>
                         )}
                     </div>
-                    <div className="flex-1 relative overflow-hidden bg-[#141619] flex items-center">
+                    <div className="flex-1 relative overflow-hidden bg-editor-surface/40 flex items-center">
                         {padSwitchEvents.length === 0 ? (
                             <span className="text-[10px] text-editor-muted italic px-3">Press Numpad [7..0] during recording to log video pad switches...</span>
                         ) : (
@@ -1565,7 +1565,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                     targetEl.addEventListener('pointerup', onUp as any);
                                                 }}
                                                 title={`Pad Clip: ${padLabel} (${durSec.toFixed(2)}s) | Drag to move clip | Right-click to delete`}
-                                                className="absolute top-0.5 bottom-0.5 rounded border border-[#23272c] hover:border-white/60 cursor-pointer shadow-xs transition-all z-20 flex items-center justify-between px-2 overflow-hidden group/clip"
+                                                className="absolute top-0.5 bottom-0.5 rounded border border-editor-border hover:border-white/60 cursor-pointer shadow-xs transition-all z-20 flex items-center justify-between px-2 overflow-hidden group/clip"
                                                 style={{
                                                     left: `${leftPct}%`,
                                                     width: `${widthPct}%`,
@@ -1577,9 +1577,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                     <span className="text-[9px] font-mono font-bold px-1 rounded shrink-0" style={{ backgroundColor: `${padColor}40`, color: '#fff' }}>
                                                         #{padInfo?.id ?? seg.padIdx}
                                                     </span>
-                                                    <span className="text-[9px] font-mono font-semibold text-[#e2e5e8] truncate">{padInfo?.name || `Pad ${seg.padIdx}`}</span>
+                                                    <span className="text-[9px] font-mono font-semibold text-editor-fg truncate">{padInfo?.name || `Pad ${seg.padIdx}`}</span>
                                                 </div>
-                                                <span className="text-[8.5px] font-mono text-[#8a9198] shrink-0 ml-1 opacity-70 group-hover/clip:opacity-100">{durSec.toFixed(1)}s</span>
+                                                <span className="text-[8.5px] font-mono text-editor-muted shrink-0 ml-1 opacity-70 group-hover/clip:opacity-100">{durSec.toFixed(1)}s</span>
 
                                                 {/* Resize Edge Handle on left edge if not time 0 */}
                                                 {seg.eventTime !== null && (
@@ -1622,13 +1622,13 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 )}
                 {extractedFrames.length > 0 && (isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('videoFrames') }}>
-                    <div className={`w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border sticky left-0 z-30 cursor-pointer transition-colors overflow-hidden ${activePreset === 'frames' ? 'bg-[#2a2a2a] ring-1 ring-inset ring-[#444]' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}>
+                    <div className={`w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border sticky left-0 z-30 cursor-pointer transition-colors overflow-hidden ${activePreset === 'frames' ? 'bg-editor-surface-hover border-l-2 border-editor-accent-purple font-semibold' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}>
                         <div className="flex flex-col justify-center gap-0.5 overflow-hidden">
                             <div className="flex items-center gap-1 w-full">
                                 <Video className="w-2.5 h-2.5 shrink-0 text-editor-accent-blue" />
-                                <span className="text-[10px] uppercase font-normal text-[#d9d9d9] truncate">Video Frames</span>
+                                <span className="text-[10px] uppercase font-medium text-editor-fg truncate">Video Frames</span>
                             </div>
-                            <span className="text-[9px] font-mono text-[#808080] truncate pl-[14px]">{extractedFrames.length} frames</span>
+                            <span className="text-[9px] font-mono text-editor-muted truncate pl-[14px]">{extractedFrames.length} frames</span>
                         </div>
                         <button
                             className="text-[9px] text-[#808080] hover:text-red-400 transition-colors shrink-0 font-bold ml-1"
@@ -2094,8 +2094,10 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 useStore.getState().setScrollKeyframes(scrollKeyframes.filter(k => Math.abs(k.time - kf.time) > 0.005));
                                                 return;
                                             }
+                                            const currentSel = useStore.getState().selectedKeyframes;
+                                            const isAlreadySelected = currentSel.length > 1 && currentSel.some(s => s.laneId === 'scrollPos' && Math.abs(s.position - kf.time) < 0.02);
                                             if (e.shiftKey) toggleSelectedKeyframe({ laneId: 'scrollPos', position: kf.time, value: kf.value });
-                                            else setSelectedKeyframe({ laneId: 'scrollPos', position: kf.time, value: kf.value });
+                                            else if (!isAlreadySelected) setSelectedKeyframe({ laneId: 'scrollPos', position: kf.time, value: kf.value });
                                         }}
                                         onContextMenu={(e) => {
                                             e.preventDefault();
@@ -2155,7 +2157,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 const applyTimeDelta = isShift ? (Math.abs(dx) >= Math.abs(dy) ? deltaTime : 0) : deltaTime;
                                                 const applyValueDelta = isShift ? (Math.abs(dy) > Math.abs(dx) ? deltaV : 0) : deltaV;
 
-                                                const newTime = Math.max(0, Math.min(sequenceDuration, +(orig.position + applyTimeDelta).toFixed(2)));
+                                                const newTime = Math.abs(applyTimeDelta) < 0.0001
+                                                    ? orig.position
+                                                    : Math.max(0, Math.min(sequenceDuration, +(orig.position + applyTimeDelta).toFixed(4)));
                                                 const newValue = Math.max(laneCfg.min, Math.min(laneCfg.max, +(orig.value + applyValueDelta).toFixed(3)));
                                                 return { laneId: orig.laneId, position: newTime, value: newValue };
                                             });
@@ -2535,8 +2539,10 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 return;
                                             }
                                             const updated = { laneId: lane.id, position: kf.time, value: kf.value };
+                                            const currentSel = useStore.getState().selectedKeyframes;
+                                            const isAlreadySelected = currentSel.length > 1 && currentSel.some(s => s.laneId === lane.id && Math.abs(s.position - kf.time) < 0.02);
                                             if (e.shiftKey) toggleSelectedKeyframe(updated);
-                                            else setSelectedKeyframe(updated);
+                                            else if (!isAlreadySelected) setSelectedKeyframe(updated);
                                         }}
                                         onPointerDown={(e) => {
                                             if (activeTool === 'eraser') return;
@@ -2592,7 +2598,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 const applyTimeDelta = isShift ? (Math.abs(dx) >= Math.abs(dy) ? deltaTime : 0) : deltaTime;
                                                 const applyValueDelta = isShift ? (Math.abs(dy) > Math.abs(dx) ? deltaV : 0) : deltaV;
 
-                                                const newTime = Math.max(0, Math.min(sequenceDuration, +(orig.position + applyTimeDelta).toFixed(2)));
+                                                const newTime = Math.abs(applyTimeDelta) < 0.0001
+                                                    ? orig.position
+                                                    : Math.max(0, Math.min(sequenceDuration, +(orig.position + applyTimeDelta).toFixed(4)));
                                                 const newValue = Math.max(laneCfg.min, Math.min(laneCfg.max, +(orig.value + applyValueDelta).toFixed(3)));
                                                 return { laneId: orig.laneId, position: newTime, value: newValue };
                                             });

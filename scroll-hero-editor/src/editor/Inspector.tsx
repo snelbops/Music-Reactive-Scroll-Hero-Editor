@@ -294,21 +294,21 @@ function LaneInspector({ laneId }: { laneId: string }) {
     return (
         <div className="flex flex-col gap-4">
             {/* Lane header */}
-            <div className="flex items-center gap-2 pb-2 border-b border-[#1a1d21]">
+            <div className="flex items-center gap-2 pb-2 border-b border-editor-border">
                 <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: lane.color }} />
-                <span className="font-semibold text-xs text-[#e2e5e8]">{lane.name}</span>
+                <span className="font-semibold text-xs text-editor-fg">{lane.name}</span>
             </div>
 
             {/* Current value readout */}
-            <div className="p-3 border border-[#23272c] rounded-md bg-[#15181b] flex flex-col gap-2">
+            <div className="p-3 border border-editor-border rounded-md bg-editor-panel flex flex-col gap-2">
                 <div className="flex justify-between items-baseline">
-                    <span className="text-[10.5px] text-[#7d848c]">Value at playhead</span>
-                    <span className="font-mono font-medium text-xs text-[#e2e5e8]">{currentValue.toFixed(3)}{lane.unit}</span>
+                    <span className="text-[10.5px] text-editor-muted">Value at playhead</span>
+                    <span className="font-mono font-medium text-xs text-editor-fg">{currentValue.toFixed(3)}{lane.unit}</span>
                 </div>
-                <div className="w-full h-1 bg-[#1d2126] rounded-full overflow-hidden relative">
+                <div className="w-full h-1 bg-editor-surface rounded-full overflow-hidden relative">
                     <div className="h-full rounded-full transition-all" style={{ width: `${normalised * 100}%`, background: lane.color }} />
                 </div>
-                <div className="flex justify-between text-[9.5px] font-mono text-[#5a6067]">
+                <div className="flex justify-between text-[9.5px] font-mono text-editor-muted">
                     <span>{min}</span><span>{max}</span>
                 </div>
             </div>
@@ -317,20 +317,20 @@ function LaneInspector({ laneId }: { laneId: string }) {
             {laneId === 'scrollPos' && (
                 <div className="flex flex-col gap-2">
                     <div className="flex items-baseline justify-between">
-                        <span className="text-[10px] font-semibold tracking-wider text-[#7d848c] uppercase">SHAPE</span>
-                        <span className="text-[9.5px] text-[#5a6067]">replaces automation</span>
+                        <span className="text-[10px] font-semibold tracking-wider text-editor-muted uppercase">SHAPE</span>
+                        <span className="text-[9.5px] text-editor-muted">replaces automation</span>
                     </div>
                     <div className="grid grid-cols-2 gap-1.5">
                         {SCROLL_PATTERNS.map(preset => (
                             <button
                                 key={preset.id}
                                 onClick={() => useStore.getState().setScrollKeyframes(preset.generate(SEQUENCE_DURATION))}
-                                className="group flex flex-col gap-1 p-1.5 border border-[#23272c] bg-[#15181b] hover:bg-[#1f2328] hover:border-[#3a4249] rounded transition-colors text-left"
+                                className="group flex flex-col gap-1 p-1.5 border border-editor-border bg-editor-panel hover:bg-editor-surface-hover hover:border-editor-accent-blue rounded transition-colors text-left"
                             >
                                 <svg viewBox="0 0 64 26" className="w-full h-6" preserveAspectRatio="none">
-                                    <path d={preset.thumb} fill="none" stroke="#8fa6bd" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="group-hover:stroke-[#c98a4d] transition-colors" />
+                                    <path d={preset.thumb} fill="none" stroke="var(--color-editor-fill)" strokeOpacity="0.6" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="group-hover:stroke-editor-accent-orange transition-colors" />
                                 </svg>
-                                <span className="text-[9.5px] text-[#8a9198] group-hover:text-[#e2e5e8] transition-colors">{preset.label}</span>
+                                <span className="text-[9.5px] text-editor-muted group-hover:text-editor-fg transition-colors">{preset.label}</span>
                             </button>
                         ))}
                     </div>
@@ -340,8 +340,8 @@ function LaneInspector({ laneId }: { laneId: string }) {
             {/* Interpolation mode hint */}
             {laneId !== 'scrollPos' && (
                 <div>
-                    <span className="text-[10px] font-semibold tracking-wider text-[#7d848c] uppercase block mb-1">Interpolation</span>
-                    <p className="text-[10px] text-[#6b7278] leading-relaxed">Click a keyframe dot on this lane to edit its curve easing.</p>
+                    <span className="text-[10px] font-semibold tracking-wider text-editor-muted uppercase block mb-1">Interpolation</span>
+                    <p className="text-[10px] text-editor-muted leading-relaxed">Click a keyframe dot on this lane to edit its curve easing.</p>
                 </div>
             )}
         </div>
@@ -372,38 +372,38 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
     return (
         <div className="flex flex-col gap-4">
             {/* Keyframe header */}
-            <div className="flex items-center gap-2 pb-2 border-b border-[#1a1d21]">
+            <div className="flex items-center gap-2 pb-2 border-b border-editor-border">
                 <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: lane.color }} />
                 <div className="flex-1 min-width-0">
                     <div className="flex items-center justify-between">
-                        <span className="font-semibold text-xs text-[#e2e5e8] truncate">{lane.name}</span>
+                        <span className="font-semibold text-xs text-editor-fg truncate">{lane.name}</span>
                         {isMulti && (
-                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#23272c] text-[#e2e5e8]">
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-editor-surface text-editor-fg border border-editor-border font-bold">
                                 {selectedCount} sel
                             </span>
                         )}
                     </div>
-                    <p className="text-[9.5px] text-[#6b7278] font-mono">{isMulti ? 'Shift+click to toggle' : `@ ${timeLabel}s`}</p>
+                    <p className="text-[9.5px] text-editor-muted font-mono">{isMulti ? 'Shift+click to toggle' : `@ ${timeLabel}s`}</p>
                 </div>
             </div>
 
             {/* Value readout */}
-            <div className="p-3 border border-[#23272c] rounded-md bg-[#15181b] flex flex-col gap-2">
+            <div className="p-3 border border-editor-border rounded-md bg-editor-panel flex flex-col gap-2">
                 <div className="flex justify-between items-center">
-                    <span className="text-[10.5px] text-[#7d848c]">Value</span>
+                    <span className="text-[10.5px] text-editor-muted">Value</span>
                     <span className="font-mono text-xs font-medium" style={{ color: lane.color }}>{kf.value.toFixed(4)}{lane.unit}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                    <span className="text-[10.5px] text-[#7d848c]">Position</span>
-                    <span className="font-mono text-xs text-[#7d848c]">{kf.position.toFixed(3)}s</span>
+                    <span className="text-[10.5px] text-editor-muted">Position</span>
+                    <span className="font-mono text-xs text-editor-muted">{kf.position.toFixed(3)}s</span>
                 </div>
                 {kf.laneId !== 'scrollPos' && !isMulti && (
-                    <div className="mt-1 pt-2 border-t border-[#23272c]">
-                        <label className="text-[9.5px] text-[#7d848c] block mb-1 uppercase font-semibold">Edit Value</label>
+                    <div className="mt-1 pt-2 border-t border-editor-border">
+                        <label className="text-[9.5px] text-editor-muted block mb-1 uppercase font-semibold">Edit Value</label>
                         <input
                             key={`${kf.laneId}-${kf.position}`}
                             type="number"
-                            className="w-full bg-[#0d0f11] border border-[#262b31] rounded px-2 py-1 text-xs font-mono text-[#e2e5e8] focus:outline-none focus:border-[#5f7f9e]"
+                            className="w-full bg-editor-surface border border-editor-border rounded px-2 py-1 text-xs font-mono text-editor-fg focus:outline-none focus:border-editor-accent-blue"
                             defaultValue={kf.value.toFixed(4)}
                             step={(lane.range[1] - lane.range[0]) / 100}
                             min={lane.range[0]}
@@ -424,8 +424,8 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
             {/* Easing presets */}
             <div className="flex flex-col gap-2">
                 <div className="flex justify-between items-baseline">
-                    <span className="text-[10px] font-semibold tracking-wider text-[#7d848c] uppercase">EASING</span>
-                    <span className="text-[9px] text-[#5a6067]">Delete to remove</span>
+                    <span className="text-[10px] font-semibold tracking-wider text-editor-muted uppercase">EASING</span>
+                    <span className="text-[9px] text-editor-muted">Delete to remove</span>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
                     {EASING_PRESETS.map((preset) => {
@@ -437,14 +437,17 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
                                     applyEasingToAllSelected(preset.id);
                                     setSelectedKeyframe({ ...kf });
                                 }}
-                                className="group flex flex-col gap-1 p-1.5 border border-[#23272c] bg-[#15181b] hover:bg-[#1f2328] rounded transition-colors text-left"
-                                style={isActive ? { borderColor: '#5f7f9e', background: '#1c222b' } : undefined}
+                                className={`group flex flex-col gap-1 p-1.5 border rounded transition-colors text-left ${
+                                    isActive
+                                        ? 'bg-editor-surface-hover border-editor-accent-blue font-semibold'
+                                        : 'bg-editor-panel border-editor-border hover:bg-editor-surface-hover'
+                                }`}
                                 title={preset.label}
                             >
                                 <svg viewBox="0 0 40 40" className="w-full h-6">
-                                    <path d={preset.d} fill="none" stroke={isActive ? '#8fa6bd' : 'rgba(255,255,255,0.35)'} strokeWidth="2.5" strokeLinecap="round" />
+                                    <path d={preset.d} fill="none" stroke="var(--color-editor-fill)" strokeOpacity={isActive ? '0.9' : '0.4'} strokeWidth="2.5" strokeLinecap="round" />
                                 </svg>
-                                <span className={`text-[9.5px] transition-colors ${isActive ? 'text-[#e2e5e8] font-semibold' : 'text-[#8a9198] group-hover:text-[#e2e5e8]'}`}>{preset.label}</span>
+                                <span className={`text-[9.5px] transition-colors ${isActive ? 'text-editor-fg font-semibold' : 'text-editor-muted group-hover:text-editor-fg'}`}>{preset.label}</span>
                             </button>
                         );
                     })}
