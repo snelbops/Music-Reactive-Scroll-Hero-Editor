@@ -2070,8 +2070,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             left: `calc(${(kf.time / sequenceDuration) * 100}% - 3px)`,
                                             top: `calc(${(1 - kf.value) * 100}% - 3px)`,
                                             borderColor: isSelected ? '#ffffff' : '#3b82f6',
-                                            borderWidth: '1.5px',
-                                            backgroundColor: isSelected ? '#fbbf24' : '#60a5fa',
+                                            borderWidth: isSelected ? '1.5px' : '1px',
+                                            backgroundColor: isSelected ? '#0a0b0e' : '#3b82f6',
                                         }}
                                         onMouseDown={(e) => e.stopPropagation()}
                                         onClick={(e) => {
@@ -2502,8 +2502,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             left: `calc(${(kf.time / sequenceDuration) * 100}% - 3px)`,
                                             top: `calc(${normalY(kf.value) / VB_H * 100}% - 3px)`,
                                             borderColor: kfSelected ? '#ffffff' : lane.color,
-                                            borderWidth: '1.5px',
-                                            backgroundColor: kfSelected ? '#fbbf24' : lane.color,
+                                            borderWidth: kfSelected ? '1.5px' : '1px',
+                                            backgroundColor: kfSelected ? '#0a0b0e' : lane.color,
                                         }}
                                         onMouseDown={(e) => e.stopPropagation()}
                                         onClick={(e) => {
