@@ -126,6 +126,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const [isolatedLane, setIsolatedLane] = useState<'all' | 'scrollPos' | 'rotationSpeed' | 'cssOpacity' | 'depth' | 'size'>('all');
     const [showRhythmModal, setShowRhythmModal] = useState(false);
     const loopTrackRef = useRef<HTMLDivElement>(null);
+    const audioRef = useRef<HTMLAudioElement>(null);
     const audioUploadInputRef = useRef<HTMLInputElement>(null);
     const canUndo = useStore(s => s._past.length > 0);
     const canRedo = useStore(s => s._future.length > 0);
@@ -868,6 +869,27 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         return unsub;
     }, []);
 
+    // Sync HTML5 Audio element to playback position & seamless loop wrap
+    useEffect(() => {
+        const a = audioRef.current;
+        if (!a || !audioUrl) return;
+
+        if (isPlaying) {
+            const seqPos = sheet.sequence.position;
+            const diff = Math.abs(a.currentTime - seqPos);
+            if (diff > 0.15) {
+                a.currentTime = Math.max(0, Math.min(a.duration || 300, seqPos));
+            }
+            if (a.paused) {
+                a.play().catch(() => {});
+            }
+        } else {
+            if (!a.paused) {
+                a.pause();
+            }
+        }
+    }, [isPlaying, seqTime, audioUrl]);
+
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if ((e.target as HTMLElement).tagName === 'INPUT') return;
@@ -931,9 +953,15 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         if (!el) return;
         if (e.clientX - el.getBoundingClientRect().left < LABEL_W) return;
 
-        // Do NOT seek playhead if using select tool, holding Shift, or clicking interactive keyframes/overlays!
-        if (e.shiftKey || activeTool === 'select' || (e.target as HTMLElement).closest('.pointer-events-auto')) {
-            return;
+        // If clicking on top ruler header area (clientY near top of lanes container), ALWAYS allow scrubbing playhead!
+        const relativeY = e.clientY - el.getBoundingClientRect().top + el.scrollTop;
+        const isRulerArea = relativeY <= 24;
+
+        if (!isRulerArea) {
+            // Do NOT seek playhead if using select tool, holding Shift, or clicking interactive keyframes/overlays!
+            if (e.shiftKey || activeTool === 'select' || (e.target as HTMLElement).closest('.pointer-events-auto')) {
+                return;
+            }
         }
 
         setIsPlaying(false);
@@ -1250,9 +1278,33 @@ export default function Timeline({ height = 280 }: { height?: number }) {
             </div>
             <div ref={lanesRef} className="flex-1 overflow-y-auto overflow-x-auto thin-scrollbar relative select-none cursor-col-resize" onMouseDown={handleLanesMouseDown}>
                 <div className="relative" style={{ width: timelineZoom !== 1 ? `${timelineZoom * 100}%` : '100%', minHeight: '100%' }}>
-                    {/* Red Playhead Line */}
-                    <div className="absolute top-0 bottom-0 w-[1px] bg-red-500 z-50 pointer-events-none shadow-[0_0_8px_rgba(239,68,68,0.8)]" style={{ left: `calc(120px + (100% - 120px) * ${seqTime / sequenceDuration})` }}>
-                        <div className="w-3 h-3 bg-red-500 absolute -top-1 -left-[5.5px] rotate-45" />
+                    {/* Red Playhead Line & Interactive Cap */}
+                    <div
+                        className="absolute top-0 bottom-0 w-[1.5px] bg-red-500 z-[60] pointer-events-auto cursor-ew-resize shadow-[0_0_8px_rgba(239,68,68,0.8)] group/playhead"
+                        style={{ left: `calc(120px + (100% - 120px) * ${seqTime / sequenceDuration})` }}
+                        onPointerDown={(e) => {
+                            e.stopPropagation();
+                            const targetEl = e.currentTarget as HTMLElement;
+                            targetEl.setPointerCapture(e.pointerId);
+                            setIsPlaying(false);
+                            const p = progressFromClientX(e.clientX);
+                            if (p !== null) seekTo(p);
+
+                            const onMove = (ev: PointerEvent) => {
+                                if (!(ev.buttons & 1)) return;
+                                const p = progressFromClientX(ev.clientX);
+                                if (p !== null) seekTo(p);
+                            };
+                            const onUp = (ev: PointerEvent) => {
+                                try { targetEl.releasePointerCapture(ev.pointerId); } catch (_) {}
+                                window.removeEventListener('pointermove', onMove);
+                                window.removeEventListener('pointerup', onUp);
+                            };
+                            window.addEventListener('pointermove', onMove);
+                            window.addEventListener('pointerup', onUp);
+                        }}
+                    >
+                        <div className="w-3.5 h-3.5 bg-red-500 hover:bg-red-400 absolute -top-1 -left-[6px] rotate-45 cursor-ew-resize shadow-md transition-transform hover:scale-125 z-[61]" />
                     </div>
                 
                 {/* Resizable & Draggable Ableton-Style Loop Region Header */}
@@ -1361,6 +1413,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             setAudioMenu({ visible: true, x: e.clientX, y: e.clientY, clickTime });
                         }}
                     >
+                        <audio ref={audioRef} src={audioUrl || undefined} preload="auto" />
                         <input
                             ref={audioUploadInputRef}
                             type="file"
