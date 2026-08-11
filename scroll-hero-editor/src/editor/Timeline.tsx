@@ -1767,8 +1767,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 const rect = targetEl.getBoundingClientRect();
                                 const startX = e.clientX - rect.left;
                                 const startY = e.clientY - rect.top;
+                                const initialSelected = e.shiftKey ? useStore.getState().selectedKeyframes : [];
                                 setMarqueeBox({ laneId: 'scrollPos', startX, startY, currentX: startX, currentY: startY });
-                                targetEl.setPointerCapture(e.pointerId);
+                                try { targetEl.setPointerCapture(e.pointerId); } catch (_) {}
 
                                 const onMove = (ev: PointerEvent) => {
                                     const r = targetEl.getBoundingClientRect();
@@ -1784,24 +1785,31 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     const seqDur = useStore.getState().sequenceDuration;
                                     const currentKfs = useStore.getState().scrollKeyframes;
                                     const laneH = r.height;
-                                    const selected = currentKfs.filter(kf => {
-                                        // Fix 1: use dynamic sequenceDuration for X, include Y check
+                                    const boxed = currentKfs.filter(kf => {
                                         const kfX = (kf.time / seqDur) * r.width;
                                         const kfY = (1 - kf.value) * laneH;
                                         return kfX >= minX && kfX <= maxX && kfY >= minY && kfY <= maxY;
                                     }).map(kf => ({ laneId: 'scrollPos', position: kf.time, value: kf.value }));
 
-                                    setSelectedKeyframes(selected);
+                                    const combined = [...initialSelected];
+                                    boxed.forEach(item => {
+                                        if (!combined.some(c => c.laneId === item.laneId && Math.abs(c.position - item.position) < 0.001)) {
+                                            combined.push(item);
+                                        }
+                                    });
+
+                                    setSelectedKeyframes(combined);
                                 };
 
-                                const onUp = () => {
+                                const onUp = (ev: PointerEvent) => {
+                                    try { targetEl.releasePointerCapture(ev.pointerId); } catch (_) {}
                                     setMarqueeBox(null);
-                                    targetEl.removeEventListener('pointermove', onMove as any);
-                                    targetEl.removeEventListener('pointerup', onUp as any);
+                                    window.removeEventListener('pointermove', onMove as any);
+                                    window.removeEventListener('pointerup', onUp as any);
                                 };
 
-                                targetEl.addEventListener('pointermove', onMove as any);
-                                targetEl.addEventListener('pointerup', onUp as any);
+                                window.addEventListener('pointermove', onMove as any);
+                                window.addEventListener('pointerup', onUp as any);
                                 return;
                             }
 
@@ -2284,15 +2292,15 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 }}
                                 onPointerDown={(e) => {
                                     if (activeTool === 'select') {
-                                        // Fix 6: stop propagation so handleLanesMouseDown doesn't also seek playhead
                                         e.stopPropagation();
                                         setSelectedLane(lane.id);
                                         const targetEl = e.currentTarget as HTMLElement;
                                         const rect = targetEl.getBoundingClientRect();
                                         const startX = e.clientX - rect.left;
                                         const startY = e.clientY - rect.top;
+                                        const initialSelected = e.shiftKey ? useStore.getState().selectedKeyframes : [];
                                         setMarqueeBox({ laneId: lane.id, startX, startY, currentX: startX, currentY: startY });
-                                        targetEl.setPointerCapture(e.pointerId);
+                                        try { targetEl.setPointerCapture(e.pointerId); } catch (_) {}
 
                                         const onMove = (ev: PointerEvent) => {
                                             const r = targetEl.getBoundingClientRect();
@@ -2306,26 +2314,32 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             const maxY = Math.max(startY, curY);
 
                                             const currentKfs = (useStore.getState().paramKeyframes[lane.id] ?? []) as ParamKf[];
-                                            const selected = currentKfs.filter(kf => {
-                                                // Fix 1: check both X and Y for accurate marquee selection
+                                            const boxed = currentKfs.filter(kf => {
                                                 const kfX = (kf.time / sequenceDuration) * r.width;
-                                                // normalY maps value to VB space; convert to pixel %
                                                 const normYRatio = (1 - (kf.value - lane.min) / (lane.max - lane.min));
                                                 const kfY = normYRatio * r.height;
                                                 return kfX >= minX && kfX <= maxX && kfY >= minY && kfY <= maxY;
                                             }).map(kf => ({ laneId: lane.id, position: kf.time, value: kf.value }));
 
-                                            setSelectedKeyframes(selected);
+                                            const combined = [...initialSelected];
+                                            boxed.forEach(item => {
+                                                if (!combined.some(c => c.laneId === item.laneId && Math.abs(c.position - item.position) < 0.001)) {
+                                                    combined.push(item);
+                                                }
+                                            });
+
+                                            setSelectedKeyframes(combined);
                                         };
 
-                                        const onUp = () => {
+                                        const onUp = (ev: PointerEvent) => {
+                                            try { targetEl.releasePointerCapture(ev.pointerId); } catch (_) {}
                                             setMarqueeBox(null);
-                                            targetEl.removeEventListener('pointermove', onMove as any);
-                                            targetEl.removeEventListener('pointerup', onUp as any);
+                                            window.removeEventListener('pointermove', onMove as any);
+                                            window.removeEventListener('pointerup', onUp as any);
                                         };
 
-                                        targetEl.addEventListener('pointermove', onMove as any);
-                                        targetEl.addEventListener('pointerup', onUp as any);
+                                        window.addEventListener('pointermove', onMove as any);
+                                        window.addEventListener('pointerup', onUp as any);
                                         return;
                                     }
 

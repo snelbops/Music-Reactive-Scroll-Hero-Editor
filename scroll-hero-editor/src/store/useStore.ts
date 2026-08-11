@@ -307,7 +307,7 @@ export const useStore = create<EditorState>((set, get) => {
         if (opacity !== null) updates.cssOpacity = opacity;
         if (Object.keys(updates).length > 0) set(updates);
     },
-    selectedLane: null, setSelectedLane: (id) => set({ selectedLane: id, selectedKeyframes: [] }),
+    selectedLane: null, setSelectedLane: (id) => set({ selectedLane: id }),
     selectedKeyframes: [],
     timeSelection: null,
     setTimeSelection: (sel) => set({ timeSelection: sel }),
