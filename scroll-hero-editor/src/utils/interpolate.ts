@@ -65,9 +65,9 @@ export function interpolateScrollAt(
             const alphaX = (t - a.time) / deltaT;
 
             if (a.handleOut || b.handleIn) {
-                // Horizontal handle normalized to [0,1]
-                const x1 = (a.handleOut?.dt ?? 0) / deltaT;
-                const x2 = 1 + (b.handleIn?.dt ?? 0) / deltaT; // b.handleIn.dt is typically negative
+                // Horizontal handle normalized to [0,1] — clamp to 45% bound to guarantee monotonic time
+                const x1 = Math.max(0, Math.min(0.45, (a.handleOut?.dt ?? 0) / deltaT));
+                const x2 = Math.min(1, Math.max(0.55, 1 + (b.handleIn?.dt ?? 0) / deltaT));
                 const bezT = solveT(alphaX, x1, x2);
                 
                 // Vertical value control points
@@ -99,8 +99,8 @@ export function interpolateParamAt(keyframes: ParamKf[], t: number): number | nu
             const alphaX = (t - a.time) / deltaT;
 
             if (a.handleOut || b.handleIn) {
-                const x1 = (a.handleOut?.dt ?? 0) / deltaT;
-                const x2 = 1 + (b.handleIn?.dt ?? 0) / deltaT;
+                const x1 = Math.max(0, Math.min(0.45, (a.handleOut?.dt ?? 0) / deltaT));
+                const x2 = Math.min(1, Math.max(0.55, 1 + (b.handleIn?.dt ?? 0) / deltaT));
                 const bezT = solveT(alphaX, x1, x2);
                 const y0 = a.value;
                 const y1 = a.value + (a.handleOut?.dv ?? 0);

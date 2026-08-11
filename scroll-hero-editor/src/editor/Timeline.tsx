@@ -32,15 +32,17 @@ function buildParamPath(kfs: ParamKf[], min: number, max: number, seqDur = 10): 
         if (kfPrev.easing === 'step') { d += ` H ${curr.x} V ${curr.y}`; continue; }
         // Bezier handles override easing
         if (kfPrev.handleOut || kfCurr.handleIn) {
-            const dt = kfCurr.time - kfPrev.time;
-            const outDt = kfPrev.handleOut?.dt ?? dt / 3;
+            const dt = Math.max(0.001, kfCurr.time - kfPrev.time);
+            const rawOutDt = kfPrev.handleOut?.dt ?? dt / 3;
+            const outDt = Math.max(0, Math.min(dt * 0.45, rawOutDt));
             const outDv = kfPrev.handleOut?.dv ?? 0;
-            const inDt  = kfCurr.handleIn?.dt  ?? -dt / 3;
+            const rawInDt  = kfCurr.handleIn?.dt  ?? -dt / 3;
+            const inDt  = Math.min(0, Math.max(-dt * 0.45, rawInDt));
             const inDv  = kfCurr.handleIn?.dv  ?? 0;
             const hox = prev.x + (outDt / seqDur) * VB_W;
-            const hoy = prev.y - (outDv / valueRange) * VB_H;
+            const hoy = Math.max(-VB_H * 0.5, Math.min(VB_H * 1.5, prev.y - (outDv / valueRange) * VB_H));
             const hix = curr.x + (inDt / seqDur) * VB_W;
-            const hiy = curr.y - (inDv / valueRange) * VB_H;
+            const hiy = Math.max(-VB_H * 0.5, Math.min(VB_H * 1.5, curr.y - (inDv / valueRange) * VB_H));
             d += ` C ${hox} ${hoy}, ${hix} ${hiy}, ${curr.x} ${curr.y}`;
             continue;
         }
@@ -1721,7 +1723,13 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     </div>
                     <div
                         className="flex-1 relative overflow-hidden bg-[#3b82f6]/[0.03]"
-                        style={{ cursor: activeTool === 'pen' ? 'crosshair' : activeTool === 'eraser' ? 'cell' : undefined }}
+                        style={{
+                            cursor: activeTool === 'pen' || activeTool === 'draw' || activeTool === 'line'
+                                ? 'crosshair'
+                                : activeTool === 'eraser'
+                                ? 'no-drop'
+                                : 'default'
+                        }}
                         onContextMenu={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -2361,7 +2369,13 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             </div>
                             <div
                                 className="flex-1 relative overflow-hidden"
-                                style={{ cursor: activeTool === 'pen' ? 'crosshair' : activeTool === 'eraser' ? 'cell' : undefined }}
+                                style={{
+                                    cursor: activeTool === 'pen' || activeTool === 'draw' || activeTool === 'line'
+                                        ? 'crosshair'
+                                        : activeTool === 'eraser'
+                                        ? 'no-drop'
+                                        : 'default'
+                                }}
                                 onContextMenu={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
