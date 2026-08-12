@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { ChevronDown, ChevronRight, UploadCloud, Video, Film, Layers, SlidersHorizontal, ImageIcon, X, Sparkles, Grid, Plus } from 'lucide-react';
-import { saveMediaFile, getMediaDataUrl, dataUrlToBlob } from '../utils/mediaStore';
+import { saveMediaFile, putMediaFile, getMediaBlob, newPadMediaKey } from '../utils/mediaStore';
 import { cacheActiveVideo } from '../utils/videoCache';
 import { extractFrames } from '../packages/ffmpegExtractor';
 
@@ -78,7 +78,10 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
         setExtractionProgress(0);
     };
 
-    const handleExtract = async (sourceOverride?: File | string) => {
+    // `userInitiated` distinguishes the button from the automatic startup extraction of
+    // sample.mp4. Only an explicit click should switch the renderer — the background run
+    // used to force 'frames' on every load, overriding the preset a project was saved with.
+    const handleExtract = async (sourceOverride?: File | string, userInitiated = true) => {
         const source = sourceOverride ?? mp4InputRef.current?.files?.[0];
         if (!source) return;
         setExtractionStatus('extracting');
@@ -87,7 +90,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
             const frames = await extractFrames(source, (p) => setExtractionProgress(p));
             setExtractedFrames(frames);
             setExtractionStatus('done');
-            setActivePreset('frames');
+            if (userInitiated) setActivePreset('frames');
         } catch (err) {
             console.error('ffmpeg extraction failed:', err);
             setExtractionStatus('error');
@@ -97,7 +100,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
     // Auto-extract sample.mp4 on first load and setup numpad drumpad key shortcuts (7, 8, 9, 4, 5, 6, 1, 2, 3, 0)
     useEffect(() => {
         if (extractionStatus === 'idle' && extractedFrames.length === 0) {
-            handleExtract('/sample.mp4');
+            handleExtract('/sample.mp4', false);
         }
 
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -189,8 +192,9 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                             if (!file) return;
                                             cacheActiveVideo(file, file.name);
                                             setActiveVideoBlob(file);
-                                            const url = await saveMediaFile(`video-pad-${idx}`, file);
-                                            setVideoPad(idx, { ...pad, name: file.name, url });
+                                            const mediaKey = newPadMediaKey();
+                                            const url = await saveMediaFile(mediaKey, file);
+                                            setVideoPad(idx, { ...pad, name: file.name, url, mediaKey });
                                             setMp4Asset({ name: file.name, url });
                                             setActiveVideoPadIdx(idx);
                                         };
@@ -206,8 +210,9 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                             if (file && (file.type.startsWith('video/') || file.name.endsWith('.mp4') || file.name.endsWith('.webm'))) {
                                                 cacheActiveVideo(file, file.name);
                                                 setActiveVideoBlob(file);
-                                                const url = await saveMediaFile(`video-pad-${idx}`, file);
-                                                setVideoPad(idx, { ...pad, name: file.name, url });
+                                                const mediaKey = newPadMediaKey();
+                                                const url = await saveMediaFile(mediaKey, file);
+                                                setVideoPad(idx, { ...pad, name: file.name, url, mediaKey });
                                                 setMp4Asset({ name: file.name, url });
                                                 setActiveVideoPadIdx(idx);
                                             }
@@ -226,10 +231,12 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                                 onClick={async () => {
                                                     setActiveVideoPadIdx(idx);
                                                     if (pad.url) useStore.getState().setVideoUrl(pad.url);
-                                                    const padData = await getMediaDataUrl(`video-pad-${idx}`);
-                                                    if (padData) {
-                                                        const blob = dataUrlToBlob(padData);
-                                                        await saveMediaFile('active-video', blob);
+                                                    const key = pad.mediaKey ?? `video-pad-${idx}`;
+                                                    const blob = await getMediaBlob(key);
+                                                    if (blob) {
+                                                        // Cache bytes only — this used to mint an
+                                                        // Object URL and drop it on every press.
+                                                        await putMediaFile('active-video', blob);
                                                         cacheActiveVideo(blob, pad.name || `pad-${idx}`);
                                                         setActiveVideoBlob(blob);
                                                     }
@@ -273,7 +280,9 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                                                     className="opacity-0 group-hover/pad:opacity-100 text-[8px] text-editor-muted hover:text-red-400 p-0.5 rounded transition-all"
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        setVideoPad(idx, { ...pad, name: '', url: '' });
+                                                                        // Drop mediaKey too, or the cleared pad would be
+                                                                        // re-hydrated from its old stored clip on next load.
+                                                                        setVideoPad(idx, { ...pad, name: '', url: '', mediaKey: undefined });
                                                                     }}
                                                                 >
                                                                     ✕

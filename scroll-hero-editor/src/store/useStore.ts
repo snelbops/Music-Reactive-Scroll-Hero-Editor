@@ -6,6 +6,13 @@ type PresetId = 'orbit' | 'light' | 'classic-dark' | 'classic-dark-copy' | 'clas
 type AspectRatio = '16:9' | '9:16' | '1:1' | 'native' | 'free';
 
 type ScrollKf = { time: number; value: number; easing?: string; handleOut?: { dt: number; dv: number }; handleIn?: { dt: number; dv: number } };
+/**
+ * `mediaKey` is a stable IndexedDB key minted when a clip is assigned. Media used to be
+ * stored under `video-pad-<index>`, which meant reordering pads left the bytes behind and
+ * a reload could not re-hydrate the (already dead) blob: URL.
+ */
+export type VideoPad = { id: number; name: string; url: string; color?: string; mediaKey?: string };
+
 type HistorySnapshot = {
     scrollKeyframes: ScrollKf[];
     paramKeyframes: Record<string, ParamKf[]>;
@@ -15,7 +22,7 @@ type HistorySnapshot = {
     videoSpeedRatio: number;
     sequenceDuration: number;
     activeVideoPadIdx: number;
-    videoPads: Array<{ id: number; name: string; url: string; color?: string }>;
+    videoPads: VideoPad[];
 };
 type ClipboardEntry = { laneId: string; time: number; value: number; easing?: string; handleOut?: { dt: number; dv: number }; handleIn?: { dt: number; dv: number } };
 
@@ -55,10 +62,10 @@ interface EditorState {
     recordStartPosition: number; setRecordStartPosition: (v: number) => void;
     mp4Asset: { name: string; url: string } | null; setMp4Asset: (asset: { name: string; url: string } | null) => void;
     removeMp4Asset: () => void;
-    videoPads: Array<{ id: number; name: string; url: string; color?: string }>;
+    videoPads: VideoPad[];
     activeVideoPadIdx: number;
-    setActiveVideoPadIdx: (idx: number) => void;
-    setVideoPad: (idx: number, pad: { name: string; url: string; color?: string }) => void;
+    setActiveVideoPadIdx: (idx: number, opts?: { keepPreset?: boolean }) => void;
+    setVideoPad: (idx: number, pad: { name: string; url: string; color?: string; mediaKey?: string }) => void;
     setVideoPadColor: (idx: number, color: string) => void;
     swapVideoPads: (idxA: number, idxB: number) => void;
     videoNaturalDimensions: { width: number; height: number } | null;
@@ -70,6 +77,8 @@ interface EditorState {
     extractionProgress: number; setExtractionProgress: (p: number) => void;
     extractionStatus: 'idle' | 'extracting' | 'done' | 'error'; setExtractionStatus: (s: 'idle' | 'extracting' | 'done' | 'error') => void;
     isScrubbing: boolean; setIsScrubbing: (v: boolean) => void;
+    // Whether the last autosave stored everything, dropped the recordings, or failed.
+    autosaveStatus: 'ok' | 'trimmed' | 'failed'; setAutosaveStatus: (s: 'ok' | 'trimmed' | 'failed') => void;
     scrollKeyframes: { time: number; value: number; easing?: string; handleOut?: { dt: number; dv: number }; handleIn?: { dt: number; dv: number } }[];
     // rangeStart: if provided, clears old keyframes strictly between rangeStart and time (overdub).
     addScrollKeyframe: (time: number, value: number, rangeStart?: number) => void;
@@ -205,12 +214,18 @@ export const useStore = create<EditorState>((set, get) => {
 
         set({ scrollKeyframes: newScrollKfs, paramKeyframes: newParamKfs });
     },
-    setActiveVideoPadIdx: (idx) => {
+    setActiveVideoPadIdx: (idx, opts) => {
         const s = get();
         const pads = s.videoPads;
         const targetUrl = pads[idx]?.url || s.videoUrl;
         if (s.activeVideoPadIdx !== idx) s.pushHistory();
-        set({ activeVideoPadIdx: idx, videoUrl: targetUrl, activePreset: 'video' });
+        // `keepPreset` is for project loading: restoring the active pad must not stomp the
+        // preset the project was saved with.
+        set({
+            activeVideoPadIdx: idx,
+            videoUrl: targetUrl,
+            ...(opts?.keepPreset ? {} : { activePreset: 'video' as const }),
+        });
         if (s.isRecording) {
             s.addPadSwitchEvent(s.playheadPosition, idx);
         }
@@ -221,7 +236,7 @@ export const useStore = create<EditorState>((set, get) => {
         const padKeyMap = [7, 8, 9, 4, 5, 6, 1, 2, 3, 0];
         const padId = padKeyMap[idx] ?? (idx + 1);
         updated[idx] = { ...updated[idx], id: padId, ...pad };
-        return { videoPads: updated, videoUrl: s.activeVideoPadIdx === idx ? pad.url : s.videoUrl, activePreset: 'frames' };
+        return { videoPads: updated, videoUrl: s.activeVideoPadIdx === idx ? pad.url : s.videoUrl, activePreset: 'video' };
     }),
     setVideoPadColor: (idx, color) => set((s) => {
         get().pushHistory();
@@ -235,9 +250,13 @@ export const useStore = create<EditorState>((set, get) => {
         if (idxA === idxB || idxA < 0 || idxB < 0 || idxA >= s.videoPads.length || idxB >= s.videoPads.length) return s;
         get().pushHistory();
         const updated = [...s.videoPads];
+        // The clip (name, url, mediaKey, colour) moves; the numpad label belongs to the
+        // slot and stays put, so the grid keeps reading #7 #8 #9 in fixed positions.
+        const idA = updated[idxA].id;
+        const idB = updated[idxB].id;
         const temp = updated[idxA];
-        updated[idxA] = updated[idxB];
-        updated[idxB] = temp;
+        updated[idxA] = { ...updated[idxB], id: idA };
+        updated[idxB] = { ...temp, id: idB };
         // Keep active index aligned if one of the swapped pads was active
         let newActiveIdx = s.activeVideoPadIdx;
         if (s.activeVideoPadIdx === idxA) newActiveIdx = idxB;
@@ -250,6 +269,7 @@ export const useStore = create<EditorState>((set, get) => {
     extractionProgress: 0, setExtractionProgress: (p) => set({ extractionProgress: p }),
     extractionStatus: 'idle', setExtractionStatus: (s) => set({ extractionStatus: s }),
     isScrubbing: false, setIsScrubbing: (v) => set({ isScrubbing: v }),
+    autosaveStatus: 'ok', setAutosaveStatus: (v) => set({ autosaveStatus: v }),
     scrollKeyframes: [],
     addScrollKeyframe: (time, value, rangeStart?) => set((s) => {
         const existing = s.scrollKeyframes;
@@ -465,7 +485,7 @@ export const useStore = create<EditorState>((set, get) => {
             Object.entries(paramKeyframes).map(([k, v]) => [k, [...v]])
         );
         _clipboard.forEach(entry => {
-            const t = Math.max(0, Math.min(10, entry.time + offset));
+            const t = Math.max(0, Math.min(get().sequenceDuration, entry.time + offset));
             if (entry.laneId === 'scrollPos') {
                 newScrollKfs = newScrollKfs.filter(k => Math.abs(k.time - t) > 0.016);
                 newScrollKfs.push({ time: t, value: entry.value, easing: entry.easing, handleOut: entry.handleOut, handleIn: entry.handleIn });

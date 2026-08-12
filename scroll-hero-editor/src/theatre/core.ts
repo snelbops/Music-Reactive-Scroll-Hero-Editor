@@ -45,11 +45,18 @@ export const cssOpacityObj = sheet.object('CSS Opacity', {
     opacity: types.number(1, { range: [0, 1] }),
 });
 
-import studio from '@theatre/studio';
-
+// Loaded dynamically so the studio UI — which only ever runs in dev — is emitted as its
+// own chunk instead of being bundled into the production entry. A static import here is
+// side-effectful, so Vite could not tree-shake it away.
 if (typeof window !== 'undefined' && import.meta.env.DEV) {
-    try {
-        studio.initialize();
-        studio.ui.hide();
-    } catch (e) {}
+    import('@theatre/studio')
+        .then(({ default: studio }) => {
+            try {
+                studio.initialize();
+                studio.ui.hide();
+            } catch (e) {
+                console.warn('Theatre studio failed to initialise:', e);
+            }
+        })
+        .catch((e) => console.warn('Theatre studio could not be loaded:', e));
 }

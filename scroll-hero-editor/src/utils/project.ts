@@ -1,6 +1,44 @@
-import { useStore } from '../store/useStore';
+import { useStore, type VideoPad } from '../store/useStore';
 import type { ParamKf } from './interpolate';
-import { saveMediaFile, loadMediaFile, getMediaDataUrl, dataUrlToBlob } from './mediaStore';
+import { saveMediaFile, loadMediaFile, getMediaDataUrl, dataUrlToBlob, getMediaBlob, newPadMediaKey, revokeMediaUrl } from './mediaStore';
+
+/**
+ * Pad and light-image URLs are `blob:` URLs, which die with the page. The bytes live on in
+ * IndexedDB, so after a reload every stored URL has to be minted again — without this the
+ * pad grid looks populated but every pad is dead.
+ *
+ * Older projects stored pad media under `video-pad-<index>`; those are migrated onto a
+ * stable per-clip key on first load so reordering can no longer desync them.
+ */
+export async function rehydrateMediaUrls(): Promise<void> {
+    const s = useStore.getState();
+
+    const pads = await Promise.all(s.videoPads.map(async (pad, idx) => {
+        if (!pad.name && !pad.url && !pad.mediaKey) return pad;
+        let key = pad.mediaKey;
+        let blob = key ? await getMediaBlob(key) : null;
+        if (!blob) {
+            const legacy = await getMediaBlob(`video-pad-${idx}`);
+            if (!legacy) return pad.url ? { ...pad, url: '' } : pad;
+            key = newPadMediaKey();
+            await saveMediaFile(key, legacy);
+            blob = legacy;
+        }
+        revokeMediaUrl(pad.url);   // the URL being replaced is dead or superseded
+        return { ...pad, url: URL.createObjectURL(blob), mediaKey: key };
+    }));
+    useStore.setState({ videoPads: pads });
+
+    const images = await Promise.all(s.lightImages.map(async (img) => {
+        const url = await loadMediaFile(`light-img-${img.name}`);
+        return url ? { ...img, url } : img;
+    }));
+    if (images.length > 0) useStore.setState({ lightImages: images });
+
+    // The active pad drives the viewport, so point it at the URL we just minted.
+    const active = pads[useStore.getState().activeVideoPadIdx];
+    if (active?.url) useStore.getState().setVideoUrl(active.url);
+}
 
 export type ScrollKf = {
     time: number;
@@ -32,7 +70,7 @@ export type ProjectData = {
     videoUrl?: string | null;
     audioUrl?: string | null;
     mp4Asset?: { name: string; url: string } | null;
-    videoPads?: Array<{ id: number; name: string; url: string; color?: string }>;
+    videoPads?: VideoPad[];
     activeVideoPadIdx?: number;
     lightImages?: { name: string; url: string }[];
     activeLightImageIdx?: number;
@@ -225,12 +263,14 @@ export function applyProjectDataToStore(data: Partial<ProjectData>): void {
         }));
         useStore.setState({ videoPads: mergedPads });
     }
-    if (typeof data.activeVideoPadIdx === 'number') s.setActiveVideoPadIdx(data.activeVideoPadIdx);
+    if (typeof data.activeVideoPadIdx === 'number') s.setActiveVideoPadIdx(data.activeVideoPadIdx, { keepPreset: true });
     if (data.lightImages) useStore.setState({ lightImages: data.lightImages });
     if (typeof data.activeLightImageIdx === 'number') s.setActiveLightImageIdx(data.activeLightImageIdx);
 
-    if (data.recordedEvents) useStore.setState({ recordedEvents: data.recordedEvents });
-    if (data.padSwitchEvents) useStore.setState({ padSwitchEvents: data.padSwitchEvents });
+    useStore.setState({
+        recordedEvents: data.recordedEvents ?? [],
+        padSwitchEvents: data.padSwitchEvents ?? [],
+    });
 
     if (typeof data.playheadPosition === 'number') s.setPlayheadPosition(data.playheadPosition);
     if (typeof data.timelineScrollLeft === 'number') s.setTimelineScrollLeft(data.timelineScrollLeft);
@@ -241,13 +281,37 @@ export function applyProjectDataToStore(data: Partial<ProjectData>): void {
     useStore.setState({ _past: [], _future: [] });
 }
 
-// Auto-save working session into localStorage
+/**
+ * Auto-save the working session.
+ *
+ * localStorage caps around 5MB and a long recording plus a dense envelope can exceed it.
+ * This used to swallow the QuotaExceededError, so work simply stopped being saved with no
+ * sign. Now the recordings — by far the bulkiest part — are dropped so the rest of the
+ * project still persists, and the outcome is published to the store so the UI can say so.
+ */
 export function autoSaveWorkingProject(): void {
     if (typeof window === 'undefined') return;
+
+    const data = getProjectDataFromStore('Working Session');
+    let status: 'ok' | 'trimmed' | 'failed' = 'ok';
     try {
-        const data = getProjectDataFromStore('Working Session');
         localStorage.setItem(LOCAL_STORAGE_KEY_CURRENT, JSON.stringify(data));
-    } catch (e) {}
+    } catch {
+        try {
+            localStorage.setItem(
+                LOCAL_STORAGE_KEY_CURRENT,
+                JSON.stringify({ ...data, recordedEvents: [], padSwitchEvents: [] }),
+            );
+            status = 'trimmed';
+        } catch {
+            status = 'failed';
+        }
+    }
+    // Guarded so this cannot loop: it is called from a store subscription, and writing the
+    // same value again would re-enter.
+    if (useStore.getState().autosaveStatus !== status) {
+        useStore.setState({ autosaveStatus: status });
+    }
 }
 
 export async function loadWorkingProject(): Promise<boolean> {
@@ -271,6 +335,8 @@ export async function loadWorkingProject(): Promise<boolean> {
                 s.setMp4Asset({ name, url: videoUrl });
                 s.setVideoUrl(videoUrl);
             }
+            // Pads and light images carry their own stored files — revive those too.
+            await rehydrateMediaUrls();
             return true;
         }
     } catch (e) {}
@@ -357,6 +423,9 @@ export async function loadProjectFromFile(file: File): Promise<void> {
         useStore.getState().setMp4Asset({ name, url });
         useStore.getState().setVideoUrl(url);
     }
+
+    // Pad URLs in the file are blob: URLs from whoever saved it — always dead here.
+    await rehydrateMediaUrls();
 
     autoSaveWorkingProject();
 }

@@ -22,13 +22,18 @@ function openDB(): Promise<IDBDatabase> {
     });
 }
 
-/** Store a File or Blob in IndexedDB under key, and return a working Object URL */
-export async function saveMediaFile(key: string, file: Blob | File): Promise<string> {
+/**
+ * Store a File or Blob under `key` without minting an Object URL.
+ *
+ * Callers that only want the bytes cached should use this. `saveMediaFile` always creates a
+ * URL, and callers that discarded it leaked the whole video every time — switching pads did
+ * exactly that, since it re-caches the active clip on each press.
+ */
+export async function putMediaFile(key: string, file: Blob | File): Promise<void> {
     try {
         const db = await openDB();
         const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        store.put(file, key);
+        tx.objectStore(STORE_NAME).put(file, key);
         await new Promise((res, rej) => {
             tx.oncomplete = res;
             tx.onerror = rej;
@@ -36,6 +41,18 @@ export async function saveMediaFile(key: string, file: Blob | File): Promise<str
     } catch (e) {
         console.warn('Could not save media file to IndexedDB:', e);
     }
+}
+
+/** Release an Object URL previously minted here. Safe to call with anything. */
+export function revokeMediaUrl(url: string | undefined | null): void {
+    if (url && url.startsWith('blob:')) {
+        try { URL.revokeObjectURL(url); } catch { /* already gone */ }
+    }
+}
+
+/** Store a File or Blob in IndexedDB under key, and return a working Object URL */
+export async function saveMediaFile(key: string, file: Blob | File): Promise<string> {
+    await putMediaFile(key, file);
     return URL.createObjectURL(file);
 }
 
@@ -57,6 +74,31 @@ export async function loadMediaFile(key: string): Promise<string | null> {
         console.warn('Could not load media file from IndexedDB:', e);
     }
     return null;
+}
+
+/** Mint a key that belongs to a clip for its lifetime, so reordering pads cannot desync it. */
+export function newPadMediaKey(): string {
+    const rand = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    return `pad-media-${rand}`;
+}
+
+/** Read the stored Blob itself. Avoids the base64 round-trip when the caller wants bytes. */
+export async function getMediaBlob(key: string): Promise<Blob | null> {
+    try {
+        const db = await openDB();
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const req = tx.objectStore(STORE_NAME).get(key);
+        const file = await new Promise<Blob | undefined>((res, rej) => {
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => rej(req.error);
+        });
+        return file ?? null;
+    } catch (e) {
+        console.warn('Could not read media blob from IndexedDB:', e);
+        return null;
+    }
 }
 
 /** Load stored File or Blob from IndexedDB and convert to Data URL */

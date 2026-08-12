@@ -1,7 +1,6 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Minimize2, Film, Sun, Moon } from 'lucide-react';
-import studio from '@theatre/studio';
 import LeftPanel from './LeftPanel';
 import Inspector from './Inspector';
 import Timeline from './Timeline';
@@ -12,6 +11,14 @@ import VideoExportModal from './VideoExportModal';
 import { useStore } from '../store/useStore';
 import { exportParticleHeroHtml, exportFrameSequenceHeroHtml, exportCurvesJson, exportLoopRegionJson } from '../export/exportHtml';
 import { saveProject, loadProject, loadWorkingProject, autoSaveWorkingProject, startNewProject } from '../utils/project';
+
+// Tallest the timeline may grow. The middle row keeps MIN_VIEWPORT_H so the preview's
+// own toolbar stays usable; the video itself scales down to whatever is left over.
+const HEADER_H = 40;
+const DIVIDER_H = 4;
+const MIN_VIEWPORT_H = 140;
+const maxTimelineH = () =>
+    Math.max(240, window.innerHeight - HEADER_H - DIVIDER_H - MIN_VIEWPORT_H);
 
 export default function Layout() {
     const isDarkMode = useStore(state => state.isDarkMode);
@@ -25,6 +32,7 @@ export default function Layout() {
     const loopEnd = useStore(state => state.loopEnd);
     const isLoop = useStore(state => state.isLoop);
     const audioUrl = useStore(state => state.audioUrl);
+    const autosaveStatus = useStore(state => state.autosaveStatus);
 
     const [isExportingHtml, setIsExportingHtml] = useState(false);
     const [isExportingLoop, setIsExportingLoop] = useState(false);
@@ -36,6 +44,13 @@ export default function Layout() {
     const [timelineH, setTimelineH] = useState(280);
     const [leftW, setLeftW] = useState(220);
     const [rightW, setRightW] = useState(240);
+
+    // Keep the timeline within bounds when the window itself shrinks.
+    useEffect(() => {
+        const onResize = () => setTimelineH(h => Math.min(h, maxTimelineH()));
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
 
     const startDrag = useCallback((
         e: React.PointerEvent<HTMLDivElement>,
@@ -71,7 +86,9 @@ export default function Layout() {
         }
     };
 
-    const handleExportJson = () => {
+    const handleExportJson = async () => {
+        // Dynamic so the studio bundle stays out of the production entry chunk.
+        const { default: studio } = await import('@theatre/studio');
         const state = studio.createContentOfSaveFile('Scroll Hero Editor');
         const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -123,13 +140,20 @@ export default function Layout() {
         const handleKey = (e: KeyboardEvent) => {
             const isMac = navigator.platform.toUpperCase().includes('MAC');
             const mod = isMac ? e.metaKey : e.ctrlKey;
+            const target = e.target as HTMLElement | null;
+            const isTyping = !!target && (
+                ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable
+            );
 
             if (e.key === 'Escape' && isFullscreen) setIsFullscreen(false);
 
-            if (e.key === ' ' && (e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+            if (e.key === ' ' && !isTyping) {
                 e.preventDefault();
                 useStore.getState().setIsPlaying(!useStore.getState().isPlaying);
             }
+
+            // While typing, leave undo/redo to the text field.
+            if (isTyping) return;
 
             // Undo: Cmd+Z / Ctrl+Z
             if (mod && e.key === 'z' && !e.shiftKey) {
@@ -173,9 +197,28 @@ export default function Layout() {
                     <span className="font-semibold text-xs text-editor-fg tracking-tight">Scroll Hero</span>
                     <span className="w-[1px] h-4 bg-editor-border" />
                     <div className="flex items-center gap-2 px-2 py-0.5 border border-editor-border rounded bg-editor-surface text-[11px]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-editor-accent-green" />
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                            autosaveStatus === 'ok' ? 'bg-editor-accent-green'
+                            : autosaveStatus === 'trimmed' ? 'bg-amber-400'
+                            : 'bg-red-500 animate-pulse'
+                        }`} />
                         <span className="font-medium text-editor-fg">{mp4Asset?.name ?? 'anteddai_Young_Max'}</span>
-                        <span className="font-mono text-[10px] text-editor-muted">saved</span>
+                        {/* This used to read "saved" unconditionally, including when the
+                            autosave had silently hit the localStorage quota. */}
+                        <span
+                            className={`font-mono text-[10px] ${
+                                autosaveStatus === 'ok' ? 'text-editor-muted'
+                                : autosaveStatus === 'trimmed' ? 'text-amber-400'
+                                : 'text-red-400 font-semibold'
+                            }`}
+                            title={
+                                autosaveStatus === 'ok' ? 'Working session saved to this browser'
+                                : autosaveStatus === 'trimmed' ? 'Storage is full — the project is saved but the mouse/pad recording was dropped. Export the project to keep it.'
+                                : 'Storage is full — this session is NOT being saved. Export the project now.'
+                            }
+                        >
+                            {autosaveStatus === 'ok' ? 'saved' : autosaveStatus === 'trimmed' ? 'saved without recording' : 'not saved'}
+                        </span>
                     </div>
                 </div>
 
@@ -283,7 +326,7 @@ export default function Layout() {
 
             <div
                 className="h-1 shrink-0 cursor-row-resize bg-editor-border hover:bg-editor-accent-purple/60 active:bg-editor-accent-purple transition-colors"
-                onPointerDown={(e) => startDrag(e, setTimelineH, timelineH, 80, 600, 'y', -1)}
+                onPointerDown={(e) => startDrag(e, setTimelineH, timelineH, 80, maxTimelineH(), 'y', -1)}
             />
             <Timeline height={timelineH} />
 
