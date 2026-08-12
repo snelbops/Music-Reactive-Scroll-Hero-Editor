@@ -84,6 +84,39 @@ page = await freshPage(ctx);
     await shot(page, 'timeline-draw');
 }
 
+// ── The Scroll POS lane has its own draw implementation; it must overwrite too ──
+// This lane was missed when the param-lane draw was fixed, and the first test written
+// for it passed against the broken code because the seeded points happened to land on
+// the stroke's sample grid. Seed times here are deliberately off that grid.
+{
+    const scroll = await laneBox(page, 'Scroll POS') ?? await page.evaluate(() => {
+        const col = [...document.querySelectorAll('span')].filter((s) => /scro/i.test(s.textContent || ''))
+            .map((s) => s.closest('[class*="w-[120px]"]')).find(Boolean);
+        const rc = col?.nextElementSibling?.getBoundingClientRect();
+        return rc ? { x: rc.x, y: rc.y, w: rc.width, h: rc.height } : null;
+    });
+    await pickTool(page, 'Pen / Edit (P)');
+    for (const f of [0.3283, 0.4371, 0.5457]) {
+        await page.mouse.move(scroll.x + scroll.w * f, scroll.y + scroll.h * 0.25);
+        await page.mouse.down(); await page.mouse.up();
+        await page.waitForTimeout(300);
+    }
+    await pickTool(page, 'Freehand Draw (D)');
+    const y = scroll.y + scroll.h * 0.85;
+    await page.mouse.move(scroll.x + scroll.w * 0.25, y);
+    await page.mouse.down();
+    for (let i = 0; i <= 40; i++) await page.mouse.move(scroll.x + scroll.w * (0.25 + (0.5 * i) / 40), y, { steps: 2 });
+    await page.mouse.up();
+    await page.waitForTimeout(700);
+
+    const inside = await page.evaluate(() =>
+        (JSON.parse(localStorage.getItem('scroll-hero-current-project')).scrollKeyframes || [])
+            .filter((k) => k.time > 2.6 && k.time < 7.4).map((k) => k.value));
+    const survivors = inside.filter((v) => v > 0.5);
+    r.ok('scroll-lane draw overwrites existing points', survivors.length === 0,
+        `${survivors.length} stray peaks left of ${inside.length} keyframes`);
+}
+
 // ── A bezier curve must stay single-valued in time however far a handle is dragged ──
 await page.close();
 page = await freshPage(ctx);

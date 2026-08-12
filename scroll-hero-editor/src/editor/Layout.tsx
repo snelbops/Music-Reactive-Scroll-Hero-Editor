@@ -172,6 +172,7 @@ export default function Layout() {
     }, [isFullscreen, setIsFullscreen]);
 
 
+    const [showBuildBanner, setShowBuildBanner] = useState(true);   // temporary — see banner below
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [showFileMenu, setShowFileMenu] = useState(false);
 
@@ -192,6 +193,25 @@ export default function Layout() {
 
     return (
         <div className="flex flex-col h-screen w-full bg-editor-bg text-editor-fg overflow-hidden font-sans select-none text-sm">
+            {/* ─── TEMPORARY BUILD BANNER ────────────────────────────────────────
+                Confirms at a glance which build is actually running, so a stale dev
+                server or an unpulled branch is obvious rather than looking like a bug.
+                To remove: delete this block, the __BUILD_STAMP__ define in
+                vite.config.ts, and its declaration in src/vite-env.d.ts. */}
+            {showBuildBanner && (
+                <div className="shrink-0 flex items-center justify-center gap-3 px-3 py-1 bg-emerald-600 text-white text-[11px] font-mono z-50">
+                    <span className="font-sans font-semibold tracking-wide">LATEST BUILD</span>
+                    <span className="opacity-90">{__BUILD_STAMP__}</span>
+                    <span className="opacity-75 font-sans">— if you don’t see this, you’re on an old build: git pull &amp;&amp; npm install, then hard-refresh</span>
+                    <button
+                        onClick={() => setShowBuildBanner(false)}
+                        className="ml-2 px-1.5 rounded hover:bg-white/20 transition-colors"
+                        title="Hide for this session"
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
             <header className="h-9 border-b border-editor-border bg-editor-panel text-editor-muted flex items-center px-3 justify-between text-[11px] font-medium shrink-0 font-sans select-none gap-3 z-40">
                 <div className="flex items-center gap-3">
                     <span className="font-semibold text-xs text-editor-fg tracking-tight">Scroll Hero</span>

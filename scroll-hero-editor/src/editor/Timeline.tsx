@@ -2052,10 +2052,25 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 const startTime = snapTimeToBeat(rawTime);
                                 const startVal = Math.max(0, Math.min(1, 1 - (e.clientY - rect.top) / rect.height));
 
+                                // Pencil semantics, matching the param lanes: the stroke replaces
+                                // everything it sweeps over. Merging against the keyframes as they
+                                // were at pointer-down means existing points inside the swept span
+                                // are dropped wholesale, rather than surviving in the gaps between
+                                // stroke samples (which are ~30ms apart).
+                                const originalKfs = useStore.getState().scrollKeyframes;
                                 let strokePoints: { time: number; value: number }[] = [{ time: startTime, value: startVal }];
-                                const currentKfs = useStore.getState().scrollKeyframes;
-                                const nextKfs = [...currentKfs.filter(k => Math.abs(k.time - startTime) > 0.005), { time: startTime, value: startVal, easing: 'linear' as const }].sort((a, b) => a.time - b.time);
-                                useStore.getState().setScrollKeyframes(nextKfs);
+                                let sweptMin = startTime;
+                                let sweptMax = startTime;
+
+                                const commitStroke = (pts: { time: number; value: number }[]) => {
+                                    const byTime = new Map<number, typeof originalKfs[number]>();
+                                    originalKfs
+                                        .filter(k => k.time < sweptMin - 0.001 || k.time > sweptMax + 0.001)
+                                        .forEach(k => byTime.set(k.time, k));
+                                    pts.forEach(p => byTime.set(p.time, { time: p.time, value: p.value, easing: 'linear' }));
+                                    useStore.getState().setScrollKeyframes([...byTime.values()].sort((a, b) => a.time - b.time));
+                                };
+                                commitStroke(strokePoints);
 
                                 const onMove = (ev: PointerEvent) => {
                                     if (ev.buttons & 1) {
@@ -2068,9 +2083,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         if (!last || Math.abs(t - last.time) >= 0.03) {
                                             const smoothedVal = last ? +(last.value * 0.60 + v * 0.40).toFixed(3) : v;
                                             strokePoints.push({ time: t, value: smoothedVal });
-                                            const baseKfs = useStore.getState().scrollKeyframes;
-                                            const updated = [...baseKfs.filter(k => Math.abs(k.time - t) > 0.005), { time: t, value: smoothedVal, easing: 'linear' as const }].sort((a, b) => a.time - b.time);
-                                            useStore.getState().setScrollKeyframes(updated);
+                                            sweptMin = Math.min(sweptMin, t);
+                                            sweptMax = Math.max(sweptMax, t);
+                                            commitStroke(strokePoints);
                                         }
                                     }
                                 };
@@ -2079,22 +2094,15 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     target.removeEventListener('pointermove', onMove as any);
                                     target.removeEventListener('pointerup', onUp as any);
 
-                                    if (strokePoints.length > 3) {
-                                        const baseKfs = useStore.getState().scrollKeyframes;
-                                        const strokeTimes = new Set(strokePoints.map(p => p.time));
-                                        const smoothedStroke = strokePoints.map((pt, i) => {
+                                    const finalPoints = strokePoints.length > 3
+                                        ? strokePoints.map((pt, i) => {
                                             if (i === 0 || i === strokePoints.length - 1) return pt;
                                             const prev = strokePoints[i - 1].value;
-                                            const curr = pt.value;
                                             const next = strokePoints[i + 1].value;
-                                            return { time: pt.time, value: +(prev * 0.25 + curr * 0.50 + next * 0.25).toFixed(3), easing: 'linear' as const };
-                                        });
-                                        const finalMerged = [
-                                            ...baseKfs.filter(k => !strokeTimes.has(k.time)),
-                                            ...smoothedStroke,
-                                        ].sort((a, b) => a.time - b.time);
-                                        useStore.getState().setScrollKeyframes(finalMerged);
-                                    }
+                                            return { time: pt.time, value: +(prev * 0.25 + pt.value * 0.50 + next * 0.25).toFixed(3) };
+                                        })
+                                        : strokePoints;
+                                    commitStroke(finalPoints);
                                 };
 
                                 target.addEventListener('pointermove', onMove as any);

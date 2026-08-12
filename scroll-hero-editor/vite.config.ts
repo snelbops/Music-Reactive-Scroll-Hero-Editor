@@ -1,4 +1,5 @@
 import { defineConfig, type Plugin } from 'vite'
+import { execSync } from 'node:child_process'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
@@ -91,7 +92,20 @@ function remotionExportPlugin(): Plugin {
 
 
 // https://vite.dev/config/
+// Stamped into the app so the running build is identifiable at a glance. Feeds the
+// temporary build banner in Layout.tsx — remove both together when it is no longer needed.
+const BUILD_STAMP = (() => {
+  try {
+    const sha = execSync('git rev-parse --short HEAD').toString().trim();
+    const when = execSync("git log -1 --format=%cd --date=format:'%d %b %H:%M'").toString().trim().replace(/'/g, '');
+    return `${sha} · ${when}`;
+  } catch {
+    return 'unknown build';
+  }
+})();
+
 export default defineConfig({
+  define: { __BUILD_STAMP__: JSON.stringify(BUILD_STAMP) },
   plugins: [react(), tailwindcss(), remotionExportPlugin()],
   optimizeDeps: {
     // @ffmpeg/ffmpeg uses a worker internally — exclude from Vite pre-bundling
