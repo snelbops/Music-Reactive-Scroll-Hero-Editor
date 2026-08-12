@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { ChevronDown, ChevronRight, UploadCloud, Video, Film, Layers, SlidersHorizontal, ImageIcon, X, Sparkles, Grid, Plus } from 'lucide-react';
-import { saveMediaFile, getMediaDataUrl, dataUrlToBlob } from '../utils/mediaStore';
+import { saveMediaFile, getMediaBlob, newPadMediaKey } from '../utils/mediaStore';
 import { cacheActiveVideo } from '../utils/videoCache';
 import { extractFrames } from '../packages/ffmpegExtractor';
 
@@ -189,8 +189,9 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                             if (!file) return;
                                             cacheActiveVideo(file, file.name);
                                             setActiveVideoBlob(file);
-                                            const url = await saveMediaFile(`video-pad-${idx}`, file);
-                                            setVideoPad(idx, { ...pad, name: file.name, url });
+                                            const mediaKey = newPadMediaKey();
+                                            const url = await saveMediaFile(mediaKey, file);
+                                            setVideoPad(idx, { ...pad, name: file.name, url, mediaKey });
                                             setMp4Asset({ name: file.name, url });
                                             setActiveVideoPadIdx(idx);
                                         };
@@ -206,8 +207,9 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                             if (file && (file.type.startsWith('video/') || file.name.endsWith('.mp4') || file.name.endsWith('.webm'))) {
                                                 cacheActiveVideo(file, file.name);
                                                 setActiveVideoBlob(file);
-                                                const url = await saveMediaFile(`video-pad-${idx}`, file);
-                                                setVideoPad(idx, { ...pad, name: file.name, url });
+                                                const mediaKey = newPadMediaKey();
+                                                const url = await saveMediaFile(mediaKey, file);
+                                                setVideoPad(idx, { ...pad, name: file.name, url, mediaKey });
                                                 setMp4Asset({ name: file.name, url });
                                                 setActiveVideoPadIdx(idx);
                                             }
@@ -226,9 +228,9 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                                 onClick={async () => {
                                                     setActiveVideoPadIdx(idx);
                                                     if (pad.url) useStore.getState().setVideoUrl(pad.url);
-                                                    const padData = await getMediaDataUrl(`video-pad-${idx}`);
-                                                    if (padData) {
-                                                        const blob = dataUrlToBlob(padData);
+                                                    const key = pad.mediaKey ?? `video-pad-${idx}`;
+                                                    const blob = await getMediaBlob(key);
+                                                    if (blob) {
                                                         await saveMediaFile('active-video', blob);
                                                         cacheActiveVideo(blob, pad.name || `pad-${idx}`);
                                                         setActiveVideoBlob(blob);

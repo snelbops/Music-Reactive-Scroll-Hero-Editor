@@ -1,6 +1,43 @@
-import { useStore } from '../store/useStore';
+import { useStore, type VideoPad } from '../store/useStore';
 import type { ParamKf } from './interpolate';
-import { saveMediaFile, loadMediaFile, getMediaDataUrl, dataUrlToBlob } from './mediaStore';
+import { saveMediaFile, loadMediaFile, getMediaDataUrl, dataUrlToBlob, getMediaBlob, newPadMediaKey } from './mediaStore';
+
+/**
+ * Pad and light-image URLs are `blob:` URLs, which die with the page. The bytes live on in
+ * IndexedDB, so after a reload every stored URL has to be minted again — without this the
+ * pad grid looks populated but every pad is dead.
+ *
+ * Older projects stored pad media under `video-pad-<index>`; those are migrated onto a
+ * stable per-clip key on first load so reordering can no longer desync them.
+ */
+export async function rehydrateMediaUrls(): Promise<void> {
+    const s = useStore.getState();
+
+    const pads = await Promise.all(s.videoPads.map(async (pad, idx) => {
+        if (!pad.name && !pad.url && !pad.mediaKey) return pad;
+        let key = pad.mediaKey;
+        let blob = key ? await getMediaBlob(key) : null;
+        if (!blob) {
+            const legacy = await getMediaBlob(`video-pad-${idx}`);
+            if (!legacy) return pad.url ? { ...pad, url: '' } : pad;
+            key = newPadMediaKey();
+            await saveMediaFile(key, legacy);
+            blob = legacy;
+        }
+        return { ...pad, url: URL.createObjectURL(blob), mediaKey: key };
+    }));
+    useStore.setState({ videoPads: pads });
+
+    const images = await Promise.all(s.lightImages.map(async (img) => {
+        const url = await loadMediaFile(`light-img-${img.name}`);
+        return url ? { ...img, url } : img;
+    }));
+    if (images.length > 0) useStore.setState({ lightImages: images });
+
+    // The active pad drives the viewport, so point it at the URL we just minted.
+    const active = pads[useStore.getState().activeVideoPadIdx];
+    if (active?.url) useStore.getState().setVideoUrl(active.url);
+}
 
 export type ScrollKf = {
     time: number;
@@ -32,7 +69,7 @@ export type ProjectData = {
     videoUrl?: string | null;
     audioUrl?: string | null;
     mp4Asset?: { name: string; url: string } | null;
-    videoPads?: Array<{ id: number; name: string; url: string; color?: string }>;
+    videoPads?: VideoPad[];
     activeVideoPadIdx?: number;
     lightImages?: { name: string; url: string }[];
     activeLightImageIdx?: number;
@@ -271,6 +308,8 @@ export async function loadWorkingProject(): Promise<boolean> {
                 s.setMp4Asset({ name, url: videoUrl });
                 s.setVideoUrl(videoUrl);
             }
+            // Pads and light images carry their own stored files — revive those too.
+            await rehydrateMediaUrls();
             return true;
         }
     } catch (e) {}
@@ -357,6 +396,9 @@ export async function loadProjectFromFile(file: File): Promise<void> {
         useStore.getState().setMp4Asset({ name, url });
         useStore.getState().setVideoUrl(url);
     }
+
+    // Pad URLs in the file are blob: URLs from whoever saved it — always dead here.
+    await rehydrateMediaUrls();
 
     autoSaveWorkingProject();
 }

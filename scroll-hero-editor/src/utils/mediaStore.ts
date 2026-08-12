@@ -59,6 +59,31 @@ export async function loadMediaFile(key: string): Promise<string | null> {
     return null;
 }
 
+/** Mint a key that belongs to a clip for its lifetime, so reordering pads cannot desync it. */
+export function newPadMediaKey(): string {
+    const rand = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    return `pad-media-${rand}`;
+}
+
+/** Read the stored Blob itself. Avoids the base64 round-trip when the caller wants bytes. */
+export async function getMediaBlob(key: string): Promise<Blob | null> {
+    try {
+        const db = await openDB();
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const req = tx.objectStore(STORE_NAME).get(key);
+        const file = await new Promise<Blob | undefined>((res, rej) => {
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => rej(req.error);
+        });
+        return file ?? null;
+    } catch (e) {
+        console.warn('Could not read media blob from IndexedDB:', e);
+        return null;
+    }
+}
+
 /** Load stored File or Blob from IndexedDB and convert to Data URL */
 export async function getMediaDataUrl(key: string): Promise<string | null> {
     try {

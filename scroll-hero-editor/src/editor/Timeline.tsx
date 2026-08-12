@@ -993,10 +993,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         const onKey = (e: KeyboardEvent) => {
             if ((e.target as HTMLElement).tagName === 'INPUT') return;
             const meta = e.metaKey || e.ctrlKey;
-            // Undo / Redo
-            if (meta && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); useStore.getState().undo(); return; }
-            if (meta && e.shiftKey  && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); useStore.getState().redo(); return; }
-            if (meta && (e.key === 'y' || e.key === 'Y'))                 { e.preventDefault(); useStore.getState().redo(); return; }
+            // Undo / Redo live in Layout's global handler — binding them here too meant
+            // both listeners fired for one keypress and every undo stepped back twice.
             // Copy / Paste
             if (meta && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); useStore.getState().copySelectedKeyframes(); return; }
             if (meta && (e.key === 'v' || e.key === 'V')) { e.preventDefault(); useStore.getState().pasteKeyframes(sheet.sequence.position); return; }

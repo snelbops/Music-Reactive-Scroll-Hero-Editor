@@ -6,6 +6,13 @@ type PresetId = 'orbit' | 'light' | 'classic-dark' | 'classic-dark-copy' | 'clas
 type AspectRatio = '16:9' | '9:16' | '1:1' | 'native' | 'free';
 
 type ScrollKf = { time: number; value: number; easing?: string; handleOut?: { dt: number; dv: number }; handleIn?: { dt: number; dv: number } };
+/**
+ * `mediaKey` is a stable IndexedDB key minted when a clip is assigned. Media used to be
+ * stored under `video-pad-<index>`, which meant reordering pads left the bytes behind and
+ * a reload could not re-hydrate the (already dead) blob: URL.
+ */
+export type VideoPad = { id: number; name: string; url: string; color?: string; mediaKey?: string };
+
 type HistorySnapshot = {
     scrollKeyframes: ScrollKf[];
     paramKeyframes: Record<string, ParamKf[]>;
@@ -15,7 +22,7 @@ type HistorySnapshot = {
     videoSpeedRatio: number;
     sequenceDuration: number;
     activeVideoPadIdx: number;
-    videoPads: Array<{ id: number; name: string; url: string; color?: string }>;
+    videoPads: VideoPad[];
 };
 type ClipboardEntry = { laneId: string; time: number; value: number; easing?: string; handleOut?: { dt: number; dv: number }; handleIn?: { dt: number; dv: number } };
 
@@ -55,10 +62,10 @@ interface EditorState {
     recordStartPosition: number; setRecordStartPosition: (v: number) => void;
     mp4Asset: { name: string; url: string } | null; setMp4Asset: (asset: { name: string; url: string } | null) => void;
     removeMp4Asset: () => void;
-    videoPads: Array<{ id: number; name: string; url: string; color?: string }>;
+    videoPads: VideoPad[];
     activeVideoPadIdx: number;
     setActiveVideoPadIdx: (idx: number) => void;
-    setVideoPad: (idx: number, pad: { name: string; url: string; color?: string }) => void;
+    setVideoPad: (idx: number, pad: { name: string; url: string; color?: string; mediaKey?: string }) => void;
     setVideoPadColor: (idx: number, color: string) => void;
     swapVideoPads: (idxA: number, idxB: number) => void;
     videoNaturalDimensions: { width: number; height: number } | null;
@@ -235,9 +242,13 @@ export const useStore = create<EditorState>((set, get) => {
         if (idxA === idxB || idxA < 0 || idxB < 0 || idxA >= s.videoPads.length || idxB >= s.videoPads.length) return s;
         get().pushHistory();
         const updated = [...s.videoPads];
+        // The clip (name, url, mediaKey, colour) moves; the numpad label belongs to the
+        // slot and stays put, so the grid keeps reading #7 #8 #9 in fixed positions.
+        const idA = updated[idxA].id;
+        const idB = updated[idxB].id;
         const temp = updated[idxA];
-        updated[idxA] = updated[idxB];
-        updated[idxB] = temp;
+        updated[idxA] = { ...updated[idxB], id: idA };
+        updated[idxB] = { ...temp, id: idB };
         // Keep active index aligned if one of the swapped pads was active
         let newActiveIdx = s.activeVideoPadIdx;
         if (s.activeVideoPadIdx === idxA) newActiveIdx = idxB;

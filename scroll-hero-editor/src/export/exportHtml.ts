@@ -1,11 +1,18 @@
 import { useStore } from '../store/useStore';
-import { SEQUENCE_DURATION } from '../theatre/core';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Read scroll keyframes directly from Zustand — authoritative source. */
 function getScrollKeyframes() {
     return useStore.getState().scrollKeyframes;
+}
+
+/**
+ * The project's real length in seconds. Exports previously baked in the fixed
+ * SEQUENCE_DURATION constant, so a 45s project shipped as a 10s page.
+ */
+function getSequenceDuration() {
+    return useStore.getState().sequenceDuration;
 }
 
 /**
@@ -59,6 +66,7 @@ function downloadFile(filename: string, content: string, mime = 'text/html') {
 
 export function exportParticleHeroHtml() {
     const keyframes = getScrollKeyframes();
+    const seqDur = getSequenceDuration();
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -134,7 +142,7 @@ export function exportParticleHeroHtml() {
 
   <script>
     // ── Baked curve data from Theatre.js ──────────────────────────────────
-    const SEQUENCE_DURATION = ${SEQUENCE_DURATION};
+    const SEQUENCE_DURATION = ${seqDur};
     const KEYFRAMES = ${JSON.stringify(keyframes, null, 4)};
 
     // ── Curve interpolation (linear) ──────────────────────────────────────
@@ -211,6 +219,7 @@ export function exportParticleHeroHtml() {
 
 export async function exportFrameSequenceHeroHtml(mp4BlobUrl: string, mp4Name: string) {
     const keyframes = getScrollKeyframes();
+    const seqDur = getSequenceDuration();
 
     // Convert the blob URL to base64
     const response = await fetch(mp4BlobUrl);
@@ -279,7 +288,7 @@ export async function exportFrameSequenceHeroHtml(mp4BlobUrl: string, mp4Name: s
 
   <script>
     // ── Baked scroll automation curve ─────────────────────────────────────
-    const SEQUENCE_DURATION = ${SEQUENCE_DURATION};
+    const SEQUENCE_DURATION = ${seqDur};
     const KEYFRAMES = ${JSON.stringify(keyframes, null, 4)};
 
     // ── Curve interpolation (easing + bezier handle support) ──────────────
@@ -319,7 +328,7 @@ export async function exportFrameSequenceHeroHtml(mp4BlobUrl: string, mp4Name: s
 /** Export the scroll automation curve as a standalone curves.json file. */
 export function exportCurvesJson() {
     const keyframes = getScrollKeyframes();
-    const data = JSON.stringify({ sequenceDuration: SEQUENCE_DURATION, keyframes }, null, 2);
+    const data = JSON.stringify({ sequenceDuration: getSequenceDuration(), keyframes }, null, 2);
     downloadFile('scroll-curves.json', data, 'application/json');
 }
 

@@ -138,13 +138,20 @@ export default function Layout() {
         const handleKey = (e: KeyboardEvent) => {
             const isMac = navigator.platform.toUpperCase().includes('MAC');
             const mod = isMac ? e.metaKey : e.ctrlKey;
+            const target = e.target as HTMLElement | null;
+            const isTyping = !!target && (
+                ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable
+            );
 
             if (e.key === 'Escape' && isFullscreen) setIsFullscreen(false);
 
-            if (e.key === ' ' && (e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+            if (e.key === ' ' && !isTyping) {
                 e.preventDefault();
                 useStore.getState().setIsPlaying(!useStore.getState().isPlaying);
             }
+
+            // While typing, leave undo/redo to the text field.
+            if (isTyping) return;
 
             // Undo: Cmd+Z / Ctrl+Z
             if (mod && e.key === 'z' && !e.shiftKey) {
