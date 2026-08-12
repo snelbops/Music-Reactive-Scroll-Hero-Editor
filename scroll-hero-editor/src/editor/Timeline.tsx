@@ -18,6 +18,70 @@ const PARAM_LANES = [
     { id: 'size',          label: 'Particle Size (Add-on)',  color: '#22c55e', selBg: 'bg-green-500/10', min: 0.1, max: 5   },
 ] as const;
 
+// Ramer–Douglas–Peucker. Points come in normalised to 0..1 on both axes so one tolerance
+// behaves the same on every lane. Returns a keep-mask: peaks survive, redundant points on
+// near-straight runs are dropped.
+function rdpKeep(pts: { x: number; y: number }[], epsilon: number): boolean[] {
+    const keep = new Array(pts.length).fill(false);
+    if (pts.length < 2) return keep.fill(true);
+    keep[0] = keep[pts.length - 1] = true;
+    const stack: [number, number][] = [[0, pts.length - 1]];
+    while (stack.length) {
+        const [first, last] = stack.pop()!;
+        if (last <= first + 1) continue;
+        const a = pts[first], b = pts[last];
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const norm = Math.hypot(dx, dy) || 1;
+        let maxDist = -1, idx = -1;
+        for (let i = first + 1; i < last; i++) {
+            const d = Math.abs(dy * pts[i].x - dx * pts[i].y + b.x * a.y - b.y * a.x) / norm;
+            if (d > maxDist) { maxDist = d; idx = i; }
+        }
+        if (idx > 0 && maxDist > epsilon) {
+            keep[idx] = true;
+            stack.push([first, idx], [idx, last]);
+        }
+    }
+    return keep;
+}
+
+// An RMS envelope emits one keyframe per analysis frame — far more than the playhead can
+// follow smoothly. Thin it on the way in so the generated curve is usable by default.
+const ENVELOPE_SIMPLIFY_EPSILON = 0.008;
+
+// Tool-shaped mouse cursors, so the active tool is obvious without looking at the toolbar.
+// Each icon is stroked twice — a dark halo under a white body — to stay legible over both
+// the dark lane background and the bright curve fills.
+function toolCursor(paths: string, hotspotX: number, hotspotY: number, fallback: string): string {
+    const svg =
+        `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" ` +
+        `fill="none" stroke-linecap="round" stroke-linejoin="round">` +
+        `<g stroke="#000" stroke-width="3.6" opacity="0.6">${paths}</g>` +
+        `<g stroke="#fff" stroke-width="1.7">${paths}</g></svg>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${hotspotX} ${hotspotY}, ${fallback}`;
+}
+
+const PEN_ICON = '<path d="M21.2 6.8a2.83 2.83 0 0 0-4-4L3.8 16.2a2 2 0 0 0-.5.83L2 21.4a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/>';
+const TOOL_CURSORS: Record<string, string> = {
+    pen: toolCursor(PEN_ICON, 2, 22, 'crosshair'),
+    draw: toolCursor(PEN_ICON + '<path d="M15 5l4 4"/>', 2, 22, 'crosshair'),
+    line: toolCursor('<path d="M16 7h6v6"/><path d="M22 7l-8.5 8.5-5-5L2 17"/>', 12, 12, 'crosshair'),
+    eraser: toolCursor('<path d="M20 20H9l-5-5a2 2 0 0 1 0-2.83l7.6-7.6a2 2 0 0 1 2.83 0l5.4 5.4a2 2 0 0 1 0 2.83L13 20"/>', 4, 20, 'cell'),
+};
+const cursorForTool = (tool: string): string => TOOL_CURSORS[tool] ?? 'default';
+
+// A cubic bezier stays single-valued in time only while both control points sit inside the
+// span between the two keyframes. Matches the bound the interpolator uses (utils/interpolate.ts),
+// so the drawn curve, the handle knobs and the evaluated values all agree — a parameter can
+// never appear to hold two values at one instant.
+const BEZIER_DT_LIMIT = 0.45;
+function clampHandleDt(dt: number, side: 'in' | 'out', gap: number): number {
+    const bound = Math.max(0.001, gap) * BEZIER_DT_LIMIT;
+    return side === 'out'
+        ? Math.max(0, Math.min(bound, dt))
+        : Math.min(0, Math.max(-bound, dt));
+}
+
 function buildParamPath(kfs: ParamKf[], min: number, max: number, seqDur = 10): string | null {
     if (kfs.length < 2) return null;
     const valueRange = max - min;
@@ -225,13 +289,19 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
         if (mode === 'envelope' && waveform.length > 0) {
             const step = seqDur / waveform.length;
+            const raw: { time: number; value: number }[] = [];
             waveform.forEach((val: number, idx: number) => {
                 const t = idx * step;
                 if (t >= lStart && t <= lEnd) {
                     const normVal = cfg.min + val * range * gainMult;
-                    newSectionKfs.push({ time: +t.toFixed(2), value: +Math.min(cfg.max, Math.max(cfg.min, normVal)).toFixed(3) });
+                    raw.push({ time: +t.toFixed(3), value: +Math.min(cfg.max, Math.max(cfg.min, normVal)).toFixed(3) });
                 }
             });
+            const keep = rdpKeep(
+                raw.map(p => ({ x: p.time / Math.max(0.001, seqDur), y: (p.value - cfg.min) / (range || 1) })),
+                ENVELOPE_SIMPLIFY_EPSILON,
+            );
+            raw.forEach((p, i) => { if (keep[i]) newSectionKfs.push(p); });
         } else if (mode === 'bounce') {
             rangeBeats.forEach((bt) => {
                 if (bt - 0.08 >= lStart) newSectionKfs.push({ time: +(bt - 0.08).toFixed(2), value: cfg.min });
@@ -567,6 +637,68 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         generateRhythmCurveForLane('scrollPos', mode, true);
     };
 
+    // ── Curve cleanup, for any lane ──────────────────────────────────────────
+    // Both operate on the selected region when there is one, otherwise the whole lane.
+    const laneValueRange = (laneId: string): { min: number; max: number } =>
+        laneId === 'scrollPos'
+            ? { min: 0, max: 1 }
+            : (PARAM_LANES.find(l => l.id === laneId) ?? { min: 0, max: 1 });
+
+    const readLaneKfs = (laneId: string): ParamKf[] =>
+        (laneId === 'scrollPos'
+            ? useStore.getState().scrollKeyframes
+            : useStore.getState().paramKeyframes[laneId] ?? []) as ParamKf[];
+
+    const writeLaneKfs = (laneId: string, kfs: ParamKf[]) => {
+        if (laneId === 'scrollPos') useStore.getState().setScrollKeyframes(kfs);
+        else useStore.getState().setParamKeyframes(laneId, kfs);
+    };
+
+    const regionFilter = (): ((t: number) => boolean) => {
+        const sel = useStore.getState().timeSelection;
+        if (!sel) return () => true;
+        return (t: number) => t >= sel.start - 1e-6 && t <= sel.end + 1e-6;
+    };
+
+    const smoothLaneCurve = (laneId: string, passes = 2) => {
+        const kfs = readLaneKfs(laneId);
+        if (kfs.length < 3) return;
+        const inRegion = regionFilter();
+        useStore.getState().pushHistory();
+
+        let values = kfs.map(k => k.value);
+        for (let p = 0; p < passes; p++) {
+            const next = [...values];
+            for (let i = 1; i < kfs.length - 1; i++) {
+                if (!inRegion(kfs[i].time)) continue;
+                next[i] = +(values[i - 1] * 0.25 + values[i] * 0.5 + values[i + 1] * 0.25).toFixed(4);
+            }
+            values = next;
+        }
+        writeLaneKfs(laneId, kfs.map((k, i) => ({ ...k, value: values[i] })));
+    };
+
+    const reduceLanePoints = (laneId: string) => {
+        const kfs = readLaneKfs(laneId);
+        if (kfs.length < 3) return;
+        const inRegion = regionFilter();
+        const target = kfs.filter(k => inRegion(k.time));
+        if (target.length < 3) return;
+
+        const { min, max } = laneValueRange(laneId);
+        const span = (max - min) || 1;
+        const seqDur = Math.max(0.001, useStore.getState().sequenceDuration);
+        const keep = rdpKeep(
+            target.map(k => ({ x: k.time / seqDur, y: (k.value - min) / span })),
+            ENVELOPE_SIMPLIFY_EPSILON * 1.5,
+        );
+        const dropped = new Set(target.filter((_, i) => !keep[i]));
+        if (dropped.size === 0) return;
+
+        useStore.getState().pushHistory();
+        writeLaneKfs(laneId, kfs.filter(k => !dropped.has(k)));
+    };
+
     const smoothCurrentScrollCurve = () => {
         const kfs = useStore.getState().scrollKeyframes;
         if (kfs.length < 3) return;
@@ -596,14 +728,17 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         useStore.getState().setScrollKeyframes(thinned.sort((a, b) => a.time - b.time));
     };
 
-    const handleTrackPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // `alwaysSelect` is for lanes that hold no keyframes (e.g. Audio Wave). The drawing
+    // tools have nothing to act on there, so dragging must always mean "select a region"
+    // rather than silently clearing the selection.
+    const handleTrackPointerDown = (e: React.PointerEvent<HTMLDivElement>, alwaysSelect = false) => {
         if (e.button !== 0) return;
         const target = e.currentTarget;
         const rect = target.getBoundingClientRect();
         const seqDurTrack = useStore.getState().sequenceDuration;
         const startTime = Math.max(0, Math.min(seqDurTrack, ((e.clientX - rect.left) / rect.width) * seqDurTrack));
 
-        if (!e.shiftKey && activeTool !== 'select') {
+        if (!alwaysSelect && !e.shiftKey && activeTool !== 'select') {
             useStore.getState().setTimeSelection(null);
             useStore.getState().setSelectedKeyframes([]);
             return;
@@ -1385,7 +1520,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         className="flex-1 relative overflow-hidden flex items-center cursor-context-menu"
                         onPointerDown={(e) => {
                             setSelectedLane('audio');
-                            handleTrackPointerDown(e);
+                            handleTrackPointerDown(e, true);
                         }}
                         onContextMenu={(e) => {
                             e.preventDefault();
@@ -1724,11 +1859,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     <div
                         className="flex-1 relative overflow-hidden bg-[#3b82f6]/[0.03]"
                         style={{
-                            cursor: activeTool === 'pen' || activeTool === 'draw' || activeTool === 'line'
-                                ? 'crosshair'
-                                : activeTool === 'eraser'
-                                ? 'no-drop'
-                                : 'default'
+                            cursor: cursorForTool(activeTool)
                         }}
                         onContextMenu={(e) => {
                             e.preventDefault();
@@ -2039,9 +2170,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 for (let i = 1; i < pts.length; i++) {
                                     const prev = pts[i - 1], curr = pts[i];
                                     const dt = scrollKeyframes[i].time - scrollKeyframes[i - 1].time;
-                                    const outDt = scrollKeyframes[i - 1].handleOut?.dt ?? dt / 3;
+                                    const outDt = clampHandleDt(scrollKeyframes[i - 1].handleOut?.dt ?? dt / 3, 'out', dt);
                                     const outDv = scrollKeyframes[i - 1].handleOut?.dv ?? 0;
-                                    const inDt  = scrollKeyframes[i].handleIn?.dt  ?? -dt / 3;
+                                    const inDt  = clampHandleDt(scrollKeyframes[i].handleIn?.dt  ?? -dt / 3, 'in', dt);
                                     const inDv  = scrollKeyframes[i].handleIn?.dv  ?? 0;
                                     const hox = prev.x + outDt * scaleX;
                                     const hoy = prev.y - outDv * scrollVbH;
@@ -2113,9 +2244,11 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                  const ky = (1 - kf.value) * scrollVbH;
                                  const hasNext = idx < scrollKeyframes.length - 1;
                                  const hasPrev = idx > 0;
-                                 const outDt = hasNext ? (kf.handleOut?.dt ?? (scrollKeyframes[idx + 1].time - kf.time) / 3) : 0;
+                                 const nextGap = hasNext ? scrollKeyframes[idx + 1].time - kf.time : 0;
+                                 const prevGap = hasPrev ? kf.time - scrollKeyframes[idx - 1].time : 0;
+                                 const outDt = hasNext ? clampHandleDt(kf.handleOut?.dt ?? nextGap / 3, 'out', nextGap) : 0;
                                  const outDv = hasNext ? (kf.handleOut?.dv ?? 0) : 0;
-                                 const inDt  = hasPrev ? (kf.handleIn?.dt  ?? -(kf.time - scrollKeyframes[idx - 1].time) / 3) : 0;
+                                 const inDt  = hasPrev ? clampHandleDt(kf.handleIn?.dt  ?? -prevGap / 3, 'in', prevGap) : 0;
                                  const inDv  = hasPrev ? (kf.handleIn?.dv  ?? 0) : 0;
                                  const hox = kx + outDt * scaleX, hoy = ky - outDv * scrollVbH;
                                  const hix = kx + inDt  * scaleX, hiy = ky - inDv  * scrollVbH;
@@ -2145,8 +2278,12 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                              const svgY = ((e.clientY - rect.top) / rect.height) * scrollVbH;
                                              const newDt = (svgX - ref.time * scaleX) / scaleX;
                                              const newDv = -((svgY - (1 - ref.value) * scrollVbH) / scrollVbH);
+                                             const refIdx = scrollKeyframes.indexOf(ref);
+                                             const gap = s === 'out'
+                                                 ? (scrollKeyframes[refIdx + 1]?.time ?? ref.time) - ref.time
+                                                 : ref.time - (scrollKeyframes[refIdx - 1]?.time ?? ref.time);
                                              updateScrollKeyframeHandle(t, s, {
-                                                 dt: s === 'out' ? Math.max(0, newDt) : Math.min(0, newDt),
+                                                 dt: clampHandleDt(newDt, s, gap),
                                                  dv: newDv,
                                              });
                                          }}
@@ -2370,11 +2507,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             <div
                                 className="flex-1 relative overflow-hidden"
                                 style={{
-                                    cursor: activeTool === 'pen' || activeTool === 'draw' || activeTool === 'line'
-                                        ? 'crosshair'
-                                        : activeTool === 'eraser'
-                                        ? 'no-drop'
-                                        : 'default'
+                                    cursor: cursorForTool(activeTool)
                                 }}
                                 onContextMenu={(e) => {
                                     e.preventDefault();
@@ -2563,11 +2696,27 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                         const startTime = snapTimeToBeat(rawTime);
                                         const startVal = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - (e.clientY - rect.top) / rect.height) * (lane.max - lane.min)));
 
+                                        // Pencil semantics: the stroke replaces everything it sweeps over.
+                                        // Merging against the keyframes as they were at pointer-down (rather than
+                                        // the live lane) means old points inside the swept span are dropped
+                                        // wholesale instead of surviving in the gaps between stroke samples.
+                                        const originalKfs = (useStore.getState().paramKeyframes[lane.id] ?? []) as ParamKf[];
                                         let strokePoints: { time: number; value: number }[] = [{ time: startTime, value: startVal }];
-                                        
-                                        const currentKfs = (useStore.getState().paramKeyframes[lane.id] ?? []) as ParamKf[];
-                                        const nextKfs = [...currentKfs.filter(k => Math.abs(k.time - startTime) > 0.005), { time: startTime, value: startVal, easing: 'linear' as const }].sort((a, b) => a.time - b.time);
-                                        useStore.getState().setParamKeyframes(lane.id, nextKfs);
+                                        let sweptMin = startTime;
+                                        let sweptMax = startTime;
+
+                                        const commitStroke = (pts: { time: number; value: number }[]) => {
+                                            const byTime = new Map<number, ParamKf>();
+                                            originalKfs
+                                                .filter(k => k.time < sweptMin - 0.001 || k.time > sweptMax + 0.001)
+                                                .forEach(k => byTime.set(k.time, k));
+                                            pts.forEach(p => byTime.set(p.time, { time: p.time, value: p.value, easing: 'linear' }));
+                                            useStore.getState().setParamKeyframes(
+                                                lane.id,
+                                                [...byTime.values()].sort((a, b) => a.time - b.time),
+                                            );
+                                        };
+                                        commitStroke(strokePoints);
 
                                         const onMove = (ev: PointerEvent) => {
                                             if (ev.buttons & 1) {
@@ -2580,10 +2729,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 if (!last || Math.abs(t - last.time) >= 0.03) {
                                                     const smoothedVal = last ? +(last.value * 0.60 + v * 0.40).toFixed(3) : v;
                                                     strokePoints.push({ time: t, value: smoothedVal });
-                                                    
-                                                    const baseKfs = useStore.getState().paramKeyframes[lane.id] ?? [];
-                                                    const updated = [...baseKfs.filter(k => Math.abs(k.time - t) > 0.005), { time: t, value: smoothedVal, easing: 'linear' as const }].sort((a, b) => a.time - b.time);
-                                                    useStore.getState().setParamKeyframes(lane.id, updated);
+                                                    sweptMin = Math.min(sweptMin, t);
+                                                    sweptMax = Math.max(sweptMax, t);
+                                                    commitStroke(strokePoints);
                                                 }
                                             }
                                         };
@@ -2592,22 +2740,15 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             target.removeEventListener('pointermove', onMove as any);
                                             target.removeEventListener('pointerup', onUp as any);
 
-                                            if (strokePoints.length > 3) {
-                                                const baseKfs = useStore.getState().paramKeyframes[lane.id] ?? [];
-                                                const strokeTimes = new Set(strokePoints.map(p => p.time));
-                                                const smoothedStroke = strokePoints.map((pt, i) => {
+                                            const finalPoints = strokePoints.length > 3
+                                                ? strokePoints.map((pt, i) => {
                                                     if (i === 0 || i === strokePoints.length - 1) return pt;
                                                     const prev = strokePoints[i - 1].value;
-                                                    const curr = pt.value;
                                                     const next = strokePoints[i + 1].value;
-                                                    return { time: pt.time, value: +(prev * 0.25 + curr * 0.50 + next * 0.25).toFixed(3), easing: 'linear' as const };
-                                                });
-                                                const finalMerged = [
-                                                    ...baseKfs.filter(k => !strokeTimes.has(k.time)),
-                                                    ...smoothedStroke,
-                                                ].sort((a, b) => a.time - b.time);
-                                                useStore.getState().setParamKeyframes(lane.id, finalMerged as ParamKf[]);
-                                            }
+                                                    return { time: pt.time, value: +(prev * 0.25 + pt.value * 0.50 + next * 0.25).toFixed(3) };
+                                                })
+                                                : strokePoints;
+                                            commitStroke(finalPoints);
                                         };
 
                                         target.addEventListener('pointermove', onMove as any);
@@ -2741,9 +2882,11 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 const ky = normalY(kf.value);
                                 const hasNext = idx < kfs.length - 1;
                                 const hasPrev = idx > 0;
-                                const outDt = hasNext ? (kf.handleOut?.dt ?? (kfs[idx+1].time - kf.time) / 3) : 0;
+                                const nextGap = hasNext ? kfs[idx+1].time - kf.time : 0;
+                                const prevGap = hasPrev ? kf.time - kfs[idx-1].time : 0;
+                                const outDt = hasNext ? clampHandleDt(kf.handleOut?.dt ?? nextGap / 3, 'out', nextGap) : 0;
                                 const outDv = hasNext ? (kf.handleOut?.dv ?? 0) : 0;
-                                const inDt  = hasPrev ? (kf.handleIn?.dt  ?? -(kf.time - kfs[idx-1].time) / 3) : 0;
+                                const inDt  = hasPrev ? clampHandleDt(kf.handleIn?.dt  ?? -prevGap / 3, 'in', prevGap) : 0;
                                 const inDv  = hasPrev ? (kf.handleIn?.dv  ?? 0) : 0;
                                 const hox = kx + outDt * scaleX, hoy = ky - (outDv / valueRange) * VB_H;
                                 const hix = kx + inDt  * scaleX, hiy = ky - (inDv  / valueRange) * VB_H;
@@ -2777,8 +2920,13 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                             const laneScaleX = VB_W / sequenceDuration;
                                             const newDt = (svgX - refKf.time * laneScaleX) / laneScaleX;
                                             const newDv = -((svgY - normalY(refKf.value)) / VB_H) * valueRange;
+                                            const laneKfs = paramKeyframes[laneId] ?? [];
+                                            const refIdx = laneKfs.indexOf(refKf);
+                                            const gap = s === 'out'
+                                                ? (laneKfs[refIdx + 1]?.time ?? refKf.time) - refKf.time
+                                                : refKf.time - (laneKfs[refIdx - 1]?.time ?? refKf.time);
                                             updateParamKeyframeHandle(laneId, kfTime, s, {
-                                                dt: s === 'out' ? Math.max(0, newDt) : Math.min(0, newDt),
+                                                dt: clampHandleDt(newDt, s, gap),
                                                 dv: newDv,
                                              });
                                         }}
@@ -3142,6 +3290,38 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         {/* TAB 1: RHYTHM PRESETS */}
                         {contextMenuTab === 'rhythm' && (
                             <div className="space-y-2 pt-1">
+                                {/* Cleanup — tidy an existing curve rather than generating a new one */}
+                                <div className="space-y-1">
+                                    <div className="flex justify-between items-center px-1">
+                                        <span className="text-[9px] uppercase font-bold text-gray-400">Cleanup</span>
+                                        <span className="text-[9px] text-gray-500">
+                                            {timeSelection ? `region ${timeSelection.start.toFixed(1)}–${timeSelection.end.toFixed(1)}s` : 'whole lane'}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-1">
+                                        <button
+                                            className="text-left p-2 rounded bg-[#252527] hover:bg-[#2c2c2e] border border-[#3a3a3c] transition-colors flex flex-col group"
+                                            onClick={() => {
+                                                smoothLaneCurve(audioTargetLane);
+                                                setAudioMenu(null);
+                                            }}
+                                        >
+                                            <span className="font-bold text-cyan-300 group-hover:text-white">✨ Smooth Curve</span>
+                                            <span className="text-[9px] text-gray-400">Average out jitter.</span>
+                                        </button>
+                                        <button
+                                            className="text-left p-2 rounded bg-[#252527] hover:bg-[#2c2c2e] border border-[#3a3a3c] transition-colors flex flex-col group"
+                                            onClick={() => {
+                                                reduceLanePoints(audioTargetLane);
+                                                setAudioMenu(null);
+                                            }}
+                                        >
+                                            <span className="font-bold text-cyan-300 group-hover:text-white">🧹 Reduce Points</span>
+                                            <span className="text-[9px] text-gray-400">Drop redundant keys.</span>
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <div className="space-y-1">
                                     <button
                                         className="w-full text-left p-2 rounded bg-[#252527] hover:bg-[#2c2c2e] border border-[#3a3a3c] transition-colors flex flex-col group"

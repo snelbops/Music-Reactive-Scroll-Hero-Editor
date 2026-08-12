@@ -13,6 +13,14 @@ import { useStore } from '../store/useStore';
 import { exportParticleHeroHtml, exportFrameSequenceHeroHtml, exportCurvesJson, exportLoopRegionJson } from '../export/exportHtml';
 import { saveProject, loadProject, loadWorkingProject, autoSaveWorkingProject, startNewProject } from '../utils/project';
 
+// Tallest the timeline may grow. The middle row keeps MIN_VIEWPORT_H so the preview's
+// own toolbar stays usable; the video itself scales down to whatever is left over.
+const HEADER_H = 40;
+const DIVIDER_H = 4;
+const MIN_VIEWPORT_H = 140;
+const maxTimelineH = () =>
+    Math.max(240, window.innerHeight - HEADER_H - DIVIDER_H - MIN_VIEWPORT_H);
+
 export default function Layout() {
     const isDarkMode = useStore(state => state.isDarkMode);
     const setIsDarkMode = useStore(state => state.setIsDarkMode);
@@ -36,6 +44,13 @@ export default function Layout() {
     const [timelineH, setTimelineH] = useState(280);
     const [leftW, setLeftW] = useState(220);
     const [rightW, setRightW] = useState(240);
+
+    // Keep the timeline within bounds when the window itself shrinks.
+    useEffect(() => {
+        const onResize = () => setTimelineH(h => Math.min(h, maxTimelineH()));
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
 
     const startDrag = useCallback((
         e: React.PointerEvent<HTMLDivElement>,
@@ -283,7 +298,7 @@ export default function Layout() {
 
             <div
                 className="h-1 shrink-0 cursor-row-resize bg-editor-border hover:bg-editor-accent-purple/60 active:bg-editor-accent-purple transition-colors"
-                onPointerDown={(e) => startDrag(e, setTimelineH, timelineH, 80, 600, 'y', -1)}
+                onPointerDown={(e) => startDrag(e, setTimelineH, timelineH, 80, maxTimelineH(), 'y', -1)}
             />
             <Timeline height={timelineH} />
 
