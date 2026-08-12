@@ -2347,7 +2347,10 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 ? currentSelected
                                                 : [{ laneId: 'scrollPos', position: kf.time, value: kf.value }];
 
-                                            if (!isCurrentSelected) {
+                                            // Shift is the "add to selection" modifier, handled by onClick's
+                                            // toggle. Replacing the selection here would wipe the earlier
+                                            // keyframe before the toggle ever ran, so multi-select never stuck.
+                                            if (!isCurrentSelected && !e.shiftKey) {
                                                 setSelectedKeyframes(activeSelection);
                                             }
 
@@ -2985,7 +2988,10 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                                 ? currentSelected
                                                 : [{ laneId: lane.id, position: kf.time, value: kf.value }];
 
-                                            if (!isCurrentSelected) {
+                                            // Shift is the "add to selection" modifier, handled by onClick's
+                                            // toggle. Replacing the selection here would wipe the earlier
+                                            // keyframe before the toggle ever ran, so multi-select never stuck.
+                                            if (!isCurrentSelected && !e.shiftKey) {
                                                 setSelectedKeyframes(activeSelection);
                                             }
 
@@ -3259,6 +3265,29 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             </div>
                         </div>
 
+                        {/* Cleanup — tidies the existing curve rather than generating a new one, so it
+                            sits outside the tabs and stays reachable whichever tab is open. */}
+                        <div className="flex items-center gap-1 pt-0.5">
+                            <span className="text-[9px] uppercase font-bold text-gray-400 shrink-0 pr-0.5">Tidy</span>
+                            <button
+                                className="flex-1 px-2 py-1 rounded bg-[#252527] hover:bg-cyan-500/20 border border-[#3a3a3c] hover:border-cyan-500/50 text-cyan-300 hover:text-white transition-colors text-[10px] font-bold"
+                                title="Average out jitter in the curve"
+                                onClick={() => { smoothLaneCurve(audioTargetLane); setAudioMenu(null); }}
+                            >
+                                ✨ Smooth
+                            </button>
+                            <button
+                                className="flex-1 px-2 py-1 rounded bg-[#252527] hover:bg-cyan-500/20 border border-[#3a3a3c] hover:border-cyan-500/50 text-cyan-300 hover:text-white transition-colors text-[10px] font-bold"
+                                title="Drop redundant keyframes, keeping the peaks"
+                                onClick={() => { reduceLanePoints(audioTargetLane); setAudioMenu(null); }}
+                            >
+                                🧹 Reduce
+                            </button>
+                            <span className="text-[9px] text-gray-500 shrink-0 pl-0.5 font-mono">
+                                {timeSelection ? `${timeSelection.start.toFixed(1)}–${timeSelection.end.toFixed(1)}s` : 'all'}
+                            </span>
+                        </div>
+
                         {/* Top Category Tabs */}
                         <div className="flex border-b border-[#2c2c2e] pt-1">
                             <button
@@ -3290,38 +3319,6 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         {/* TAB 1: RHYTHM PRESETS */}
                         {contextMenuTab === 'rhythm' && (
                             <div className="space-y-2 pt-1">
-                                {/* Cleanup — tidy an existing curve rather than generating a new one */}
-                                <div className="space-y-1">
-                                    <div className="flex justify-between items-center px-1">
-                                        <span className="text-[9px] uppercase font-bold text-gray-400">Cleanup</span>
-                                        <span className="text-[9px] text-gray-500">
-                                            {timeSelection ? `region ${timeSelection.start.toFixed(1)}–${timeSelection.end.toFixed(1)}s` : 'whole lane'}
-                                        </span>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-1">
-                                        <button
-                                            className="text-left p-2 rounded bg-[#252527] hover:bg-[#2c2c2e] border border-[#3a3a3c] transition-colors flex flex-col group"
-                                            onClick={() => {
-                                                smoothLaneCurve(audioTargetLane);
-                                                setAudioMenu(null);
-                                            }}
-                                        >
-                                            <span className="font-bold text-cyan-300 group-hover:text-white">✨ Smooth Curve</span>
-                                            <span className="text-[9px] text-gray-400">Average out jitter.</span>
-                                        </button>
-                                        <button
-                                            className="text-left p-2 rounded bg-[#252527] hover:bg-[#2c2c2e] border border-[#3a3a3c] transition-colors flex flex-col group"
-                                            onClick={() => {
-                                                reduceLanePoints(audioTargetLane);
-                                                setAudioMenu(null);
-                                            }}
-                                        >
-                                            <span className="font-bold text-cyan-300 group-hover:text-white">🧹 Reduce Points</span>
-                                            <span className="text-[9px] text-gray-400">Drop redundant keys.</span>
-                                        </button>
-                                    </div>
-                                </div>
-
                                 <div className="space-y-1">
                                     <button
                                         className="w-full text-left p-2 rounded bg-[#252527] hover:bg-[#2c2c2e] border border-[#3a3a3c] transition-colors flex flex-col group"

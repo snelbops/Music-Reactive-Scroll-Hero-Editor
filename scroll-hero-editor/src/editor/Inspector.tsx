@@ -1,6 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../store/useStore';
 import { SEQUENCE_DURATION } from '../theatre/core';
+
+// Must match the bound used by the timeline and the interpolator: a bezier handle may reach
+// at most 45% of the way to its neighbour before the curve doubles back on itself.
+const BEZIER_DT_LIMIT = 0.45;
 
 // Lane configuration — maps laneId to display info
 const LANE_CONFIG = {
@@ -12,6 +16,16 @@ const LANE_CONFIG = {
 } as const;
 
 type LaneId = keyof typeof LANE_CONFIG;
+
+// Lanes that carry no keyframes of their own. They still deserve a panel — before this
+// the inspector rendered nothing at all when one was selected.
+const INFO_LANES: Record<string, { name: string; color: string; hint: string }> = {
+    audio: {
+        name: 'Audio Wave',
+        color: '#f97316',
+        hint: 'Drag across the waveform to select a region, then right-click to generate or tidy automation for a parameter across it.',
+    },
+};
 
 // Easing presets — SVG path drawn in a 40×40 viewBox (x=time, y=value inverted)
 const EASING_PRESETS = [
@@ -128,26 +142,34 @@ function CustomBezierEditor({ laneId, position, laneColor }: { laneId: string; p
     const scrollKfs = useStore(s => s.scrollKeyframes);
     const paramKfs = useStore(s => s.paramKeyframes);
 
-    const kf = laneId === 'scrollPos'
-        ? scrollKfs.find(k => Math.abs(k.time - position) < 0.001)
-        : (paramKfs[laneId] ?? []).find(k => Math.abs(k.time - position) < 0.001);
+    const laneKfs = laneId === 'scrollPos' ? scrollKfs : (paramKfs[laneId] ?? []);
+    const kfIdx = laneKfs.findIndex(k => Math.abs(k.time - position) < 0.001);
+    const kf = kfIdx >= 0 ? laneKfs[kfIdx] : undefined;
+
+    // A handle may only reach 45% of the way to its neighbour before the curve would double
+    // back on itself. Scaling by the real gap (rather than a flat 10% of the sequence) makes
+    // this editor agree with the timeline curve and the interpolator.
+    const nextGap = kf && kfIdx < laneKfs.length - 1 ? laneKfs[kfIdx + 1].time - kf.time : 0;
+    const prevGap = kf && kfIdx > 0 ? kf.time - laneKfs[kfIdx - 1].time : 0;
+    const outReach = Math.max(0.001, nextGap) * BEZIER_DT_LIMIT;
+    const inReach = Math.max(0.001, prevGap) * BEZIER_DT_LIMIT;
 
     // Default cp positions: ease-in-out style
     const [cp1, setCp1] = useState({ x: 0.42, y: 0 });
     const [cp2, setCp2] = useState({ x: 0.58, y: 1 });
     const [dragging, setDragging] = useState<'cp1' | 'cp2' | null>(null);
 
-    // Sync from existing handles on mount / selection change
-    const initFromKf = useCallback(() => {
-        if (!kf) return;
-        const ho = kf.handleOut;
-        const hi = kf.handleIn;
-        if (ho) setCp1({ x: Math.max(0, Math.min(1, ho.dt / (SEQUENCE_DURATION * 0.1))), y: ho.dv });
-        if (hi) setCp2({ x: Math.max(0, Math.min(1, 1 + hi.dt / (SEQUENCE_DURATION * 0.1))), y: 1 + hi.dv });
-    }, [kf]);
-
-    // Initialize on first render
-    useState(() => { initFromKf(); });
+    // Re-sync when a different keyframe is inspected. This component keeps its place in the
+    // tree between selections, so without this it would keep showing the previous curve.
+    // Deliberately keyed on identity only — including the handle values would fight the drag.
+    useEffect(() => {
+        const ho = kf?.handleOut;
+        const hi = kf?.handleIn;
+        setCp1(ho ? { x: Math.max(0, Math.min(1, ho.dt / outReach)), y: ho.dv } : { x: 0.42, y: 0 });
+        setCp2(hi ? { x: Math.max(0, Math.min(1, 1 + hi.dt / inReach)), y: 1 + hi.dv } : { x: 0.58, y: 1 });
+        setDragging(null);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [laneId, position]);
 
     const SIZE = 120;
     const PAD = 12;
@@ -171,14 +193,17 @@ function CustomBezierEditor({ laneId, position, laneColor }: { laneId: string; p
     const curvePath = `M ${p0.x} ${p0.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p3.x} ${p3.y}`;
 
     const writeHandles = (newCp1: typeof cp1, newCp2: typeof cp2) => {
-        // Convert normalized cp to handle deltas (dt in seconds, dv in value units)
-        const dtScale = SEQUENCE_DURATION * 0.1; // 10% of duration as handle reach
+        // Normalised cp -> handle deltas (dt in seconds, dv in value units). x is scaled by the
+        // reach to each neighbour, so a full-width drag lands exactly on the monotonic limit
+        // and can never describe a curve that holds two values at one instant.
+        const out = { dt: newCp1.x * outReach, dv: newCp1.y };
+        const inn = { dt: (newCp2.x - 1) * inReach, dv: newCp2.y - 1 };
         if (laneId === 'scrollPos') {
-            useStore.getState().updateScrollKeyframeHandle(position, 'out', { dt: newCp1.x * dtScale, dv: newCp1.y });
-            useStore.getState().updateScrollKeyframeHandle(position, 'in', { dt: (newCp2.x - 1) * dtScale, dv: newCp2.y - 1 });
+            useStore.getState().updateScrollKeyframeHandle(position, 'out', out);
+            useStore.getState().updateScrollKeyframeHandle(position, 'in', inn);
         } else {
-            useStore.getState().updateParamKeyframeHandle(laneId, position, 'out', { dt: newCp1.x * dtScale, dv: newCp1.y });
-            useStore.getState().updateParamKeyframeHandle(laneId, position, 'in', { dt: (newCp2.x - 1) * dtScale, dv: newCp2.y - 1 });
+            useStore.getState().updateParamKeyframeHandle(laneId, position, 'out', out);
+            useStore.getState().updateParamKeyframeHandle(laneId, position, 'in', inn);
         }
     };
 
@@ -272,19 +297,65 @@ function EmptyState() {
     );
 }
 
+// ── Info Lane Selected (no keyframes of its own, e.g. Audio Wave) ─────────────
+function InfoLaneInspector({ laneId, timeSelection }: {
+    laneId: string;
+    timeSelection: { start: number; end: number } | null;
+}) {
+    const info = INFO_LANES[laneId];
+    if (!info) return <EmptyState />;
+
+    return (
+        <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2 pb-2 border-b border-editor-border">
+                <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: info.color }} />
+                <span className="font-semibold text-xs text-editor-fg">{info.name}</span>
+            </div>
+
+            <div className="p-3 border border-editor-border rounded-md bg-editor-panel flex flex-col gap-2">
+                <div className="flex justify-between items-baseline">
+                    <span className="text-[10.5px] text-editor-muted">Selected region</span>
+                    <span className="font-mono font-medium text-xs text-editor-fg">
+                        {timeSelection
+                            ? `${timeSelection.start.toFixed(2)}s – ${timeSelection.end.toFixed(2)}s`
+                            : 'none'}
+                    </span>
+                </div>
+                {timeSelection && (
+                    <div className="flex justify-between items-baseline">
+                        <span className="text-[10.5px] text-editor-muted">Length</span>
+                        <span className="font-mono text-xs text-editor-muted">
+                            {(timeSelection.end - timeSelection.start).toFixed(2)}s
+                        </span>
+                    </div>
+                )}
+            </div>
+
+            <p className="text-[10px] text-editor-muted leading-relaxed">{info.hint}</p>
+        </div>
+    );
+}
+
 // ── Lane Selected ─────────────────────────────────────────────────────────────
 function LaneInspector({ laneId }: { laneId: string }) {
-    const lane = LANE_CONFIG[laneId as LaneId];
-    if (!lane) return null;
+    // Every hook runs before any early return — switching between a configured lane and an
+    // info lane must not change the hook count.
+    const scrollProgress = useStore(s => s.scrollProgress);
+    const rotationSpeed  = useStore(s => s.rotationSpeed);
+    const particleDepth  = useStore(s => s.particleDepth);
+    const particleSize   = useStore(s => s.particleSize);
+    const cssOpacity     = useStore(s => s.cssOpacity);
+    const timeSelection  = useStore(s => s.timeSelection);
 
-    // Read current value from store for this lane
-    const store = useStore();
+    const lane = LANE_CONFIG[laneId as LaneId];
+    if (!lane) return <InfoLaneInspector laneId={laneId} timeSelection={timeSelection} />;
+
     const currentValue = (() => {
-        if (laneId === 'scrollPos')     return store.scrollProgress;
-        if (laneId === 'rotationSpeed') return store.rotationSpeed;
-        if (laneId === 'depth')         return store.particleDepth;
-        if (laneId === 'size')          return store.particleSize;
-        if (laneId === 'cssOpacity')    return store.cssOpacity;
+        if (laneId === 'scrollPos')     return scrollProgress;
+        if (laneId === 'rotationSpeed') return rotationSpeed;
+        if (laneId === 'depth')         return particleDepth;
+        if (laneId === 'size')          return particleSize;
+        if (laneId === 'cssOpacity')    return cssOpacity;
         return 0;
     })();
 
@@ -350,15 +421,48 @@ function LaneInspector({ laneId }: { laneId: string }) {
 
 // ── Keyframe Selected ─────────────────────────────────────────────────────────
 function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; value: number } }) {
+    // Hooks first — the early return below must not change the hook count.
+    const setSelectedKeyframe = useStore(s => s.setSelectedKeyframe);
+    const selectedKeyframes = useStore(s => s.selectedKeyframes);
+    const scrollKfs = useStore(s => s.scrollKeyframes);
+    const paramKfs = useStore(s => s.paramKeyframes);
+
     const lane = LANE_CONFIG[kf.laneId as LaneId];
     if (!lane) return null;
 
-    const setSelectedKeyframe = useStore(s => s.setSelectedKeyframe);
-    const selectedKeyframes = useStore(s => s.selectedKeyframes);
     const selectedCount = selectedKeyframes.length;
     const isMulti = selectedCount > 1;
-    const scrollKfs = useStore(s => s.scrollKeyframes);
-    const paramKfs = useStore(s => s.paramKeyframes);
+
+    // Clamp against the keyframe's OWN lane. A selection can span lanes, and using the
+    // primary lane's range for all of them squashed e.g. Particle Depth (0–10) into 0–1.
+    const clampForLane = (laneId: string, v: number): number => {
+        const cfg = LANE_CONFIG[laneId as LaneId];
+        if (!cfg) return v;
+        return Math.max(cfg.range[0], Math.min(cfg.range[1], v));
+    };
+
+    const commitValueInput = (input: HTMLInputElement) => {
+        const v = parseFloat(input.value);
+        if (isNaN(v)) return;
+        const clamped = clampForLane(kf.laneId, v);
+        useStore.getState().updateParamKeyframeValue(kf.laneId, kf.position, clamped);
+        useStore.getState().setSelectedKeyframe({ laneId: kf.laneId, position: kf.position, value: clamped });
+        input.value = clamped.toFixed(4);
+    };
+
+    // Re-read the store after a batch edit so the readout reflects what actually landed.
+    const syncSelectionFromStore = () => {
+        const state = useStore.getState();
+        state.setSelectedKeyframes(
+            state.selectedKeyframes.map(item => {
+                const source = item.laneId === 'scrollPos'
+                    ? state.scrollKeyframes
+                    : state.paramKeyframes[item.laneId] ?? [];
+                const match = source.find(k => Math.abs(k.time - item.position) < 0.001);
+                return match ? { ...item, value: match.value } : item;
+            }),
+        );
+    };
 
     const getEasing = (laneId: string, position: number): string => {
         if (laneId === 'scrollPos') return scrollKfs.find(k => Math.abs(k.time - position) < 0.001)?.easing ?? 'linear';
@@ -408,12 +512,15 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
                             step={(lane.range[1] - lane.range[0]) / 100}
                             min={lane.range[0]}
                             max={lane.range[1]}
-                            onBlur={(e) => {
-                                const v = parseFloat(e.target.value);
-                                if (!isNaN(v)) {
-                                    const clamped = Math.max(lane.range[0], Math.min(lane.range[1], v));
-                                    useStore.getState().updateParamKeyframeValue(kf.laneId, kf.position, clamped);
-                                    useStore.getState().setSelectedKeyframe({ laneId: kf.laneId, position: kf.position, value: clamped });
+                            onBlur={(e) => commitValueInput(e.currentTarget)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    commitValueInput(e.currentTarget);
+                                } else if (e.key === 'Escape') {
+                                    e.preventDefault();
+                                    e.currentTarget.value = kf.value.toFixed(4);
+                                    e.currentTarget.blur();
                                 }
                             }}
                         />
@@ -434,15 +541,17 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
                                 max={lane.range[1]}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
+                                        e.preventDefault();
                                         const v = parseFloat((e.currentTarget as HTMLInputElement).value);
                                         if (!isNaN(v)) {
-                                            const clamped = Math.max(lane.range[0], Math.min(lane.range[1], v));
                                             useStore.getState().selectedKeyframes.forEach(item => {
                                                 if (item.laneId !== 'scrollPos') {
-                                                    useStore.getState().updateParamKeyframeValue(item.laneId, item.position, clamped);
+                                                    useStore.getState().updateParamKeyframeValue(
+                                                        item.laneId, item.position, clampForLane(item.laneId, v),
+                                                    );
                                                 }
                                             });
-                                            useStore.getState().setSelectedKeyframes(selectedKeyframes.map(s => ({ ...s, value: clamped })));
+                                            syncSelectionFromStore();
                                         }
                                     }
                                 }}
@@ -456,18 +565,23 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
                                         key={offset}
                                         className="px-1.5 py-0.5 rounded bg-editor-surface border border-editor-border text-[9.5px] font-mono text-editor-fg hover:bg-editor-surface-hover hover:border-editor-accent-blue transition-colors"
                                         onClick={() => {
-                                            const range = lane.range[1] - lane.range[0];
-                                            const scaledOffset = offset * (range <= 1 ? 1 : range <= 5 ? 0.5 : 1);
                                             useStore.getState().selectedKeyframes.forEach(item => {
-                                                if (item.laneId !== 'scrollPos') {
-                                                    const curKfs = (useStore.getState().paramKeyframes[item.laneId] ?? []);
-                                                    const matchKf = curKfs.find(k => Math.abs(k.time - item.position) < 0.001);
-                                                    if (matchKf) {
-                                                        const newVal = Math.max(lane.range[0], Math.min(lane.range[1], matchKf.value + scaledOffset));
-                                                        useStore.getState().updateParamKeyframeValue(item.laneId, item.position, newVal);
-                                                    }
+                                                if (item.laneId === 'scrollPos') return;
+                                                const cfg = LANE_CONFIG[item.laneId as LaneId];
+                                                if (!cfg) return;
+                                                // Scale the nudge to the lane it lands on, not the primary one.
+                                                const range = cfg.range[1] - cfg.range[0];
+                                                const scaledOffset = offset * (range <= 1 ? 1 : range <= 5 ? 0.5 : 1);
+                                                const curKfs = (useStore.getState().paramKeyframes[item.laneId] ?? []);
+                                                const matchKf = curKfs.find(k => Math.abs(k.time - item.position) < 0.001);
+                                                if (matchKf) {
+                                                    useStore.getState().updateParamKeyframeValue(
+                                                        item.laneId, item.position,
+                                                        clampForLane(item.laneId, matchKf.value + scaledOffset),
+                                                    );
                                                 }
                                             });
+                                            syncSelectionFromStore();
                                         }}
                                     >
                                         {offset > 0 ? `+${offset}` : offset}
@@ -514,7 +628,12 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
 
             {/* Custom bezier editor */}
             {!isMulti && (
-                <CustomBezierEditor laneId={kf.laneId} position={kf.position} laneColor={lane.color} />
+                <CustomBezierEditor
+                    key={`${kf.laneId}-${kf.position}`}
+                    laneId={kf.laneId}
+                    position={kf.position}
+                    laneColor={lane.color}
+                />
             )}
         </div>
     );
