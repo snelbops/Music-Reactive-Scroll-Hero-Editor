@@ -78,7 +78,10 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
         setExtractionProgress(0);
     };
 
-    const handleExtract = async (sourceOverride?: File | string) => {
+    // `userInitiated` distinguishes the button from the automatic startup extraction of
+    // sample.mp4. Only an explicit click should switch the renderer — the background run
+    // used to force 'frames' on every load, overriding the preset a project was saved with.
+    const handleExtract = async (sourceOverride?: File | string, userInitiated = true) => {
         const source = sourceOverride ?? mp4InputRef.current?.files?.[0];
         if (!source) return;
         setExtractionStatus('extracting');
@@ -87,7 +90,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
             const frames = await extractFrames(source, (p) => setExtractionProgress(p));
             setExtractedFrames(frames);
             setExtractionStatus('done');
-            setActivePreset('frames');
+            if (userInitiated) setActivePreset('frames');
         } catch (err) {
             console.error('ffmpeg extraction failed:', err);
             setExtractionStatus('error');
@@ -97,7 +100,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
     // Auto-extract sample.mp4 on first load and setup numpad drumpad key shortcuts (7, 8, 9, 4, 5, 6, 1, 2, 3, 0)
     useEffect(() => {
         if (extractionStatus === 'idle' && extractedFrames.length === 0) {
-            handleExtract('/sample.mp4');
+            handleExtract('/sample.mp4', false);
         }
 
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -275,7 +278,9 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                                                     className="opacity-0 group-hover/pad:opacity-100 text-[8px] text-editor-muted hover:text-red-400 p-0.5 rounded transition-all"
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        setVideoPad(idx, { ...pad, name: '', url: '' });
+                                                                        // Drop mediaKey too, or the cleared pad would be
+                                                                        // re-hydrated from its old stored clip on next load.
+                                                                        setVideoPad(idx, { ...pad, name: '', url: '', mediaKey: undefined });
                                                                     }}
                                                                 >
                                                                     ✕

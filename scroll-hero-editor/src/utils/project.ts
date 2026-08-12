@@ -262,12 +262,14 @@ export function applyProjectDataToStore(data: Partial<ProjectData>): void {
         }));
         useStore.setState({ videoPads: mergedPads });
     }
-    if (typeof data.activeVideoPadIdx === 'number') s.setActiveVideoPadIdx(data.activeVideoPadIdx);
+    if (typeof data.activeVideoPadIdx === 'number') s.setActiveVideoPadIdx(data.activeVideoPadIdx, { keepPreset: true });
     if (data.lightImages) useStore.setState({ lightImages: data.lightImages });
     if (typeof data.activeLightImageIdx === 'number') s.setActiveLightImageIdx(data.activeLightImageIdx);
 
-    if (data.recordedEvents) useStore.setState({ recordedEvents: data.recordedEvents });
-    if (data.padSwitchEvents) useStore.setState({ padSwitchEvents: data.padSwitchEvents });
+    useStore.setState({
+        recordedEvents: data.recordedEvents ?? [],
+        padSwitchEvents: data.padSwitchEvents ?? [],
+    });
 
     if (typeof data.playheadPosition === 'number') s.setPlayheadPosition(data.playheadPosition);
     if (typeof data.timelineScrollLeft === 'number') s.setTimelineScrollLeft(data.timelineScrollLeft);

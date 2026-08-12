@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../store/useStore';
-import { SEQUENCE_DURATION } from '../theatre/core';
 
 // Must match the bound used by the timeline and the interpolator: a bezier handle may reach
 // at most 45% of the way to its neighbour before the curve doubles back on itself.
@@ -395,7 +394,7 @@ function LaneInspector({ laneId }: { laneId: string }) {
                         {SCROLL_PATTERNS.map(preset => (
                             <button
                                 key={preset.id}
-                                onClick={() => useStore.getState().setScrollKeyframes(preset.generate(SEQUENCE_DURATION))}
+                                onClick={() => useStore.getState().setScrollKeyframes(preset.generate(useStore.getState().sequenceDuration))}
                                 className="group flex flex-col gap-1 p-1.5 border border-editor-border bg-editor-panel hover:bg-editor-surface-hover hover:border-editor-accent-blue rounded transition-colors text-left"
                             >
                                 <svg viewBox="0 0 64 26" className="w-full h-6" preserveAspectRatio="none">

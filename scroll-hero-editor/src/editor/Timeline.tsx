@@ -4,7 +4,7 @@ import { onChange } from '@theatre/core';
 import { useStore } from '../store/useStore';
 import { saveMediaFile } from '../utils/mediaStore';
 import { useKickDrumData } from '../packages/useKickDrumData';
-import { sheet, SEQUENCE_DURATION } from '../theatre/core';
+import { sheet } from '../theatre/core';
 import { interpolateParamAt, type ParamKf } from '../utils/interpolate';
 
 const LABEL_W = 120;
@@ -1041,10 +1041,11 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     }, [snapToBeat, beats]);
 
     const seekTo = useCallback((progress: number) => {
-        sheet.sequence.position = progress * SEQUENCE_DURATION;
+        const seqDur = useStore.getState().sequenceDuration;
+        sheet.sequence.position = progress * seqDur;
         setSceneProgress(progress);
         scrollHistory.current = [];
-        useStore.getState().applyParamKeyframesAt(progress * SEQUENCE_DURATION);
+        useStore.getState().applyParamKeyframesAt(progress * seqDur);
     }, [setSceneProgress]);
 
     const handleLanesMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {

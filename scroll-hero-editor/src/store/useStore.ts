@@ -64,7 +64,7 @@ interface EditorState {
     removeMp4Asset: () => void;
     videoPads: VideoPad[];
     activeVideoPadIdx: number;
-    setActiveVideoPadIdx: (idx: number) => void;
+    setActiveVideoPadIdx: (idx: number, opts?: { keepPreset?: boolean }) => void;
     setVideoPad: (idx: number, pad: { name: string; url: string; color?: string; mediaKey?: string }) => void;
     setVideoPadColor: (idx: number, color: string) => void;
     swapVideoPads: (idxA: number, idxB: number) => void;
@@ -212,12 +212,18 @@ export const useStore = create<EditorState>((set, get) => {
 
         set({ scrollKeyframes: newScrollKfs, paramKeyframes: newParamKfs });
     },
-    setActiveVideoPadIdx: (idx) => {
+    setActiveVideoPadIdx: (idx, opts) => {
         const s = get();
         const pads = s.videoPads;
         const targetUrl = pads[idx]?.url || s.videoUrl;
         if (s.activeVideoPadIdx !== idx) s.pushHistory();
-        set({ activeVideoPadIdx: idx, videoUrl: targetUrl, activePreset: 'video' });
+        // `keepPreset` is for project loading: restoring the active pad must not stomp the
+        // preset the project was saved with.
+        set({
+            activeVideoPadIdx: idx,
+            videoUrl: targetUrl,
+            ...(opts?.keepPreset ? {} : { activePreset: 'video' as const }),
+        });
         if (s.isRecording) {
             s.addPadSwitchEvent(s.playheadPosition, idx);
         }
@@ -228,7 +234,7 @@ export const useStore = create<EditorState>((set, get) => {
         const padKeyMap = [7, 8, 9, 4, 5, 6, 1, 2, 3, 0];
         const padId = padKeyMap[idx] ?? (idx + 1);
         updated[idx] = { ...updated[idx], id: padId, ...pad };
-        return { videoPads: updated, videoUrl: s.activeVideoPadIdx === idx ? pad.url : s.videoUrl, activePreset: 'frames' };
+        return { videoPads: updated, videoUrl: s.activeVideoPadIdx === idx ? pad.url : s.videoUrl, activePreset: 'video' };
     }),
     setVideoPadColor: (idx, color) => set((s) => {
         get().pushHistory();
@@ -476,7 +482,7 @@ export const useStore = create<EditorState>((set, get) => {
             Object.entries(paramKeyframes).map(([k, v]) => [k, [...v]])
         );
         _clipboard.forEach(entry => {
-            const t = Math.max(0, Math.min(10, entry.time + offset));
+            const t = Math.max(0, Math.min(get().sequenceDuration, entry.time + offset));
             if (entry.laneId === 'scrollPos') {
                 newScrollKfs = newScrollKfs.filter(k => Math.abs(k.time - t) > 0.016);
                 newScrollKfs.push({ time: t, value: entry.value, easing: entry.easing, handleOut: entry.handleOut, handleIn: entry.handleIn });

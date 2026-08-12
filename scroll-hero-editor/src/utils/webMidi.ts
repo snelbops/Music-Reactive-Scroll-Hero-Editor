@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
+import { sheet } from '../theatre/core';
 
 /**
  * Web MIDI API integration hook.
@@ -7,6 +8,10 @@ import { useStore } from '../store/useStore';
  * and MIDI pads to Video Pads 1-4.
  */
 export function useWebMIDI() {
+    // Start of the span the current knob sweep has overwritten, matching how the mouse
+    // and scroll recorders overdub.
+    const lastRecordedTimeRef = useRef<number | null>(null);
+
     useEffect(() => {
         if (!navigator.requestMIDIAccess) return;
 
@@ -45,12 +50,20 @@ export function useWebMIDI() {
                 // Map CC 1 (Modwheel), CC 7 (Volume), CC 16-20 (Knobs) to Scroll POS
                 if ([1, 7, 16, 17, 18, 19, 20, 74].includes(data1)) {
                     const store = useStore.getState();
-                    store.setScrollProgress(normalizedValue);
+                    // setSceneProgress also drives the active scene, so the knob moves the
+                    // preview rather than only updating the store value.
+                    store.setSceneProgress(normalizedValue);
 
-                    // If recording, write live scroll keyframe
                     if (store.isRecording && store.isPlaying) {
-                        const time = store.scrollProgress;
-                        store.addScrollKeyframe(time, normalizedValue);
+                        // The keyframe belongs at the playhead. This previously passed
+                        // scrollProgress — a 0..1 value, and one just overwritten with the
+                        // CC value — so every recorded keyframe landed in the first second
+                        // at a time equal to its own value.
+                        const t = sheet.sequence.position;
+                        store.addScrollKeyframe(t, normalizedValue, lastRecordedTimeRef.current ?? t);
+                        lastRecordedTimeRef.current = t;
+                    } else {
+                        lastRecordedTimeRef.current = null;
                     }
                 }
             }

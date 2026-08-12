@@ -8,7 +8,7 @@ import FrameSequenceScene from './FrameSequenceScene';
 import ScrollyVideoPlayer from './ScrollyVideoPlayer';
 import { useStore } from '../store/useStore';
 import { OrbitAdapter, ClassicAdapter, FrameSequenceAdapter } from './SceneAdapter';
-import { sheet, SEQUENCE_DURATION } from '../theatre/core';
+import { sheet } from '../theatre/core';
 
 const RATIO_VALUES: Record<string, number | null> = {
     '16:9': 16 / 9,
@@ -68,8 +68,9 @@ export default function Viewport() {
             e.preventDefault();
             if (e.shiftKey) {
                 // Shift+scroll → scrub playhead only, don't touch scroll progress
-                const delta = (e.deltaY / 800) * SEQUENCE_DURATION;
-                const next = Math.max(0, Math.min(SEQUENCE_DURATION, sheet.sequence.position + delta));
+                const seqDur = useStore.getState().sequenceDuration;
+                const delta = (e.deltaY / 800) * seqDur;
+                const next = Math.max(0, Math.min(seqDur, sheet.sequence.position + delta));
                 sheet.sequence.position = next;
             } else {
                 // Normal scroll → move scroll handle / scene progress only
