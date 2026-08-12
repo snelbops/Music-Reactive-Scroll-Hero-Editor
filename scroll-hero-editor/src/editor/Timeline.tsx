@@ -991,7 +991,10 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            if ((e.target as HTMLElement).tagName === 'INPUT') return;
+            // Single-letter tool shortcuts and Delete live below, so anything the user is
+            // typing into must be excluded — not just INPUT, which was the only case checked.
+            const target = e.target as HTMLElement | null;
+            if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return;
             const meta = e.metaKey || e.ctrlKey;
             // Undo / Redo live in Layout's global handler — binding them here too meant
             // both listeners fired for one keypress and every undo stepped back twice.
@@ -1381,8 +1384,17 @@ export default function Timeline({ height = 280 }: { height?: number }) {
             <div ref={lanesRef} className="flex-1 overflow-y-auto overflow-x-auto thin-scrollbar relative select-none cursor-col-resize" onMouseDown={handleLanesMouseDown}>
                 <div className="relative" style={{ width: timelineZoom !== 1 ? `${timelineZoom * 100}%` : '100%', minHeight: '100%' }}>
                     {/* Red Playhead Line & Interactive Cap */}
+                    {/* The line itself is visual only. It used to be pointer-events-auto over the
+                        full lane height, which meant any keyframe sitting under the playhead
+                        could not be clicked. Dragging now happens on the grab strip below,
+                        which is confined to the ruler band. */}
                     <div
-                        className="absolute top-0 bottom-0 w-[1.5px] bg-red-500 z-[60] pointer-events-auto cursor-ew-resize shadow-[0_0_8px_rgba(239,68,68,0.8)] group/playhead"
+                        className="absolute top-0 bottom-0 w-[1.5px] bg-red-500 z-[60] pointer-events-none shadow-[0_0_8px_rgba(239,68,68,0.8)] group/playhead"
+                        style={{ left: `calc(120px + (100% - 120px) * ${seqTime / sequenceDuration})` }}
+                    />
+                    <div
+                        className="absolute top-0 h-6 w-3 -translate-x-1/2 z-[62] pointer-events-auto cursor-ew-resize"
+                        title="Drag to scrub"
                         style={{ left: `calc(120px + (100% - 120px) * ${seqTime / sequenceDuration})` }}
                         onPointerDown={(e) => {
                             e.stopPropagation();
@@ -1406,7 +1418,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             window.addEventListener('pointerup', onUp);
                         }}
                     >
-                        <div className="w-3.5 h-3.5 bg-red-500 hover:bg-red-400 absolute -top-1 -left-[6px] rotate-45 cursor-ew-resize shadow-md transition-transform hover:scale-125 z-[61]" />
+                        <div className="w-3.5 h-3.5 bg-red-500 hover:bg-red-400 absolute -top-1 left-1/2 -translate-x-1/2 rotate-45 shadow-md transition-transform hover:scale-125 pointer-events-none" />
                     </div>
                 
                 {/* Resizable & Draggable Ableton-Style Loop Region Header */}

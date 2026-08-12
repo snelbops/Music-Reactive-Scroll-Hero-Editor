@@ -1,7 +1,6 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Minimize2, Film, Sun, Moon } from 'lucide-react';
-import studio from '@theatre/studio';
 import LeftPanel from './LeftPanel';
 import Inspector from './Inspector';
 import Timeline from './Timeline';
@@ -33,6 +32,7 @@ export default function Layout() {
     const loopEnd = useStore(state => state.loopEnd);
     const isLoop = useStore(state => state.isLoop);
     const audioUrl = useStore(state => state.audioUrl);
+    const autosaveStatus = useStore(state => state.autosaveStatus);
 
     const [isExportingHtml, setIsExportingHtml] = useState(false);
     const [isExportingLoop, setIsExportingLoop] = useState(false);
@@ -86,7 +86,9 @@ export default function Layout() {
         }
     };
 
-    const handleExportJson = () => {
+    const handleExportJson = async () => {
+        // Dynamic so the studio bundle stays out of the production entry chunk.
+        const { default: studio } = await import('@theatre/studio');
         const state = studio.createContentOfSaveFile('Scroll Hero Editor');
         const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -195,9 +197,28 @@ export default function Layout() {
                     <span className="font-semibold text-xs text-editor-fg tracking-tight">Scroll Hero</span>
                     <span className="w-[1px] h-4 bg-editor-border" />
                     <div className="flex items-center gap-2 px-2 py-0.5 border border-editor-border rounded bg-editor-surface text-[11px]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-editor-accent-green" />
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                            autosaveStatus === 'ok' ? 'bg-editor-accent-green'
+                            : autosaveStatus === 'trimmed' ? 'bg-amber-400'
+                            : 'bg-red-500 animate-pulse'
+                        }`} />
                         <span className="font-medium text-editor-fg">{mp4Asset?.name ?? 'anteddai_Young_Max'}</span>
-                        <span className="font-mono text-[10px] text-editor-muted">saved</span>
+                        {/* This used to read "saved" unconditionally, including when the
+                            autosave had silently hit the localStorage quota. */}
+                        <span
+                            className={`font-mono text-[10px] ${
+                                autosaveStatus === 'ok' ? 'text-editor-muted'
+                                : autosaveStatus === 'trimmed' ? 'text-amber-400'
+                                : 'text-red-400 font-semibold'
+                            }`}
+                            title={
+                                autosaveStatus === 'ok' ? 'Working session saved to this browser'
+                                : autosaveStatus === 'trimmed' ? 'Storage is full — the project is saved but the mouse/pad recording was dropped. Export the project to keep it.'
+                                : 'Storage is full — this session is NOT being saved. Export the project now.'
+                            }
+                        >
+                            {autosaveStatus === 'ok' ? 'saved' : autosaveStatus === 'trimmed' ? 'saved without recording' : 'not saved'}
+                        </span>
                     </div>
                 </div>
 

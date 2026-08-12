@@ -77,6 +77,8 @@ interface EditorState {
     extractionProgress: number; setExtractionProgress: (p: number) => void;
     extractionStatus: 'idle' | 'extracting' | 'done' | 'error'; setExtractionStatus: (s: 'idle' | 'extracting' | 'done' | 'error') => void;
     isScrubbing: boolean; setIsScrubbing: (v: boolean) => void;
+    // Whether the last autosave stored everything, dropped the recordings, or failed.
+    autosaveStatus: 'ok' | 'trimmed' | 'failed'; setAutosaveStatus: (s: 'ok' | 'trimmed' | 'failed') => void;
     scrollKeyframes: { time: number; value: number; easing?: string; handleOut?: { dt: number; dv: number }; handleIn?: { dt: number; dv: number } }[];
     // rangeStart: if provided, clears old keyframes strictly between rangeStart and time (overdub).
     addScrollKeyframe: (time: number, value: number, rangeStart?: number) => void;
@@ -267,6 +269,7 @@ export const useStore = create<EditorState>((set, get) => {
     extractionProgress: 0, setExtractionProgress: (p) => set({ extractionProgress: p }),
     extractionStatus: 'idle', setExtractionStatus: (s) => set({ extractionStatus: s }),
     isScrubbing: false, setIsScrubbing: (v) => set({ isScrubbing: v }),
+    autosaveStatus: 'ok', setAutosaveStatus: (v) => set({ autosaveStatus: v }),
     scrollKeyframes: [],
     addScrollKeyframe: (time, value, rangeStart?) => set((s) => {
         const existing = s.scrollKeyframes;

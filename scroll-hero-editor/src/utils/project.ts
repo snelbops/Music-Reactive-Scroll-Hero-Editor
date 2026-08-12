@@ -1,6 +1,6 @@
 import { useStore, type VideoPad } from '../store/useStore';
 import type { ParamKf } from './interpolate';
-import { saveMediaFile, loadMediaFile, getMediaDataUrl, dataUrlToBlob, getMediaBlob, newPadMediaKey } from './mediaStore';
+import { saveMediaFile, loadMediaFile, getMediaDataUrl, dataUrlToBlob, getMediaBlob, newPadMediaKey, revokeMediaUrl } from './mediaStore';
 
 /**
  * Pad and light-image URLs are `blob:` URLs, which die with the page. The bytes live on in
@@ -24,6 +24,7 @@ export async function rehydrateMediaUrls(): Promise<void> {
             await saveMediaFile(key, legacy);
             blob = legacy;
         }
+        revokeMediaUrl(pad.url);   // the URL being replaced is dead or superseded
         return { ...pad, url: URL.createObjectURL(blob), mediaKey: key };
     }));
     useStore.setState({ videoPads: pads });
@@ -280,13 +281,37 @@ export function applyProjectDataToStore(data: Partial<ProjectData>): void {
     useStore.setState({ _past: [], _future: [] });
 }
 
-// Auto-save working session into localStorage
+/**
+ * Auto-save the working session.
+ *
+ * localStorage caps around 5MB and a long recording plus a dense envelope can exceed it.
+ * This used to swallow the QuotaExceededError, so work simply stopped being saved with no
+ * sign. Now the recordings — by far the bulkiest part — are dropped so the rest of the
+ * project still persists, and the outcome is published to the store so the UI can say so.
+ */
 export function autoSaveWorkingProject(): void {
     if (typeof window === 'undefined') return;
+
+    const data = getProjectDataFromStore('Working Session');
+    let status: 'ok' | 'trimmed' | 'failed' = 'ok';
     try {
-        const data = getProjectDataFromStore('Working Session');
         localStorage.setItem(LOCAL_STORAGE_KEY_CURRENT, JSON.stringify(data));
-    } catch (e) {}
+    } catch {
+        try {
+            localStorage.setItem(
+                LOCAL_STORAGE_KEY_CURRENT,
+                JSON.stringify({ ...data, recordedEvents: [], padSwitchEvents: [] }),
+            );
+            status = 'trimmed';
+        } catch {
+            status = 'failed';
+        }
+    }
+    // Guarded so this cannot loop: it is called from a store subscription, and writing the
+    // same value again would re-enter.
+    if (useStore.getState().autosaveStatus !== status) {
+        useStore.setState({ autosaveStatus: status });
+    }
 }
 
 export async function loadWorkingProject(): Promise<boolean> {

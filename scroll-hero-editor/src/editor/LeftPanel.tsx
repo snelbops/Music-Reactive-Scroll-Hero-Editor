@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { ChevronDown, ChevronRight, UploadCloud, Video, Film, Layers, SlidersHorizontal, ImageIcon, X, Sparkles, Grid, Plus } from 'lucide-react';
-import { saveMediaFile, getMediaBlob, newPadMediaKey } from '../utils/mediaStore';
+import { saveMediaFile, putMediaFile, getMediaBlob, newPadMediaKey } from '../utils/mediaStore';
 import { cacheActiveVideo } from '../utils/videoCache';
 import { extractFrames } from '../packages/ffmpegExtractor';
 
@@ -234,7 +234,9 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                                     const key = pad.mediaKey ?? `video-pad-${idx}`;
                                                     const blob = await getMediaBlob(key);
                                                     if (blob) {
-                                                        await saveMediaFile('active-video', blob);
+                                                        // Cache bytes only — this used to mint an
+                                                        // Object URL and drop it on every press.
+                                                        await putMediaFile('active-video', blob);
                                                         cacheActiveVideo(blob, pad.name || `pad-${idx}`);
                                                         setActiveVideoBlob(blob);
                                                     }
