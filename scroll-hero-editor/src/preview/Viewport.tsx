@@ -7,6 +7,7 @@ import RecordMode from './RecordMode';
 import FrameSequenceScene from './FrameSequenceScene';
 import ScrollyVideoPlayer from './ScrollyVideoPlayer';
 import { useStore } from '../store/useStore';
+import { createPunchIn } from '../utils/punchIn';
 import { OrbitAdapter, ClassicAdapter, FrameSequenceAdapter } from './SceneAdapter';
 import { playhead } from '../theatre/playhead';
 
@@ -58,7 +59,7 @@ export default function Viewport() {
     // Ref for the classic dark iframe
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
-    const lastRecordedTimeRef = useRef<number | null>(null);
+    const punchIn = useRef(createPunchIn()).current;
 
     // Mouse wheel → scrub progress (passive:false required for preventDefault)
     useEffect(() => {
@@ -81,8 +82,7 @@ export default function Viewport() {
                 const { isRecording, isPlaying } = useStore.getState();
                 if (isRecording && isPlaying) {
                     const t = playhead.position;
-                    useStore.getState().addScrollKeyframe(t, next, lastRecordedTimeRef.current ?? t);
-                    lastRecordedTimeRef.current = t;
+                    useStore.getState().addScrollKeyframe(t, next, punchIn.at(t));
                 }
             }
         };
@@ -94,7 +94,7 @@ export default function Viewport() {
     const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
         e.currentTarget.setPointerCapture(e.pointerId);
         useStore.getState().setIsScrubbing(true);
-        lastRecordedTimeRef.current = null;
+        punchIn.reset();
     }, []);
 
     const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -105,14 +105,13 @@ export default function Viewport() {
         const { isRecording, isPlaying } = useStore.getState();
         if (isRecording && isPlaying) {
             const t = playhead.position;
-            addScrollKeyframe(t, p, lastRecordedTimeRef.current ?? t);
-            lastRecordedTimeRef.current = t;
+            addScrollKeyframe(t, p, punchIn.at(t));
         }
     }, [setSceneProgress, addScrollKeyframe]);
 
     const onPointerUp = useCallback((_e: React.PointerEvent<HTMLDivElement>) => {
         useStore.getState().setIsScrubbing(false);
-        lastRecordedTimeRef.current = null;
+        punchIn.reset();
     }, []);
 
     // Wire the appropriate adapter whenever activePreset changes

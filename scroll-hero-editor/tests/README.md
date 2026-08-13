@@ -48,6 +48,7 @@ In a container with browsers pre-installed, set `CHROMIUM_PATH` (or rely on the 
 | `transport` | Scrubbing and playback running past the old 10-second ceiling · the playhead line tracking it · the lane labels covering a playhead scrolled behind them |
 | `padproxy` | Building a proxy from a pad's own button · the viewport drawing it instead of seeking the clip · the proxy being keyed by clip rather than slot · surviving a reload |
 | `transport-audio` | One audio player rather than two · the loop still wrapping while recording, without stretching the sequence |
+| `punchin` | The timeline opening on the Scroll POS lane · punch-in ending on a pause, a loop wrap or a reset, but not on a held-still control · a second recording pass leaving the stretch it never touched alone |
 | `midi` | Note-on pad switching and note-off being ignored · the knob sweep recording across the timeline rather than bunching at zero · the connection indicator. Driven by a fake MIDIAccess injected before boot, so no hardware is needed. |
 | `proxy` | How a clip is sampled for the frame proxy · reading its shape out of ffmpeg's log · real extraction end to end · giving up rather than hanging · the cap on decoded frames held on the GPU |
 

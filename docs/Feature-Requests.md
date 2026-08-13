@@ -110,6 +110,44 @@ second time.
 
 ---
 
+## FR-4 — Punch-in recording · Done
+
+Recording overwrites the span between the start of the current gesture and the playhead.
+That is right while performing and wrong the moment you stop: the span stayed open, so
+touching the control again later swept away everything recorded in between — a stretch you
+never went near on that pass. With looping now working during recording, a second pass over
+the same bars destroyed the first.
+
+**The rule: punch in on touch, not on change.**
+
+- Touching the control at all counts as performing, *including holding it perfectly still* —
+  that is a deliberate flat value, not an absence of input. Change-based detection gets that
+  backwards and ignores you when you are holding something steady on purpose.
+- A gesture ends when input stops arriving (250ms), when the playhead jumps backwards (a
+  loop wrap), or on release.
+- Never touching a control writes nothing at all, so the old curve stands.
+
+Lives in `utils/punchIn.ts` and is shared by the scroll wheel, the scrub handle and MIDI, so
+every input behaves the same way. Covered by `tests/e2e/punchin.spec.mjs`; against the
+previous code a second pass collapses a 16-keyframe curve to 7.
+
+**Not done, and worth doing eventually:** Ableton's model, where each loop pass records a new
+take and you comp between them. Better than overwriting, and this punch-in rule is a
+prerequisite rather than a detour.
+
+---
+
+## FR-5 — Timeline opens on the scroll lane · Done
+
+Scroll is the effect this project is built around and the other automation lanes were noise
+while working on it, so the timeline now opens isolated to Scroll POS. Nothing is removed —
+the isolate row switches back to ALL, and the other lanes are unchanged for later work.
+
+The Audio Wave lane is exempt: isolating hid it too, and the waveform is what the automation
+is being written against. Hiding it takes away the reference, not the noise.
+
+---
+
 ## Known issues carried over from the audit
 
 Not feature requests, but open and worth keeping visible.
