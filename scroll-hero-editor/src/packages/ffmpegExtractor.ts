@@ -125,9 +125,29 @@ const extensionOf = (source: File | string): string => {
 };
 
 /**
+ * Whether a failure is the wasm heap refusing to fit the frame, rather than something
+ * about the clip itself. Both shapes are the same underlying limit: the core either traps
+ * outright, or stops answering and the deadline fires.
+ */
+function isCapacityFailure(err: unknown): boolean {
+    const message = err instanceof Error ? err.message : String(err);
+    return /out of bounds|memory access|Aborted|OOM|allocation|gave up after/i.test(message);
+}
+
+/** Heights to fall back through when the heap cannot fit the frame. */
+function retryHeights(from: number): number[] {
+    return [from, 360, 240, 180].filter((h, i, all) => h <= from && all.indexOf(h) === i);
+}
+
+/**
  * Decodes a clip into a downscaled JPEG proxy covering its full length.
  *
  * `onProgress` reports 0–1 overall, plus the number of frames read back so far.
+ *
+ * How large a frame the wasm heap can hold varies by machine and by browser, and the limit
+ * announces itself as a trap ("memory access out of bounds") or as a core that simply stops
+ * answering. Neither is worth failing the whole extraction over when a smaller proxy would
+ * have worked, so this steps the frame size down and tries again.
  */
 export async function extractFrames(
     file: File | string,
@@ -135,6 +155,37 @@ export async function extractFrames(
     options: ProxyOptions = {},
 ): Promise<Blob[]> {
     const opts = { ...DEFAULTS, ...options };
+    const heights = retryHeights(opts.maxHeight);
+    let lastError: unknown;
+
+    for (const [i, maxHeight] of heights.entries()) {
+        const isLast = i === heights.length - 1;
+        // A size that will not fit usually traps immediately, but it can also just stop
+        // answering — and waiting the full deadline before trying something smaller turns a
+        // recoverable failure into a four-minute stall. Only the last rung gets the full
+        // budget, since by then there is nothing left to fall back to.
+        const timeoutMs = isLast
+            ? opts.timeoutMs
+            : Math.min(opts.timeoutMs, Math.max(60_000, Math.round(opts.timeoutMs / 4)));
+        try {
+            return await extractOnce(file, onProgress, { ...opts, maxHeight, timeoutMs });
+        } catch (err) {
+            lastError = err;
+            if (!isCapacityFailure(err)) throw err;
+            console.warn(`[proxy] ${maxHeight}p did not fit the decoder; trying smaller`, err);
+            onProgress(0, 0);
+        }
+    }
+    throw lastError instanceof Error
+        ? new Error(`${lastError.message} (already retried down to ${heights[heights.length - 1]}p)`)
+        : lastError;
+}
+
+async function extractOnce(
+    file: File | string,
+    onProgress: (progress: number, current: number) => void,
+    opts: Required<ProxyOptions>,
+): Promise<Blob[]> {
     const ffmpeg = new FFmpeg();
     const input = `input.${extensionOf(file)}`;
 

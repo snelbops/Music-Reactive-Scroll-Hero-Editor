@@ -174,5 +174,41 @@ const PROXY_HEIGHT = 360;
     r.ok('dispose releases everything', cache.afterDispose === 0);
 }
 
+// ── A frame too big for the heap steps down rather than failing ──
+//
+// This is the container's actual limit and a real one on some machines: the decoder either
+// traps with "memory access out of bounds" or stops answering. Asking for 540p here exceeds
+// what headless Chromium can grow to for this clip, so the retry ladder is what makes it
+// succeed at all.
+{
+    const result = await page.evaluate(async () => {
+        const m = await import('/src/packages/ffmpegExtractor.ts');
+        const warnings = [];
+        const realWarn = console.warn;
+        console.warn = (...args) => { warnings.push(String(args[0])); realWarn(...args); };
+        try {
+            const started = performance.now();
+            const frames = await m.extractFrames('/sample.mp4', () => {}, { maxHeight: 540 });
+            const bitmap = frames.length ? await createImageBitmap(frames[0]) : null;
+            return {
+                count: frames.length,
+                height: bitmap?.height ?? 0,
+                steppedDown: warnings.filter((w) => w.includes('did not fit the decoder')),
+                ms: Math.round(performance.now() - started),
+            };
+        } finally {
+            console.warn = realWarn;
+        }
+    });
+    r.note(`asked for 540p, got ${result.height}p in ${result.ms}ms`);
+
+    r.ok('extraction succeeds despite the first size being too large', result.count > 100,
+        `${result.count} frames`);
+    r.ok('it stepped the frame size down', result.steppedDown.length > 0,
+        result.steppedDown[0] ?? 'no step-down logged');
+    r.ok('the frames it settled on are smaller than asked for',
+        result.height > 0 && result.height < 540, `${result.height}p`);
+}
+
 await browser.close();
 process.exit(r.summary() ? 0 : 1);
