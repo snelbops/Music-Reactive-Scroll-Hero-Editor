@@ -22,8 +22,7 @@ It now behaves like the loop region above it.
 - Resizing never edits keyframes. It only changes which keyframes are selected, exactly as
   dragging out a new region does, so the intensity drag afterwards acts on the right ones.
   Nothing is re-generated.
-- The loop range still follows the selection while the two match, since they are set together
-  when a region is first dragged out. A loop deliberately moved elsewhere is left alone.
+- The selection and the loop are **separate**, and converted between explicitly. See FR-3.
 
 **Fixed along the way:** the ✕ clear button never worked. The header bar captured the pointer
 on `pointerdown`, which retargets the click away from the button.
@@ -75,6 +74,25 @@ pads scrub their clips directly, so they do not benefit from it yet — wiring p
 
 The Video Frames lane says 'Click "Load as Scene" to preview', but no such button exists —
 the only thing that switches the viewport to the frame sequence is the Extract button.
+
+---
+
+## FR-3 — Selection and loop · Done
+
+Drawing a region used to overwrite the loop range and switch looping on, so the two always
+showed the same span in two colours and you could not scope an edit without moving where
+playback repeated.
+
+They are different jobs — the loop is a transport setting, the selection is edit scope — and
+keeping them separate is what lets you loop an eight-bar section while smoothing one beat
+inside it. So the automatic overwrite is gone, and converting between them is explicit:
+
+- **⟳ on the region header** loops the selected region
+- **Double-click the loop bar** selects the loop's range for editing
+
+Fixed alongside: clicking the loop bar let the click bubble to the track behind it, whose
+handler re-centres the loop on the pointer — so releasing a drag of the bar moved it a
+second time.
 
 ---
 

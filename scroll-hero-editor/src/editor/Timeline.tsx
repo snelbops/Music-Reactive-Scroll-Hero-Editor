@@ -605,23 +605,36 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     };
 
     /**
-     * Writes a new selection range, keeping everything that was set up when the
-     * region was first dragged out in step with it: the keyframe selection the
-     * intensity drag acts on, and the loop range — but the loop only while it
-     * still matches, so a loop deliberately moved elsewhere is left alone.
+     * Writes a new selection range and re-selects the keyframes inside it, which is what
+     * the intensity drag and the tidy actions operate on.
+     *
+     * The loop is deliberately not touched. The selection is edit scope and the loop is a
+     * transport setting; they were being set together, which meant you could not scope an
+     * edit without also moving where playback repeats. Converting between them is now an
+     * explicit action in both directions.
      */
     const applySelection = (start: number, end: number) => {
-        const st = useStore.getState();
-        const prev = st.timeSelection;
-        const loopWasLinked = prev !== null
-            && Math.abs(st.loopStart - prev.start) < 1e-3
-            && Math.abs((st.loopEnd || 0) - prev.end) < 1e-3;
-
         const s = +start.toFixed(2);
         const e = +end.toFixed(2);
-        st.setTimeSelection({ start: s, end: e });
-        if (loopWasLinked) st.setLoopRange(s, e);
+        useStore.getState().setTimeSelection({ start: s, end: e });
         selectKeyframesInRange(s, e);
+    };
+
+    /** Region → loop. The other direction is a double-click on the loop bar. */
+    const loopTheSelection = () => {
+        const sel = useStore.getState().timeSelection;
+        if (!sel) return;
+        useStore.getState().setLoopRange(sel.start, sel.end);
+        useStore.getState().setIsLoop(true);
+    };
+
+    /** Loop → region, so a section you are auditioning becomes the scope for edits. */
+    const selectTheLoop = () => {
+        const st = useStore.getState();
+        const start = st.loopStart || 0;
+        const end = st.loopEnd || st.sequenceDuration;
+        if (end - start <= 0.05) return;
+        applySelection(start, end);
     };
 
     /**
@@ -869,9 +882,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 const start = +Math.min(startTime, currTime).toFixed(2);
                 const end = +Math.max(startTime, currTime).toFixed(2);
                 if (end - start > 0.05) {
+                    // Scoping an edit no longer moves the loop with it. Use the ⟳ on the
+                    // region header to loop what you have selected.
                     useStore.getState().setTimeSelection({ start, end });
-                    useStore.getState().setLoopRange(start, end);
-                    useStore.getState().setIsLoop(true);
                     selectKeyframesInRange(start, end);
                 }
             }
@@ -1706,6 +1719,12 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     }`}
                                     style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
                                     onPointerDown={(e) => handleLoopDrag('bar', e)}
+                                    // Without this the click bubbles to the track behind, whose
+                                    // handler re-centres the loop on the pointer — so releasing a
+                                    // drag of the bar moved it a second time.
+                                    onClick={(e) => e.stopPropagation()}
+                                    onDoubleClick={(e) => { e.stopPropagation(); selectTheLoop(); }}
+                                    title="Drag to move the loop  |  Double-click to select this range for editing"
                                 >
                                     <div
                                         className="w-2.5 h-full bg-editor-accent-purple hover:bg-white rounded-l flex items-center justify-center text-[7px] text-black font-bold select-none cursor-ew-resize shrink-0 z-10"
@@ -1777,6 +1796,14 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 <span className="text-[8px] font-mono text-cyan-200 font-bold select-none pointer-events-none">
                                     REGION ({timeSelection.start.toFixed(1)}s - {timeSelection.end.toFixed(1)}s)
                                 </span>
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        className="w-3.5 h-3.5 bg-black/60 hover:bg-black text-cyan-300 hover:text-editor-accent-purple rounded flex items-center justify-center pointer-events-auto transition-colors"
+                                        onClick={(e) => { e.stopPropagation(); loopTheSelection(); }}
+                                        title="Loop this region (double-click the loop bar for the reverse)"
+                                    >
+                                        <Repeat className="w-2 h-2" />
+                                    </button>
                                 <button
                                     className="w-3.5 h-3.5 bg-black/60 hover:bg-black text-cyan-300 hover:text-white rounded flex items-center justify-center text-[9px] font-bold pointer-events-auto transition-colors"
                                     onClick={(e) => {
@@ -1788,6 +1815,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 >
                                     ✕
                                 </button>
+                                </div>
                             </div>
                         </div>
                     </div>
