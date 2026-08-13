@@ -45,8 +45,9 @@ In a container with browsers pre-installed, set `CHROMIUM_PATH` (or rely on the 
 | `pads` | Each pad serving its own clip · reordering moving the clip and not the slot label · media surviving a reload · legacy index-keyed projects migrating |
 | `selection` | The blue time selection: resizing from either edge · a near miss on the edge still resizing · edges not crossing · sliding the region · the intensity drag surviving the axis split · selection and loop staying independent and converting both ways · the clear button |
 | `easing` | The Line tool's click–preview–click gesture and Esc · easing presets reaching keyframes that carry bezier handles · a second preset click acting on the same selection |
-| `transport` | Scrubbing and playback running past the old 10-second ceiling · the playhead line tracking it |
+| `transport` | Scrubbing and playback running past the old 10-second ceiling · the playhead line tracking it · the lane labels covering a playhead scrolled behind them |
 | `padproxy` | Building a proxy from a pad's own button · the viewport drawing it instead of seeking the clip · the proxy being keyed by clip rather than slot · surviving a reload |
+| `transport-audio` | One audio player rather than two · the loop still wrapping while recording, without stretching the sequence |
 | `midi` | Note-on pad switching and note-off being ignored · the knob sweep recording across the timeline rather than bunching at zero · the connection indicator. Driven by a fake MIDIAccess injected before boot, so no hardware is needed. |
 | `proxy` | How a clip is sampled for the frame proxy · reading its shape out of ffmpeg's log · real extraction end to end · giving up rather than hanging · the cap on decoded frames held on the GPU |
 

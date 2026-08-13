@@ -50,8 +50,12 @@ frames far too large to hold. It now:
 - downscales to 480p (never upscales) and writes JPEG instead of PNG
 - frees each frame from the wasm filesystem as it reads it, and terminates the core
   afterwards instead of leaving its heap alive for the session
-- gives up with a readable message instead of spinning forever when the decoder stops
-  answering, which it does on clips too large for the wasm heap
+- steps the frame size down and retries when the decoder cannot fit the frame, rather than
+  failing the whole extraction — how large a frame the wasm heap can hold varies by machine
+  and browser, and it announces the limit either as a trap ("memory access out of bounds")
+  or by silently ceasing to answer
+- gives up with a readable message instead of spinning forever once even the smallest size
+  has failed
 
 *Playback* (`preview/FrameSequenceScene.tsx`) uploaded every frame to the GPU before showing
 anything, so a proxy covering a whole clip was unusable by construction. Frames are now

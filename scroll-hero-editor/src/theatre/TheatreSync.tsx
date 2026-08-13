@@ -106,12 +106,17 @@ export default function TheatreSync() {
                     }
                 }
 
-                // Dynamic duration extension during recording
-                if (isRec && nextPos >= currentDuration - 1) {
+                // Dynamic duration extension during recording — but not while looping, where
+                // the point is to stay inside the loop rather than run past its end.
+                if (isRec && !isLp && nextPos >= currentDuration - 1) {
                     useStore.getState().setSequenceDuration(Math.ceil(nextPos + 5));
                 }
 
-                if (isLp && !isRec && (nextPos >= endL || nextPos < startL)) {
+                // Recording used to suppress looping outright, so record + loop ran straight
+                // past the loop end and extended the sequence instead. Looping while
+                // recording is the whole point of a loop: each pass replays the same span so
+                // a performance can be built up over it.
+                if (isLp && (nextPos >= endL || nextPos < startL)) {
                     playhead.position = startL;
                     if (audioRef.current && audioUrl) {
                         audioRef.current.currentTime = startL;

@@ -102,5 +102,46 @@ await setLength(30);
         `${during}s`);
 }
 
+// ── Scrolled far enough, the playhead hides behind the lane labels ──
+//
+// The playhead is pinned to its time in the scrolling content, so scrolling right slides it
+// left. The label column is sticky and opaque, so it should cover it — otherwise the
+// playhead is drawn over the lane names and looks like it has run off before the start.
+{
+    await scrubTo(0);   // the playhead has to be near the start for a small scroll to reach it
+    // Zoom in so the lanes are actually scrollable; at 1x there is nothing to scroll.
+    for (let i = 0; i < 6; i++) {
+        await page.locator('button[title*="Zoom"]').last().click().catch(() => {});
+        await page.waitForTimeout(120);
+    }
+    const geom = await page.evaluate(() => {
+        const el = document.querySelector('div.overflow-x-auto.thin-scrollbar');
+        el.scrollLeft = 42;
+        const line = [...document.querySelectorAll('div')].find((d) =>
+            typeof d.className === 'string'
+            && d.className.includes('w-[1.5px]')
+            && d.className.includes('bg-red-500'));
+        const label = [...document.querySelectorAll('span')]
+            .filter((s) => s.textContent?.trim() === 'Audio Wave')
+            .map((s) => s.closest('[class*="w-[120px]"]'))
+            .find(Boolean);
+        const lb = label.getBoundingClientRect();
+        return {
+            playheadX: Math.round(line.getBoundingClientRect().x),
+            labelLeft: Math.round(lb.x),
+            labelRight: Math.round(lb.right),
+            playheadZ: Number(getComputedStyle(line).zIndex),
+            labelZ: Number(getComputedStyle(label).zIndex),
+        };
+    });
+    await page.waitForTimeout(200);
+
+    const behindLabels = geom.playheadX >= geom.labelLeft && geom.playheadX < geom.labelRight;
+    r.ok('scrolling puts the playhead inside the label column (sanity check)', behindLabels,
+        `playhead at ${geom.playheadX}, labels ${geom.labelLeft}..${geom.labelRight}`);
+    r.ok('the labels are painted over it rather than under it', geom.labelZ > geom.playheadZ,
+        `label z-${geom.labelZ} vs playhead z-${geom.playheadZ}`);
+}
+
 await browser.close();
 process.exit(r.summary() ? 0 : 1);
