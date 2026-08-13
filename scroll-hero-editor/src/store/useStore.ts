@@ -11,6 +11,14 @@ type ScrollKf = { time: number; value: number; easing?: string; handleOut?: { dt
  * stored under `video-pad-<index>`, which meant reordering pads left the bytes behind and
  * a reload could not re-hydrate the (already dead) blob: URL.
  */
+export type PadProxy = {
+    status: 'building' | 'ready' | 'error';
+    /** 0–1 while building. */
+    progress: number;
+    frames: Blob[];
+    error?: string;
+};
+
 export type VideoPad = { id: number; name: string; url: string; color?: string; mediaKey?: string };
 
 /**
@@ -117,6 +125,10 @@ interface EditorState {
     extractionError: string | null; setExtractionError: (msg: string | null) => void;
     /** Names of connected MIDI inputs, so the transport can say whether a controller is seen. */
     midiInputs: string[]; setMidiInputs: (names: string[]) => void;
+    /** Downscaled frame proxies, keyed by clip rather than pad slot. See utils/padProxy.ts. */
+    padProxies: Record<string, PadProxy>;
+    setPadProxy: (key: string, proxy: PadProxy) => void;
+    clearPadProxy: (key: string) => void;
     isScrubbing: boolean; setIsScrubbing: (v: boolean) => void;
     // Whether the last autosave stored everything, dropped the recordings, or failed.
     autosaveStatus: 'ok' | 'trimmed' | 'failed'; setAutosaveStatus: (s: 'ok' | 'trimmed' | 'failed') => void;
@@ -311,6 +323,12 @@ export const useStore = create<EditorState>((set, get) => {
     extractionStatus: 'idle', setExtractionStatus: (s) => set({ extractionStatus: s }),
     extractionError: null, setExtractionError: (msg) => set({ extractionError: msg }),
     midiInputs: [], setMidiInputs: (names) => set({ midiInputs: names }),
+    padProxies: {},
+    setPadProxy: (key, proxy) => set((s) => ({ padProxies: { ...s.padProxies, [key]: proxy } })),
+    clearPadProxy: (key) => set((s) => {
+        const { [key]: _dropped, ...rest } = s.padProxies;
+        return { padProxies: rest };
+    }),
     isScrubbing: false, setIsScrubbing: (v) => set({ isScrubbing: v }),
     autosaveStatus: 'ok', setAutosaveStatus: (v) => set({ autosaveStatus: v }),
     scrollKeyframes: [],

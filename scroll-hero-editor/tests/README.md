@@ -46,6 +46,7 @@ In a container with browsers pre-installed, set `CHROMIUM_PATH` (or rely on the 
 | `selection` | The blue time selection: resizing from either edge · a near miss on the edge still resizing · edges not crossing · sliding the region · the intensity drag surviving the axis split · selection and loop staying independent and converting both ways · the clear button |
 | `easing` | The Line tool's click–preview–click gesture and Esc · easing presets reaching keyframes that carry bezier handles · a second preset click acting on the same selection |
 | `transport` | Scrubbing and playback running past the old 10-second ceiling · the playhead line tracking it |
+| `padproxy` | Building a proxy from a pad's own button · the viewport drawing it instead of seeking the clip · the proxy being keyed by clip rather than slot · surviving a reload |
 | `midi` | Note-on pad switching and note-off being ignored · the knob sweep recording across the timeline rather than bunching at zero · the connection indicator. Driven by a fake MIDIAccess injected before boot, so no hardware is needed. |
 | `proxy` | How a clip is sampled for the frame proxy · reading its shape out of ffmpeg's log · real extraction end to end · giving up rather than hanging · the cap on decoded frames held on the GPU |
 
@@ -70,8 +71,12 @@ without booting the editor next to it. Two things to know if you extend it:
 
 - **The wasm decoder has a ceiling in a container.** Headless Chromium here cannot grow the
   heap past roughly 170k output pixels per frame; above that the ffmpeg core stops answering
-  rather than failing. The spec asks for a smaller proxy for that reason. This is the
-  container's limit, not the app's — the previous full-resolution command stalls here too.
+  rather than failing. This is the container's limit, not the app's — the previous
+  full-resolution command stalls here too. The app's 480p default sits under it for the test
+  clips, so `padproxy` builds through the real UI path; `proxy` asks for a smaller one still.
+- **The store cannot be reached from `page.evaluate`.** A dynamic `import()` of the store
+  module gets its own instance, not the app's, so writes to it are invisible to the running
+  app. Drive the UI instead, or read the autosaved project out of localStorage.
 - **Two `exec` calls on one core are fine, but the first must produce an output.** Running
   `-i input` with no output prints the clip's details and exits non-zero, which leaves the
   core wedged for everything after it. Decoding one frame to `-f null -` gets the same

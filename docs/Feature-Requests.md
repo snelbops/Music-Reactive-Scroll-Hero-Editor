@@ -47,7 +47,7 @@ frames far too large to hold. It now:
   formats the browser itself cannot decode — the point of a proxy
 - picks a sampling rate that fits the whole clip inside a frame budget, lowering the rate
   rather than truncating, so a ten-minute clip is covered end to end
-- downscales to 540p (never upscales) and writes JPEG instead of PNG
+- downscales to 480p (never upscales) and writes JPEG instead of PNG
 - frees each frame from the wasm filesystem as it reads it, and terminates the core
   afterwards instead of leaving its heap alive for the session
 - gives up with a readable message instead of spinning forever when the decoder stops
@@ -66,11 +66,21 @@ the running seek lands.
 
 Covered by `tests/e2e/proxy.spec.mjs`.
 
-**Still open**
+**Per-pad proxies — done**
 
-The proxy is only reachable through "Extract Frames" on the single master asset. The video
-pads scrub their clips directly, so they do not benefit from it yet — wiring per-pad proxies
-(extraction queue, storage in IndexedDB, automatic fallback) is the natural next step.
+Each pad now builds and keeps its own. The ⚡ on a pad builds a proxy for that pad's clip;
+the button carries the state (building with a percentage, ready with a frame count, or the
+error). When the active pad has one, the viewport draws from its frames instead of seeking
+the clip, so scrubbing costs an array index rather than a keyframe-to-keyframe decode.
+
+- Proxies are keyed by clip, not by slot, so reordering pads cannot desync them — the same
+  reason `mediaKey` exists
+- Stored in IndexedDB as a single entry per clip and picked up again on load, since building
+  one is far too slow to repeat every session
+- Builds are queued: ffmpeg.wasm is single-threaded and memory-hungry, so two at once is
+  worse than one after the other
+- Only the `fit` sync mode uses the proxy. `realtime` and `loop` need real clip time rather
+  than a position along it, so they stay on the video element.
 
 ~~The Video Frames lane says 'Click "Load as Scene" to preview', but no such button exists.~~
 Fixed — the lane now has the button it was telling you to press.

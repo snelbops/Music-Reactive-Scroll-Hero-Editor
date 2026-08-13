@@ -38,7 +38,7 @@ export interface ProxyPlan {
 
 const DEFAULTS: Required<ProxyOptions> = {
     maxFrames: 600,
-    maxHeight: 540,
+    maxHeight: 480,
     targetFps: 20,
     quality: 5,
     timeoutMs: 4 * 60 * 1000,

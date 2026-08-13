@@ -1,6 +1,7 @@
 import { useStore, type VideoPad } from '../store/useStore';
 import type { ParamKf } from './interpolate';
 import { saveMediaFile, loadMediaFile, getMediaDataUrl, dataUrlToBlob, getMediaBlob, newPadMediaKey, revokeMediaUrl } from './mediaStore';
+import { rehydratePadProxies } from './padProxy';
 
 /**
  * Pad and light-image URLs are `blob:` URLs, which die with the page. The bytes live on in
@@ -351,6 +352,10 @@ export async function loadWorkingProject(): Promise<boolean> {
             }
             // Pads and light images carry their own stored files — revive those too.
             await rehydrateMediaUrls();
+            // Proxies are expensive to build, so a stored one is picked back up rather than
+            // rebuilt. Deliberately not awaited: it only makes scrubbing cheaper, and the
+            // editor should not wait on it to open.
+            void rehydratePadProxies();
             return true;
         }
     } catch (e) {}
@@ -440,6 +445,7 @@ export async function loadProjectFromFile(file: File): Promise<void> {
 
     // Pad URLs in the file are blob: URLs from whoever saved it — always dead here.
     await rehydrateMediaUrls();
+    void rehydratePadProxies();
 
     autoSaveWorkingProject();
 }
