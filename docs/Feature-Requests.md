@@ -82,9 +82,11 @@ the only thing that switches the viewport to the frame sequence is the Extract b
 
 Not feature requests, but open and worth keeping visible.
 
-- **10-second playback cap.** Theatre's sequence length is fixed at its default, so playback
-  and scrubbing stop at 10s regardless of the project length. Needs an architectural choice:
-  seed the length at project creation, or drive the playhead from our own clock and use
-  Theatre only for interpolation. See `docs/Scroll-Hero-Editor-Audit.md`.
+- ~~**10-second playback cap.**~~ Fixed. Theatre clamps its sequence position to a length
+  fixed when the project is created; `sequence.length` looks assignable but is not a setter,
+  and a length seeded through `getProject({ state })` is ignored once Studio has persisted a
+  state for that project — so seeding could never have helped an existing install. The clock
+  now lives in `theatre/playhead.ts` and the position is mirrored into Theatre only to keep
+  the Studio UI in step. Covered by `tests/e2e/transport.spec.mjs`.
 - **MIDI recording timing** was fixed but never tested against real hardware.
 - **Temporary build banner** in `Layout.tsx` to be removed when no longer useful.

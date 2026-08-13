@@ -1,5 +1,5 @@
 import { useStore } from '../store/useStore';
-import { sheet } from '../theatre/core';
+import { playhead } from '../theatre/playhead';
 import { interpolateScrollAt, interpolateParamAt, type ParamKf } from '../utils/interpolate';
 
 export type VideoExportOptions = {
@@ -168,7 +168,7 @@ export class VideoExporter {
 
             // Pause background TheatreSync loop to prevent playhead conflicts
             useStore.getState().setIsPlaying(false);
-            sheet.sequence.position = 0;
+            playhead.position = 0;
             this.mediaRecorder.start(100);
 
             if (audioEl) {
@@ -183,7 +183,7 @@ export class VideoExporter {
                 if (this.isCancelled) break;
 
                 const t = (i / totalFrames) * seqDur;
-                sheet.sequence.position = t;
+                playhead.position = t;
 
                 // 1. Evaluate scroll keyframes at time t
                 const kfs = useStore.getState().scrollKeyframes;

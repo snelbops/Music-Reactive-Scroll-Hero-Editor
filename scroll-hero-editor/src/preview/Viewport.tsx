@@ -8,7 +8,7 @@ import FrameSequenceScene from './FrameSequenceScene';
 import ScrollyVideoPlayer from './ScrollyVideoPlayer';
 import { useStore } from '../store/useStore';
 import { OrbitAdapter, ClassicAdapter, FrameSequenceAdapter } from './SceneAdapter';
-import { sheet } from '../theatre/core';
+import { playhead } from '../theatre/playhead';
 
 const RATIO_VALUES: Record<string, number | null> = {
     '16:9': 16 / 9,
@@ -70,8 +70,8 @@ export default function Viewport() {
                 // Shift+scroll → scrub playhead only, don't touch scroll progress
                 const seqDur = useStore.getState().sequenceDuration;
                 const delta = (e.deltaY / 800) * seqDur;
-                const next = Math.max(0, Math.min(seqDur, sheet.sequence.position + delta));
-                sheet.sequence.position = next;
+                const next = Math.max(0, Math.min(seqDur, playhead.position + delta));
+                playhead.position = next;
             } else {
                 // Normal scroll → move scroll handle / scene progress only
                 const delta = e.deltaY / 800;
@@ -80,7 +80,7 @@ export default function Viewport() {
                 useStore.getState().setSceneProgress(next);
                 const { isRecording, isPlaying } = useStore.getState();
                 if (isRecording && isPlaying) {
-                    const t = sheet.sequence.position;
+                    const t = playhead.position;
                     useStore.getState().addScrollKeyframe(t, next, lastRecordedTimeRef.current ?? t);
                     lastRecordedTimeRef.current = t;
                 }
@@ -104,7 +104,7 @@ export default function Viewport() {
         setSceneProgress(p);
         const { isRecording, isPlaying } = useStore.getState();
         if (isRecording && isPlaying) {
-            const t = sheet.sequence.position;
+            const t = playhead.position;
             addScrollKeyframe(t, p, lastRecordedTimeRef.current ?? t);
             lastRecordedTimeRef.current = t;
         }
