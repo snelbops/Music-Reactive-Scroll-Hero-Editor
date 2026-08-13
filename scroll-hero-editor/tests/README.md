@@ -43,6 +43,8 @@ In a container with browsers pre-installed, set `CHROMIUM_PATH` (or rely on the 
 | `inspector` | Panel for lanes without keyframes · hook stability when switching lane types · Enter committing a value · multi-select · per-lane clamping on batch edits · nudge refreshing the readout · the bezier editor following the selection |
 | `project` | Undo/redo stepping once · typing guard · curve smooth/reduce · export duration · shape presets spanning the project · renderer consistency · preset restore · New Project resetting recordings |
 | `pads` | Each pad serving its own clip · reordering moving the clip and not the slot label · media surviving a reload · legacy index-keyed projects migrating |
+| `selection` | The blue time selection: resizing from either edge · edges not crossing · sliding the region · the intensity drag surviving the axis split · the loop staying in step · the clear button |
+| `proxy` | How a clip is sampled for the frame proxy · reading its shape out of ffmpeg's log · real extraction end to end · giving up rather than hanging · the cap on decoded frames held on the GPU |
 
 ## Writing more
 
@@ -58,3 +60,16 @@ Two traps worth knowing, both of which produced false passes here:
 
 Also note React ignores a directly assigned `input.value`; use the native setter when
 simulating input.
+
+`proxy.spec.mjs` works differently from the rest: it serves a blank document on the app's
+origin and imports the app's own modules from the dev server, so it exercises the real code
+without booting the editor next to it. Two things to know if you extend it:
+
+- **The wasm decoder has a ceiling in a container.** Headless Chromium here cannot grow the
+  heap past roughly 170k output pixels per frame; above that the ffmpeg core stops answering
+  rather than failing. The spec asks for a smaller proxy for that reason. This is the
+  container's limit, not the app's — the previous full-resolution command stalls here too.
+- **Two `exec` calls on one core are fine, but the first must produce an output.** Running
+  `-i input` with no output prints the clip's details and exits non-zero, which leaves the
+  core wedged for everything after it. Decoding one frame to `-f null -` gets the same
+  information and exits cleanly.

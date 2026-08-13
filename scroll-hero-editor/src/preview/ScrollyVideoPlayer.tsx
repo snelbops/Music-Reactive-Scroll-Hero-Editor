@@ -10,10 +10,30 @@ export default function ScrollyVideoPlayer() {
     const videoSyncMode = useStore((state) => state.videoSyncMode);
     const videoSpeedRatio = useStore((state) => state.videoSpeedRatio);
     const videoRef = useRef<HTMLVideoElement>(null);
+    // Newest requested time while a seek is already in flight. See seekTo below.
+    const pendingSeekRef = useRef<number | null>(null);
 
     const setVideoNaturalDimensions = useStore((state) => state.setVideoNaturalDimensions);
     const activePad = videoPads[activeVideoPadIdx];
     const currentUrl = activePad?.url || videoUrl || '/sample.mp4';
+
+    /**
+     * A seek issued while another is still running is dropped by the browser, and on a
+     * high-resolution long-GOP file each one takes long enough that scrolling produces
+     * them faster than they complete. Holding only the newest target and applying it when
+     * the current seek lands keeps the picture tracking the scroll instead of falling
+     * behind a backlog of stale positions.
+     */
+    const seekTo = (v: HTMLVideoElement, time: number) => {
+        const clamped = Math.max(0, Math.min(v.duration - 0.01, time));
+        if (v.seeking) {
+            pendingSeekRef.current = clamped;
+            return;
+        }
+        pendingSeekRef.current = null;
+        if (Math.abs(v.currentTime - clamped) < 0.001) return;
+        v.currentTime = clamped;
+    };
 
     // Direct synchronous HTML5 video currentTime seeking — supporting fit, realtime, and loop modes + speed ratio
     useEffect(() => {
@@ -33,7 +53,7 @@ export default function ScrollyVideoPlayer() {
                 targetTime = currentTimelineTime;
             }
 
-            v.currentTime = Math.max(0, Math.min(v.duration - 0.01, targetTime));
+            seekTo(v, targetTime);
         }
     }, [scrollProgress, sequenceDuration, videoSyncMode, videoSpeedRatio]);
 
@@ -62,7 +82,13 @@ export default function ScrollyVideoPlayer() {
                     }
                 }}
                 onSeeked={() => {
-                    // Ensures frame is cleanly rendered without lag
+                    // Catch up to wherever the scroll got to while this seek was running.
+                    const v = videoRef.current;
+                    const pending = pendingSeekRef.current;
+                    pendingSeekRef.current = null;
+                    if (v && pending !== null && Math.abs(v.currentTime - pending) > 0.001) {
+                        v.currentTime = pending;
+                    }
                 }}
             />
         </div>
