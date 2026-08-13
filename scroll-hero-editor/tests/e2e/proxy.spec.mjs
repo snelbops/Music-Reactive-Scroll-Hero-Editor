@@ -44,7 +44,7 @@ await page.goto(new URL('/__proxy_spec', APP_URL).href, { waitUntil: 'domcontent
     r.ok('coverage beats the old fixed 12-second window',
         plans.long.frames / plans.long.fps > plans.legacySeconds * 10);
 
-    r.ok('frames are downscaled', plans.short.height === 540, `${plans.short.height}px tall`);
+    r.ok('frames are downscaled', plans.short.height === 480, `${plans.short.height}px tall`);
     r.ok('a source smaller than the proxy size is not upscaled', plans.small.height === 360,
         `${plans.small.height}px tall`);
     r.ok('an unreadable duration still yields a workable plan',

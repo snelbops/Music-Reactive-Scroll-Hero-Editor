@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { ChevronDown, ChevronRight, UploadCloud, Video, Film, Layers, SlidersHorizontal, ImageIcon, X, Sparkles, Grid, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, UploadCloud, Video, Film, Layers, SlidersHorizontal, ImageIcon, X, Sparkles, Grid, Plus, Zap } from 'lucide-react';
 import { saveMediaFile, putMediaFile, getMediaBlob, newPadMediaKey } from '../utils/mediaStore';
 import { cacheActiveVideo } from '../utils/videoCache';
 import { extractFrames } from '../packages/ffmpegExtractor';
+import { buildPadProxy, padProxyKey } from '../utils/padProxy';
 
 const PARTICLE_LAB_PRESETS = [
     { id: 'orbit' as const,            label: 'Orbit',             description: 'Dark bg · white particles' },
@@ -60,6 +61,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
     const setActiveVideoBlob = useStore(s => s.setActiveVideoBlob);
 
     const videoPads = useStore(s => s.videoPads);
+    const padProxies = useStore(s => s.padProxies);
     const activeVideoPadIdx = useStore(s => s.activeVideoPadIdx);
     const setActiveVideoPadIdx = useStore(s => s.setActiveVideoPadIdx);
     const setVideoPad = useStore(s => s.setVideoPad);
@@ -221,6 +223,9 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                             }
                                         };
 
+                                        const proxyKey = padProxyKey(pad);
+                                        const proxy = proxyKey ? padProxies[proxyKey] : undefined;
+
                                         const isWideZeroPad = pad.id === 0;
 
                                         return (
@@ -289,6 +294,39 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                                                     }}
                                                                 >
                                                                     ✕
+                                                                </button>
+                                                            )}
+                                                            {pad.url && (
+                                                                <button
+                                                                    data-purpose="pad-proxy-button"
+                                                                    title={
+                                                                        proxy?.status === 'ready'
+                                                                            ? `Proxy ready — ${proxy.frames.length} frames. Click to rebuild.`
+                                                                            : proxy?.status === 'building'
+                                                                                ? `Building proxy… ${Math.round(proxy.progress * 100)}%`
+                                                                                : proxy?.status === 'error'
+                                                                                    ? `Proxy failed: ${proxy.error ?? 'unknown error'}`
+                                                                                    : 'Build a scrubbing proxy for this clip'
+                                                                    }
+                                                                    className={`text-[8px] p-0.5 rounded transition-all ${
+                                                                        proxy?.status === 'ready'
+                                                                            ? 'text-editor-accent-green opacity-100'
+                                                                            : proxy?.status === 'building'
+                                                                                ? 'text-editor-accent-orange opacity-100 animate-pulse'
+                                                                                : proxy?.status === 'error'
+                                                                                    ? 'text-red-400 opacity-100'
+                                                                                    : 'text-editor-muted hover:text-editor-fg opacity-0 group-hover/pad:opacity-100'
+                                                                    }`}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        if (proxy?.status === 'building') return;
+                                                                        if (proxyKey && proxy?.status === 'ready') {
+                                                                            useStore.getState().clearPadProxy(proxyKey);
+                                                                        }
+                                                                        void buildPadProxy(idx);
+                                                                    }}
+                                                                >
+                                                                    <Zap className="w-2.5 h-2.5" />
                                                                 </button>
                                                             )}
                                                             <button

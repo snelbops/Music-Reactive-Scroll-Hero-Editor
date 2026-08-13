@@ -1,5 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
+import { padProxyKey } from '../utils/padProxy';
+import ProxyFramePlayer from './ProxyFramePlayer';
 
 export default function ScrollyVideoPlayer() {
     const scrollProgress = useStore((state) => state.scrollProgress);
@@ -14,8 +16,14 @@ export default function ScrollyVideoPlayer() {
     const pendingSeekRef = useRef<number | null>(null);
 
     const setVideoNaturalDimensions = useStore((state) => state.setVideoNaturalDimensions);
+    const padProxies = useStore((state) => state.padProxies);
     const activePad = videoPads[activeVideoPadIdx];
     const currentUrl = activePad?.url || videoUrl || '/sample.mp4';
+
+    // A pad with a built proxy is shown from its frames instead of by seeking the clip.
+    const proxyKey = padProxyKey(activePad);
+    const proxy = proxyKey ? padProxies[proxyKey] : undefined;
+    const useProxy = proxy?.status === 'ready' && proxy.frames.length > 0;
 
     /**
      * A seek issued while another is still running is dropped by the browser, and on a
@@ -56,6 +64,15 @@ export default function ScrollyVideoPlayer() {
             seekTo(v, targetTime);
         }
     }, [scrollProgress, sequenceDuration, videoSyncMode, videoSpeedRatio]);
+
+    if (useProxy) {
+        // 'fit' maps the whole clip across the sequence, which is exactly what an index into
+        // the proxy expresses. The other sync modes still need real time, so they keep the
+        // video element and its seeking.
+        if (videoSyncMode === 'fit') {
+            return <ProxyFramePlayer frames={proxy.frames} progress={scrollProgress * videoSpeedRatio} />;
+        }
+    }
 
     if (!currentUrl) return null;
 

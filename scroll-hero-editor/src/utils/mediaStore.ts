@@ -43,6 +43,42 @@ export async function putMediaFile(key: string, file: Blob | File): Promise<void
     }
 }
 
+/**
+ * Store any structured-cloneable value — used for a pad's proxy, which is an array of JPEG
+ * blobs rather than a single file. IndexedDB clones arrays of Blobs directly, so a whole
+ * proxy is one entry rather than several hundred.
+ */
+export async function putMediaValue(key: string, value: unknown): Promise<void> {
+    try {
+        const db = await openDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).put(value, key);
+        await new Promise((res, rej) => {
+            tx.oncomplete = res;
+            tx.onerror = rej;
+        });
+    } catch (e) {
+        console.warn('Could not save value to IndexedDB:', e);
+    }
+}
+
+/** Read back a value stored by putMediaValue. */
+export async function getMediaValue<T>(key: string): Promise<T | null> {
+    try {
+        const db = await openDB();
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const req = tx.objectStore(STORE_NAME).get(key);
+        const value = await new Promise<T | undefined>((res, rej) => {
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => rej(req.error);
+        });
+        return value ?? null;
+    } catch (e) {
+        console.warn('Could not read value from IndexedDB:', e);
+        return null;
+    }
+}
+
 /** Release an Object URL previously minted here. Safe to call with anything. */
 export function revokeMediaUrl(url: string | undefined | null): void {
     if (url && url.startsWith('blob:')) {
