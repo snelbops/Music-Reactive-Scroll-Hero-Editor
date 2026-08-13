@@ -63,6 +63,9 @@ Two traps worth knowing, both of which produced false passes here:
   clobbered by the outgoing page. Use `seededPage`, which seeds in an init script.
 - **The playhead's grab strip can sit over a keyframe dot.** Park it elsewhere before clicking
   a dot, or the click lands on the playhead.
+- **The timeline opens isolated to Scroll POS.** `freshPage` and `seededPage` click ALL so a
+  spec gets every lane; pass `{ isolate: 'default' }` to see the shipped layout. A `page.reload()`
+  mid-spec comes back on the default, so call `showAllLanes` again after one.
 
 Also note React ignores a directly assigned `input.value`; use the native setter when
 simulating input.
