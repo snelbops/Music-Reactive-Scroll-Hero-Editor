@@ -44,6 +44,7 @@ In a container with browsers pre-installed, set `CHROMIUM_PATH` (or rely on the 
 | `project` | Undo/redo stepping once · typing guard · curve smooth/reduce · export duration · shape presets spanning the project · renderer consistency · preset restore · New Project resetting recordings |
 | `pads` | Each pad serving its own clip · reordering moving the clip and not the slot label · media surviving a reload · legacy index-keyed projects migrating |
 | `selection` | The blue time selection: resizing from either edge · a near miss on the edge still resizing · edges not crossing · sliding the region · the intensity drag surviving the axis split · the loop staying in step · the clear button |
+| `easing` | The Line tool's click–preview–click gesture and Esc · easing presets reaching keyframes that carry bezier handles · a second preset click acting on the same selection |
 | `transport` | Scrubbing and playback running past the old 10-second ceiling · the playhead line tracking it |
 | `proxy` | How a clip is sampled for the frame proxy · reading its shape out of ffmpeg's log · real extraction end to end · giving up rather than hanging · the cap on decoded frames held on the GPU |
 

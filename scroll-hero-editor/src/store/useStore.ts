@@ -13,6 +13,43 @@ type ScrollKf = { time: number; value: number; easing?: string; handleOut?: { dt
  */
 export type VideoPad = { id: number; name: string; url: string; color?: string; mediaKey?: string };
 
+/**
+ * Applies an easing preset to the keyframe at `time`.
+ *
+ * A segment is drawn and evaluated from bezier handles whenever *either* of its ends carries
+ * one, so a preset can only take effect if the handles on that segment go with it. This used
+ * to preserve them, which made every preset a no-op on any keyframe that had handles — the
+ * Line tool gave every point it created a pair, so clicking Ease In on its output did
+ * nothing at all.
+ *
+ * A preset governs the segment leaving the keyframe: its own `handleOut`, and the incoming
+ * handle of the keyframe after it. The neighbour's own easing is left alone. `bezier` is the
+ * one preset that means "use the handles", so it seeds them instead of clearing them.
+ */
+function applyEasingAt<T extends { time: number; easing?: string; handleIn?: { dt: number; dv: number }; handleOut?: { dt: number; dv: number } }>(
+    kfs: T[],
+    time: number,
+    easing: string,
+): T[] {
+    const idx = kfs.findIndex(kf => Math.abs(kf.time - time) < 0.015);
+    if (idx < 0) return kfs;
+
+    return kfs.map((kf, i) => {
+        if (i === idx) {
+            return easing === 'bezier'
+                ? {
+                    ...kf,
+                    easing,
+                    handleIn: kf.handleIn ?? { dt: -0.3, dv: 0 },
+                    handleOut: kf.handleOut ?? { dt: 0.3, dv: 0 },
+                  }
+                : { ...kf, easing, handleOut: undefined };
+        }
+        if (i === idx + 1 && easing !== 'bezier') return { ...kf, handleIn: undefined };
+        return kf;
+    });
+}
+
 type HistorySnapshot = {
     scrollKeyframes: ScrollKf[];
     paramKeyframes: Record<string, ParamKf[]>;
@@ -292,16 +329,7 @@ export const useStore = create<EditorState>((set, get) => {
     clearScrollKeyframes: () => set({ scrollKeyframes: [] }),
     setScrollKeyframes: (kfs) => set({ scrollKeyframes: kfs }),
     updateScrollKeyframeEasing: (time, easing) => set((s) => ({
-        scrollKeyframes: s.scrollKeyframes.map(kf =>
-            Math.abs(kf.time - time) < 0.015
-                ? {
-                    ...kf,
-                    easing,
-                    handleIn: easing === 'bezier' ? (kf.handleIn ?? { dt: -0.3, dv: 0 }) : kf.handleIn,
-                    handleOut: easing === 'bezier' ? (kf.handleOut ?? { dt: 0.3, dv: 0 }) : kf.handleOut,
-                  }
-                : kf
-        ),
+        scrollKeyframes: applyEasingAt(s.scrollKeyframes, time, easing),
     })),
     updateScrollKeyframeHandle: (time, side, handle) => set((s) => ({
         scrollKeyframes: s.scrollKeyframes.map(kf =>
@@ -328,16 +356,10 @@ export const useStore = create<EditorState>((set, get) => {
         paramKeyframes: { ...s.paramKeyframes, [laneId]: (s.paramKeyframes[laneId] ?? []).filter(kf => Math.abs(kf.time - time) > 0.005) },
     })),
     updateParamKeyframeEasing: (laneId, time, easing) => set((s) => ({
-        paramKeyframes: { ...s.paramKeyframes, [laneId]: (s.paramKeyframes[laneId] ?? []).map(kf =>
-            Math.abs(kf.time - time) < 0.015
-                ? {
-                    ...kf,
-                    easing,
-                    handleIn: easing === 'bezier' ? (kf.handleIn ?? { dt: -0.3, dv: 0 }) : kf.handleIn,
-                    handleOut: easing === 'bezier' ? (kf.handleOut ?? { dt: 0.3, dv: 0 }) : kf.handleOut,
-                  }
-                : kf
-        ) },
+        paramKeyframes: {
+            ...s.paramKeyframes,
+            [laneId]: applyEasingAt((s.paramKeyframes[laneId] ?? []) as ParamKf[], time, easing),
+        },
     })),
     updateParamKeyframeValue: (laneId, time, value) => set((s) => ({
         paramKeyframes: { ...s.paramKeyframes, [laneId]: (s.paramKeyframes[laneId] ?? []).map(kf => Math.abs(kf.time - time) < 0.015 ? { ...kf, value } : kf) },
