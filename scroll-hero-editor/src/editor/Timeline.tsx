@@ -204,7 +204,6 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const [showRhythmModal, setShowRhythmModal] = useState(false);
     const loopTrackRef = useRef<HTMLDivElement>(null);
     const selectionTrackRef = useRef<HTMLDivElement>(null);
-    const audioRef = useRef<HTMLAudioElement>(null);
     const audioUploadInputRef = useRef<HTMLInputElement>(null);
     const canUndo = useStore(s => s._past.length > 0);
     const canRedo = useStore(s => s._future.length > 0);
@@ -1244,26 +1243,10 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         });
     }, []);
 
-    // Sync HTML5 Audio element to playback position & seamless loop wrap
-    useEffect(() => {
-        const a = audioRef.current;
-        if (!a || !audioUrl) return;
-
-        if (isPlaying) {
-            const seqPos = playhead.position;
-            const diff = Math.abs(a.currentTime - seqPos);
-            if (diff > 0.15) {
-                a.currentTime = Math.max(0, Math.min(a.duration || 300, seqPos));
-            }
-            if (a.paused) {
-                a.play().catch(() => {});
-            }
-        } else {
-            if (!a.paused) {
-                a.pause();
-            }
-        }
-    }, [isPlaying, seqTime, audioUrl]);
+    // The audio element used to live here as well as in TheatreSync, each with its own
+    // play/pause and drift correction on the same file — two players a fraction of a second
+    // apart, which is what the doubled audio was. TheatreSync owns it now: it owns the clock,
+    // and it stays mounted whatever the timeline is showing.
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
@@ -1677,6 +1660,9 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         full lane height, which meant any keyframe sitting under the playhead
                         could not be clicked. Dragging now happens on the grab strip below,
                         which is confined to the ruler band. */}
+                    {/* The lane label column is sticky and opaque at z-[70], so a playhead
+                        scrolled behind it is covered rather than drawn over the labels —
+                        which looked like the playhead had run off before the start. */}
                     <div
                         className="absolute top-0 bottom-0 w-[1.5px] bg-red-500 z-[60] pointer-events-none shadow-[0_0_8px_rgba(239,68,68,0.8)] group/playhead"
                         style={{ left: `calc(120px + (100% - 120px) * ${seqTime / sequenceDuration})` }}
@@ -1837,7 +1823,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 {(isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('audio') }}>
                     <div
-                        className={`w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border sticky left-0 z-30 overflow-hidden cursor-pointer transition-colors ${selectedLane === 'audio' ? 'bg-editor-surface-hover border-l-2 border-editor-accent-blue text-editor-fg font-semibold' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}
+                        className={`w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border sticky left-0 z-[70] overflow-hidden cursor-pointer transition-colors ${selectedLane === 'audio' ? 'bg-editor-surface-hover border-l-2 border-editor-accent-blue text-editor-fg font-semibold' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}
                         onClick={() => setSelectedLane('audio')}
                     >
                         <div className="flex items-center gap-1.5 overflow-hidden">
@@ -1867,7 +1853,6 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             setAudioMenu({ visible: true, x: e.clientX, y: e.clientY, clickTime });
                         }}
                     >
-                        <audio ref={audioRef} src={audioUrl || undefined} preload="auto" />
                         <input
                             ref={audioUploadInputRef}
                             type="file"
@@ -1934,7 +1919,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 )}
                 {(isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: 40 }}>
-                    <div className="w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border bg-editor-panel text-editor-fg sticky left-0 z-30 overflow-hidden">
+                    <div className="w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border bg-editor-panel text-editor-fg sticky left-0 z-[70] overflow-hidden">
                         <div className="flex items-center gap-1.5 overflow-hidden">
                             <Grid className="w-3 h-3 text-amber-400 shrink-0" />
                             <span className="text-[10px] uppercase font-bold text-amber-400 truncate">Drum Pads</span>
@@ -2068,7 +2053,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 )}
                 {extractedFrames.length > 0 && (isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('videoFrames') }}>
-                    <div className={`w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border sticky left-0 z-30 cursor-pointer transition-colors overflow-hidden ${activePreset === 'frames' ? 'bg-editor-surface-hover border-l-2 border-editor-accent-purple font-semibold' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}>
+                    <div className={`w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border sticky left-0 z-[70] cursor-pointer transition-colors overflow-hidden ${activePreset === 'frames' ? 'bg-editor-surface-hover border-l-2 border-editor-accent-purple font-semibold' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}>
                         <div className="flex flex-col justify-center gap-0.5 overflow-hidden">
                             <div className="flex items-center gap-1 w-full">
                                 <Video className="w-2.5 h-2.5 shrink-0 text-editor-accent-blue" />
@@ -2106,7 +2091,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 )}
                 {(isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('mouseX') }}>
-                    <div className="w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border bg-editor-panel text-editor-fg sticky left-0 z-30 overflow-hidden">
+                    <div className="w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border bg-editor-panel text-editor-fg sticky left-0 z-[70] overflow-hidden">
                         <div className="flex items-center gap-2 overflow-hidden">
                             <MousePointer2 className="w-2.5 h-2.5 text-editor-accent-blue shrink-0" />
                             <span className="text-[10px] uppercase font-normal text-[#d9d9d9] truncate">Mouse X</span>
@@ -2138,7 +2123,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 )}
                 {(isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('mouseY') }}>
-                    <div className="w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border bg-editor-panel text-editor-fg sticky left-0 z-30 overflow-hidden">
+                    <div className="w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border bg-editor-panel text-editor-fg sticky left-0 z-[70] overflow-hidden">
                         <div className="flex items-center gap-2 overflow-hidden">
                             <MousePointer2 className="w-2.5 h-2.5 text-editor-accent-blue shrink-0" />
                             <span className="text-[10px] uppercase font-normal text-[#d9d9d9] truncate">Mouse Y</span>
@@ -2171,7 +2156,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 {(isolatedLane === 'all' || isolatedLane === 'scrollPos') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('scrollPos', isolatedLane === 'scrollPos' ? 220 : 100) }}>
                     <div
-                        className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-editor-border sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors overflow-hidden ${isRecording ? 'ring-1 ring-inset ring-red-500/60 bg-red-500/10' : selectedLane === 'scrollPos' ? 'bg-editor-surface-hover border-l-2 border-editor-accent-purple text-editor-fg font-semibold' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}
+                        className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-editor-border sticky left-0 z-[70] gap-0.5 cursor-pointer transition-colors overflow-hidden ${isRecording ? 'ring-1 ring-inset ring-red-500/60 bg-red-500/10' : selectedLane === 'scrollPos' ? 'bg-editor-surface-hover border-l-2 border-editor-accent-purple text-editor-fg font-semibold' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}
                         onClick={() => setSelectedLane('scrollPos')}
                     >
                         <div className="flex items-center justify-between w-full">
@@ -2793,7 +2778,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     return (
                         <div key={lane.id} className="flex border-b border-editor-border group relative" style={{ height: currentLaneHeight }}>
                             <div
-                                className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-editor-border sticky left-0 z-30 gap-0.5 cursor-pointer transition-colors overflow-hidden ${isSelected ? 'bg-editor-surface-hover border-l-2 border-editor-accent-purple text-editor-fg font-semibold' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}
+                                className={`w-[120px] shrink-0 flex flex-col justify-center px-3 border-r border-editor-border sticky left-0 z-[70] gap-0.5 cursor-pointer transition-colors overflow-hidden ${isSelected ? 'bg-editor-surface-hover border-l-2 border-editor-accent-purple text-editor-fg font-semibold' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}
                                 onClick={() => setSelectedLane(lane.id)}
                             >
                                 <div className="flex items-center justify-between w-full">
@@ -3369,7 +3354,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
                 {/* Lane: Click Events */}
                 <div className="flex h-10 border-b border-editor-border group">
-                    <div className="w-[120px] shrink-0 flex items-center gap-1 px-3 border-r border-editor-border bg-editor-panel z-30 overflow-hidden">
+                    <div className="w-[120px] shrink-0 flex items-center gap-1 px-3 border-r border-editor-border bg-editor-panel z-[70] overflow-hidden">
                         <MousePointer2 className="w-2.5 h-2.5 text-[#3b82f6] shrink-0" />
                         <span className="text-[10px] uppercase font-normal text-[#d9d9d9] truncate">Clicks</span>
                     </div>
