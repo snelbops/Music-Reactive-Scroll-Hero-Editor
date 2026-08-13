@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Film, Download, StopCircle, Smartphone, Monitor, Square, Sparkles, Terminal, Play, CheckCircle, Repeat, Clock, FlipHorizontal } from 'lucide-react';
 import { videoExporter } from '../export/exportVideo';
+import { getExporter, UNAVAILABLE_MESSAGE } from '../export/exporter';
 import { useStore } from '../store/useStore';
 import { getMediaDataUrl, blobToDataUrl } from '../utils/mediaStore';
 import { getCachedActiveVideo } from '../utils/videoCache';
@@ -172,40 +173,32 @@ export default function VideoExportModal({ onClose }: VideoExportModalProps) {
                 }
             } catch (_) {}
 
-            const res = await fetch('/api/export-remotion', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    fps,
-                    width,
-                    height,
+            const exporter = getExporter();
+            if (!(await exporter.isAvailable())) throw new Error(UNAVAILABLE_MESSAGE);
+
+            const blob = await exporter.render({
+                fps,
+                width,
+                height,
+                startFrame,
+                durationInFrames,
+                videoBase64,
+                audioBase64,
+                inputProps: {
+                    videoUrl: videoUrl && !videoUrl.startsWith('blob:') ? videoUrl : undefined,
+                    audioUrl: audioUrl && !audioUrl.startsWith('blob:') ? audioUrl : undefined,
                     startFrame,
-                    durationInFrames,
-                    videoBase64,
-                    audioBase64,
-                    inputProps: {
-                        videoUrl: videoUrl && !videoUrl.startsWith('blob:') ? videoUrl : undefined,
-                        audioUrl: audioUrl && !audioUrl.startsWith('blob:') ? audioUrl : undefined,
-                        startFrame,
-                        mirrorVideo,
-                        // Keyframe animation data — MUST come via inputProps since Remotion
-                        // renders in a separate headless Chrome with no Zustand state
-                        scrollKeyframes,
-                        sequenceDuration,
-                        videoSyncMode,
-                        videoSpeedRatio,
-                        videoDuration,
-                        padSwitchEvents: useStore.getState().padSwitchEvents,
-                    },
-                }),
+                    mirrorVideo,
+                    // Keyframe animation data — MUST come via inputProps since Remotion
+                    // renders in a separate headless Chrome with no Zustand state
+                    scrollKeyframes,
+                    sequenceDuration,
+                    videoSyncMode,
+                    videoSpeedRatio,
+                    videoDuration,
+                    padSwitchEvents: useStore.getState().padSwitchEvents,
+                },
             });
-
-            if (!res.ok) {
-                const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.error || 'Remotion server export failed');
-            }
-
-            const blob = await res.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;

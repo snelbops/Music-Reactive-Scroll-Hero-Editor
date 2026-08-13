@@ -10,6 +10,14 @@ function remotionExportPlugin(): Plugin {
     name: 'remotion-export-plugin',
     configureServer(server) {
       server.middlewares.use('/api/export-remotion', async (req, res, next) => {
+        // A GET answers the availability probe. Without it the app cannot tell a running
+        // renderer from Vite's SPA fallback, which serves index.html for anything unmatched
+        // — so a built copy with no renderer at all looks identical to a working one.
+        if (req.method === 'GET') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ available: true, renderer: 'remotion-dev-server' }));
+          return;
+        }
         if (req.method !== 'POST') return next();
 
         // Prevent Node HTTP server socket timeout during Remotion rendering
