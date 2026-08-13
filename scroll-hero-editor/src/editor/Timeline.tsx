@@ -945,6 +945,153 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         target.addEventListener('pointerup', onUp as any);
     };
 
+    /**
+     * Line tool: click to drop an anchor, move to preview the ramp, click again to commit,
+     * Esc to abandon it. It used to be a press-drag-release, which is a harder gesture to
+     * place accurately and gave no way to change your mind part-way through.
+     *
+     * The anchor is a ref rather than state because the pointer handlers have to read the
+     * current value; the preview is state because it renders.
+     */
+    const lineAnchorRef = useRef<
+        | {
+            laneId: string;
+            min: number;
+            max: number;
+            target: HTMLElement;
+            startX: number;
+            startY: number;
+            startTime: number;
+            startVal: number;
+            detach: () => void;
+          }
+        | null
+    >(null);
+
+    const cancelLine = useCallback(() => {
+        lineAnchorRef.current?.detach();
+        lineAnchorRef.current = null;
+        setLinePreview(null);
+    }, []);
+
+    const linePointFrom = (
+        target: HTMLElement,
+        lane: { min: number; max: number },
+        clientX: number,
+        clientY: number,
+    ) => {
+        const rect = target.getBoundingClientRect();
+        const seqDur = useStore.getState().sequenceDuration;
+        const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+        const y = Math.max(0, Math.min(rect.height, clientY - rect.top));
+        return {
+            x,
+            y,
+            time: snapTimeToBeat(Math.max(0, Math.min(seqDur, (x / rect.width) * seqDur))),
+            value: Math.max(lane.min, Math.min(lane.max, lane.min + (1 - y / rect.height) * (lane.max - lane.min))),
+        };
+    };
+
+    /** Replaces everything between the two points with a straight ramp. */
+    const commitLine = (
+        laneId: string,
+        a: { time: number; value: number },
+        b: { time: number; value: number },
+    ) => {
+        if (Math.abs(b.time - a.time) < 0.001) return;
+        useStore.getState().pushHistory();
+
+        const minT = Math.min(a.time, b.time);
+        const maxT = Math.max(a.time, b.time);
+        const isScroll = laneId === 'scrollPos';
+        const existing = (isScroll
+            ? useStore.getState().scrollKeyframes
+            : useStore.getState().paramKeyframes[laneId] ?? []) as ParamKf[];
+
+        // A straight line, so the two ends carry no handles. Giving them a bezier pair — as
+        // this used to — made the segment a slight S, and left every easing preset inert on
+        // it, since handles override easing everywhere they appear.
+        const ramp = [
+            ...existing.filter(k => k.time < minT - 0.001 || k.time > maxT + 0.001),
+            { time: a.time, value: a.value, easing: 'linear' },
+            { time: b.time, value: b.value, easing: 'linear' },
+        ].sort((x, y) => x.time - y.time) as ParamKf[];
+
+        if (isScroll) useStore.getState().setScrollKeyframes(ramp);
+        else useStore.getState().setParamKeyframes(laneId, ramp);
+
+        useStore.getState().setSelectedKeyframes([
+            { laneId, position: a.time, value: a.value },
+            { laneId, position: b.time, value: b.value },
+        ]);
+    };
+
+    const handleLinePointerDown = (
+        lane: { id: string; min: number; max: number },
+        e: React.PointerEvent<HTMLElement>,
+    ) => {
+        const target = e.currentTarget as HTMLElement;
+        const here = linePointFrom(target, lane, e.clientX, e.clientY);
+        const anchor = lineAnchorRef.current;
+
+        if (anchor && anchor.laneId === lane.id) {
+            commitLine(lane.id, { time: anchor.startTime, value: anchor.startVal }, here);
+            cancelLine();
+            return;
+        }
+
+        // Starting on a different lane abandons the anchor rather than drawing across lanes.
+        cancelLine();
+
+        const onMove = (ev: PointerEvent) => {
+            const current = lineAnchorRef.current;
+            if (!current) return;
+            const p = linePointFrom(current.target, current, ev.clientX, ev.clientY);
+            setLinePreview({
+                laneId: current.laneId,
+                startX: current.startX, startY: current.startY,
+                currentX: p.x, currentY: p.y,
+                startTime: current.startTime, startVal: current.startVal,
+                currentTime: p.time, currentVal: p.value,
+            });
+        };
+        document.addEventListener('pointermove', onMove);
+
+        lineAnchorRef.current = {
+            laneId: lane.id,
+            min: lane.min,
+            max: lane.max,
+            target,
+            startX: here.x,
+            startY: here.y,
+            startTime: here.time,
+            startVal: here.value,
+            detach: () => document.removeEventListener('pointermove', onMove),
+        };
+        setLinePreview({
+            laneId: lane.id,
+            startX: here.x, startY: here.y, currentX: here.x, currentY: here.y,
+            startTime: here.time, startVal: here.value,
+            currentTime: here.time, currentVal: here.value,
+        });
+    };
+
+    // Abandon a half-drawn line, and drop the anchor if the tool changes under it.
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && lineAnchorRef.current) {
+                e.preventDefault();
+                cancelLine();
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [cancelLine]);
+
+    useEffect(() => {
+        if (activeTool !== 'line') cancelLine();
+    }, [activeTool, cancelLine]);
+
     const handleLoopDrag = (type: 'start' | 'end' | 'bar', e: React.PointerEvent<HTMLDivElement>) => {
         e.stopPropagation();
         e.preventDefault();
@@ -2107,77 +2254,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                             }
 
                             if (activeTool === 'line') {
-                                useStore.getState().pushHistory();
-                                const rect = target.getBoundingClientRect();
-                                const seqDur = useStore.getState().sequenceDuration;
-                                const startX = e.clientX - rect.left;
-                                const startY = e.clientY - rect.top;
-                                const startTime = snapTimeToBeat(Math.max(0, Math.min(seqDur, (startX / rect.width) * seqDur)));
-                                const startVal = Math.max(0, Math.min(1, 1 - startY / rect.height));
-
-                                setLinePreview({
-                                    laneId: 'scrollPos',
-                                    startX, startY, currentX: startX, currentY: startY,
-                                    startTime, startVal, currentTime: startTime, currentVal: startVal
-                                });
-
-                                const onMove = (ev: PointerEvent) => {
-                                    if (ev.buttons & 1) {
-                                        const r = target.getBoundingClientRect();
-                                        const curX = Math.max(0, Math.min(r.width, ev.clientX - r.left));
-                                        const curY = Math.max(0, Math.min(r.height, ev.clientY - r.top));
-                                        const curTime = snapTimeToBeat(Math.max(0, Math.min(seqDur, (curX / r.width) * seqDur)));
-                                        const curVal = Math.max(0, Math.min(1, 1 - curY / r.height));
-                                        setLinePreview({
-                                            laneId: 'scrollPos',
-                                            startX, startY, currentX: curX, currentY: curY,
-                                            startTime, startVal, currentTime: curTime, currentVal: curVal
-                                        });
-                                    }
-                                };
-
-                                const onUp = (ev: PointerEvent) => {
-                                    setLinePreview(null);
-                                    target.removeEventListener('pointermove', onMove as any);
-                                    target.removeEventListener('pointerup', onUp as any);
-
-                                    const r = target.getBoundingClientRect();
-                                    const curX = Math.max(0, Math.min(r.width, ev.clientX - r.left));
-                                    const curY = Math.max(0, Math.min(r.height, ev.clientY - r.top));
-                                    const curTime = snapTimeToBeat(Math.max(0, Math.min(seqDur, (curX / r.width) * seqDur)));
-                                    const curVal = Math.max(0, Math.min(1, 1 - curY / r.height));
-
-                                    const minT = Math.min(startTime, curTime);
-                                    const maxT = Math.max(startTime, curTime);
-
-                                    const existingKfs = useStore.getState().scrollKeyframes;
-                                    const filtered = existingKfs.filter(k => k.time < minT - 0.001 || k.time > maxT + 0.001);
-                                    const dt = Math.abs(curTime - startTime);
-                                    const handleDt = Math.max(0.1, dt * 0.3);
-                                    const newRamp = [
-                                        ...filtered,
-                                        {
-                                            time: startTime,
-                                            value: startVal,
-                                            easing: 'bezier' as const,
-                                            handleOut: { dt: handleDt, dv: (curVal - startVal) * 0.2 },
-                                        },
-                                        {
-                                            time: curTime,
-                                            value: curVal,
-                                            easing: 'bezier' as const,
-                                            handleIn: { dt: -handleDt, dv: -(curVal - startVal) * 0.2 },
-                                        },
-                                    ].sort((a, b) => a.time - b.time);
-                                    useStore.getState().setScrollKeyframes(newRamp);
-                                    useStore.getState().setSelectedKeyframes([
-                                        { laneId: 'scrollPos', position: startTime, value: startVal },
-                                        { laneId: 'scrollPos', position: curTime, value: curVal },
-                                    ]);
-                                };
-
-                                target.addEventListener('pointermove', onMove as any);
-                                target.addEventListener('pointerup', onUp as any);
+                                handleLinePointerDown({ id: 'scrollPos', min: 0, max: 1 }, e);
                                 return;
                             }
 
@@ -2286,6 +2363,25 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     height: Math.abs(marqueeBox.currentY - marqueeBox.startY),
                                 }}
                             />
+                        )}
+
+                        {/* Line tool rubber band. The param lanes have always drawn this; the
+                            scroll lane never did, which matters now that the second click is
+                            what commits the ramp. */}
+                        {linePreview && linePreview.laneId === 'scrollPos' && (
+                            <svg className="absolute inset-0 w-full h-full pointer-events-none z-40" style={{ overflow: 'visible' }}>
+                                <line
+                                    x1={linePreview.startX}
+                                    y1={linePreview.startY}
+                                    x2={linePreview.currentX}
+                                    y2={linePreview.currentY}
+                                    stroke="#3b82f6"
+                                    strokeWidth="2"
+                                    strokeDasharray="4 4"
+                                />
+                                <circle cx={linePreview.startX} cy={linePreview.startY} r="4" fill="#3b82f6" />
+                                <circle cx={linePreview.currentX} cy={linePreview.currentY} r="4" fill="#fbbf24" />
+                            </svg>
                         )}
 
                         <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VB_W} ${scrollVbH}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
@@ -2773,77 +2869,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     }
 
                                     if (activeTool === 'line') {
-                                        useStore.getState().pushHistory();
-                                        const rect = target.getBoundingClientRect();
-                                        const seqDur = useStore.getState().sequenceDuration;
-                                        const startX = e.clientX - rect.left;
-                                        const startY = e.clientY - rect.top;
-                                        const startTime = snapTimeToBeat(Math.max(0, Math.min(seqDur, (startX / rect.width) * seqDur)));
-                                        const startVal = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - startY / rect.height) * (lane.max - lane.min)));
-
-                                        setLinePreview({
-                                            laneId: lane.id,
-                                            startX, startY, currentX: startX, currentY: startY,
-                                            startTime, startVal, currentTime: startTime, currentVal: startVal
-                                        });
-
-                                        const onMove = (ev: PointerEvent) => {
-                                            if (ev.buttons & 1) {
-                                                const r = target.getBoundingClientRect();
-                                                const curX = Math.max(0, Math.min(r.width, ev.clientX - r.left));
-                                                const curY = Math.max(0, Math.min(r.height, ev.clientY - r.top));
-                                                const curTime = snapTimeToBeat(Math.max(0, Math.min(seqDur, (curX / r.width) * seqDur)));
-                                                const curVal = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - curY / r.height) * (lane.max - lane.min)));
-                                                setLinePreview({
-                                                    laneId: lane.id,
-                                                    startX, startY, currentX: curX, currentY: curY,
-                                                    startTime, startVal, currentTime: curTime, currentVal: curVal
-                                                });
-                                            }
-                                        };
-
-                                        const onUp = (ev: PointerEvent) => {
-                                            setLinePreview(null);
-                                            target.removeEventListener('pointermove', onMove as any);
-                                            target.removeEventListener('pointerup', onUp as any);
-
-                                            const r = target.getBoundingClientRect();
-                                            const curX = Math.max(0, Math.min(r.width, ev.clientX - r.left));
-                                            const curY = Math.max(0, Math.min(r.height, ev.clientY - r.top));
-                                            const curTime = snapTimeToBeat(Math.max(0, Math.min(seqDur, (curX / r.width) * seqDur)));
-                                            const curVal = Math.max(lane.min, Math.min(lane.max, lane.min + (1 - curY / r.height) * (lane.max - lane.min)));
-
-                                            const minT = Math.min(startTime, curTime);
-                                            const maxT = Math.max(startTime, curTime);
-
-                                            const existingKfs = (useStore.getState().paramKeyframes[lane.id] ?? []) as ParamKf[];
-                                            const filtered = existingKfs.filter(k => k.time < minT - 0.001 || k.time > maxT + 0.001);
-                                            const dt = Math.abs(curTime - startTime);
-                                            const handleDt = Math.max(0.1, dt * 0.3);
-                                            const newRamp = [
-                                                ...filtered,
-                                                {
-                                                    time: startTime,
-                                                    value: startVal,
-                                                    easing: 'bezier' as const,
-                                                    handleOut: { dt: handleDt, dv: (curVal - startVal) * 0.2 },
-                                                },
-                                                {
-                                                    time: curTime,
-                                                    value: curVal,
-                                                    easing: 'bezier' as const,
-                                                    handleIn: { dt: -handleDt, dv: -(curVal - startVal) * 0.2 },
-                                                },
-                                            ].sort((a, b) => a.time - b.time);
-                                            useStore.getState().setParamKeyframes(lane.id, newRamp as ParamKf[]);
-                                            useStore.getState().setSelectedKeyframes([
-                                                { laneId: lane.id, position: startTime, value: startVal },
-                                                { laneId: lane.id, position: curTime, value: curVal },
-                                            ]);
-                                        };
-
-                                        target.addEventListener('pointermove', onMove as any);
-                                        target.addEventListener('pointerup', onUp as any);
+                                        handleLinePointerDown(lane, e);
                                         return;
                                     }
 

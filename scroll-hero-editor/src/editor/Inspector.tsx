@@ -421,7 +421,6 @@ function LaneInspector({ laneId }: { laneId: string }) {
 // ── Keyframe Selected ─────────────────────────────────────────────────────────
 function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; value: number } }) {
     // Hooks first — the early return below must not change the hook count.
-    const setSelectedKeyframe = useStore(s => s.setSelectedKeyframe);
     const selectedKeyframes = useStore(s => s.selectedKeyframes);
     const scrollKfs = useStore(s => s.scrollKeyframes);
     const paramKfs = useStore(s => s.paramKeyframes);
@@ -604,10 +603,12 @@ function KeyframeInspector({ kf }: { kf: { laneId: string; position: number; val
                         return (
                             <button
                                 key={preset.id}
-                                onClick={() => {
-                                    applyEasingToAllSelected(preset.id);
-                                    setSelectedKeyframe({ ...kf });
-                                }}
+                                // Applying a preset used to collapse the selection to the
+                                // primary keyframe, so the first click acted on everything
+                                // selected and the second one only on the last of them. The
+                                // panel already re-renders from the keyframe subscriptions,
+                                // so no reset is needed to refresh the highlight.
+                                onClick={() => applyEasingToAllSelected(preset.id)}
                                 className={`group flex flex-col gap-1 p-1.5 border rounded transition-colors text-left ${
                                     isActive
                                         ? 'bg-editor-surface-hover border-editor-accent-blue font-semibold'
