@@ -218,5 +218,33 @@ page = await freshPage(ctx);
     await shot(page, 'project-save-failed');
 }
 
+// ── A blob: URL from a previous session is dead on arrival and must not be restored ──
+{
+    await page.close();
+    const DEAD = 'blob:http://127.0.0.1:5173/00000000-dead-0000-0000-000000000000';
+    const failedRequests = [];
+    const warnings = [];
+    page = await seededPage(
+        ctx,
+        `p.audioUrl = '${DEAD}'; p.videoUrl = p.audioUrl;`,
+        async (p) => {
+            p.on('requestfailed', (req) => failedRequests.push(req.url()));
+            p.on('console', (m) => { if (m.type() === 'warning') warnings.push(m.text()); });
+        },
+    );
+
+    // The Audio Wave lane only offers "Remove audio track" while an audio URL is set, so
+    // its absence is the observable sign that the dead one was dropped.
+    const hasAudio = await page.locator('button[title="Remove audio track"]').count();
+    r.ok('a dead blob audio URL is not restored', hasAudio === 0,
+        hasAudio ? 'the lane still thinks it has audio' : 'lane offers an upload instead');
+
+    r.ok('nothing tries to fetch the dead URL', !failedRequests.some((u) => u.includes('0000-dead-')),
+        failedRequests.find((u) => u.includes('0000-dead-')) ?? 'no failed requests');
+    r.ok('the waveform decoder is not handed a dead URL',
+        !warnings.some((w) => w.includes('useKickDrumData')),
+        warnings.find((w) => w.includes('useKickDrumData')) ?? 'no decode warning');
+}
+
 await browser.close();
 process.exit(r.summary() ? 0 : 1);

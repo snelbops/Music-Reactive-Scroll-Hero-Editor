@@ -225,6 +225,15 @@ export function getProjectDataFromStore(name = 'Untitled Project'): ProjectData 
     };
 }
 
+/**
+ * A `blob:` URL only lives as long as the document that minted it, so one read back out of
+ * a saved project is always dead. Restoring it left the app pointing at a URL that fails to
+ * fetch — the waveform silently never drew, and the video export had nothing to send.
+ * Dropping it lets the IndexedDB rehydration that follows mint a fresh one instead.
+ */
+const liveUrl = (url: string | null | undefined): string | null =>
+    url && !url.startsWith('blob:') ? url : null;
+
 export function applyProjectDataToStore(data: Partial<ProjectData>): void {
     const s = useStore.getState();
     if (data.scrollKeyframes) s.setScrollKeyframes(data.scrollKeyframes);
@@ -249,9 +258,14 @@ export function applyProjectDataToStore(data: Partial<ProjectData>): void {
     if (typeof data.particleSize === 'number') s.setParticleSize(data.particleSize);
     if (typeof data.cssOpacity === 'number') s.setCssOpacity(data.cssOpacity);
 
-    if (data.videoUrl !== undefined) s.setVideoUrl(data.videoUrl);
-    if (data.audioUrl !== undefined) s.setAudioUrl(data.audioUrl);
-    if (data.mp4Asset !== undefined) s.setMp4Asset(data.mp4Asset);
+    if (data.videoUrl !== undefined) s.setVideoUrl(liveUrl(data.videoUrl));
+    if (data.audioUrl !== undefined) s.setAudioUrl(liveUrl(data.audioUrl));
+    if (data.mp4Asset !== undefined) {
+        // Keeps the file name for the panel; setMp4Asset mirrors its url into videoUrl,
+        // so a dead one has to be cleared again afterwards.
+        s.setMp4Asset(data.mp4Asset);
+        if (data.mp4Asset && !liveUrl(data.mp4Asset.url)) s.setVideoUrl(null);
+    }
     const DEFAULT_PAD_COLORS: Record<number, string> = {
         7: '#5f7f9e', 8: '#6e9c73', 9: '#a86a5c', 4: '#7a6fa8', 5: '#c98a4d',
         6: '#5f9e96', 1: '#9e7a5f', 2: '#7d848c', 3: '#8a9e6e', 0: '#6e7a9e',

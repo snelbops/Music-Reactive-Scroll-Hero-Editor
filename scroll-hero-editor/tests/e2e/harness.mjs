@@ -51,8 +51,11 @@ export async function freshPage(ctx) {
  * The app autosaves on beforeunload, so writing localStorage and reloading is always
  * clobbered by the outgoing page. Seeding has to happen in an init script.
  */
-export async function seededPage(ctx, mutateSource) {
+export async function seededPage(ctx, mutateSource, beforeLoad) {
     const page = await ctx.newPage();
+    // Listeners that have to see the first load (failed requests, console warnings) must be
+    // attached before the navigation, not after it.
+    if (beforeLoad) await beforeLoad(page);
     await page.addInitScript((src) => {
         const raw = localStorage.getItem('scroll-hero-current-project');
         if (!raw) return;
