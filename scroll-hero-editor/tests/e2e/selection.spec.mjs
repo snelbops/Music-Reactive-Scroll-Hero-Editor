@@ -152,8 +152,39 @@ await selectRegion(page, 0.3, 0.6);
         Math.abs((after.end - after.start) - (before.end - before.start)) < 0.06,
         `${(before.end - before.start).toFixed(2)}s → ${(after.end - after.start).toFixed(2)}s`);
     const loop = await loopRange(page);
-    r.ok('the loop range follows the moved selection',
-        loop && Math.abs(loop.start - after.start) < 0.11, loop && `loop ${loop.start}s - ${loop.end}s`);
+    r.ok('moving the region leaves the loop where it was',
+        loop && Math.abs(loop.start - after.start) > 0.2, loop && `loop ${loop.start}s - ${loop.end}s`);
+}
+
+// ── Selection and loop are converted between explicitly, in both directions ──
+{
+    const sel = await region(page);
+    const loopBefore = await loopRange(page);
+    r.ok('drawing a region did not move the loop',
+        loopBefore && Math.abs(loopBefore.start - sel.start) > 0.2,
+        `region ${sel.start}s, loop ${loopBefore.start}s`);
+
+    await page.locator('button[title^="Loop this region"]').click();
+    await page.waitForTimeout(300);
+    const loopAfter = await loopRange(page);
+    r.ok('the region button sets the loop to the region',
+        loopAfter && Math.abs(loopAfter.start - sel.start) < 0.11 && Math.abs(loopAfter.end - sel.end) < 0.11,
+        loopAfter && `loop ${loopAfter.start}s - ${loopAfter.end}s for region ${sel.start}s - ${sel.end}s`);
+
+    // Move the loop somewhere else, then pull the selection back off it.
+    await dragBy(page, page.locator('div[title^="Drag to move the loop"]'), -140, 0);
+    await page.waitForTimeout(300);
+    const moved = await loopRange(page);
+    r.ok('the loop can be dragged clear of the region', moved && moved.start < sel.start - 0.2,
+        moved && `loop ${moved.start}s - ${moved.end}s`);
+
+    const bar = await page.locator('div[title^="Drag to move the loop"]').boundingBox();
+    await page.mouse.dblclick(bar.x + bar.width / 2, bar.y + bar.height / 2);
+    await page.waitForTimeout(400);
+    const pulled = await region(page);
+    r.ok('double-clicking the loop bar selects that range',
+        pulled && Math.abs(pulled.start - moved.start) < 0.11 && Math.abs(pulled.end - moved.end) < 0.11,
+        pulled && `region ${pulled.start}s - ${pulled.end}s for loop ${moved.start}s - ${moved.end}s`);
 }
 
 // ── Up/down on the header is still the intensity drag ──
