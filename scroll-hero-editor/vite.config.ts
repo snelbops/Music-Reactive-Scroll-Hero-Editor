@@ -30,6 +30,13 @@ function remotionExportPlugin(): Plugin {
 
             if (!data.inputProps) data.inputProps = {};
 
+            // The temp files below are written into public/, so this very server already
+            // serves them. This used to hand Remotion a hard-coded http://localhost:5174,
+            // a second Vite instance that nothing in the project starts — so headless
+            // Chrome got a refused connection and the render failed unless one happened
+            // to be running.
+            const origin = `http://${req.headers.host ?? 'localhost:5173'}`;
+
             // Save video buffer to static public folder for Headless Chrome
             if (data.videoBase64) {
               // Strip any data URL header regardless of MIME type
@@ -38,7 +45,7 @@ function remotionExportPlugin(): Plugin {
               const tempVideoPath = path.resolve(publicDir, 'temp-export-video.mp4');
               fs.writeFileSync(tempVideoPath, videoBuffer);
               console.log(`[Remotion] Wrote video: ${(videoBuffer.length / 1024 / 1024).toFixed(1)} MB → ${tempVideoPath}`);
-              data.inputProps.videoUrl = 'http://localhost:5174/temp-export-video.mp4';
+              data.inputProps.videoUrl = `${origin}/temp-export-video.mp4`;
             } else {
               console.warn('[Remotion] No videoBase64 received — Remotion will render without video');
             }
@@ -49,7 +56,7 @@ function remotionExportPlugin(): Plugin {
               const audioBuffer = Buffer.from(base64Data, 'base64');
               const tempAudioPath = path.resolve(publicDir, 'temp-export-audio.mp3');
               fs.writeFileSync(tempAudioPath, audioBuffer);
-              data.inputProps.audioUrl = 'http://localhost:5174/temp-export-audio.mp3';
+              data.inputProps.audioUrl = `${origin}/temp-export-audio.mp3`;
             }
 
             const outDir = path.resolve(process.cwd(), 'out');
