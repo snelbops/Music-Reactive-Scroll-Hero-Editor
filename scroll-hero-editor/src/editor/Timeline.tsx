@@ -75,6 +75,13 @@ const cursorForTool = (tool: string): string => TOOL_CURSORS[tool] ?? 'default';
 // so the drawn curve, the handle knobs and the evaluated values all agree — a parameter can
 // never appear to hold two values at one instant.
 const BEZIER_DT_LIMIT = 0.45;
+
+// Shortest time selection an edge drag can collapse the region to, matching the
+// threshold that has to be crossed to create one in the first place.
+const MIN_SELECTION = 0.05;
+// Pixels of pointer travel before a drag on the region header commits to an axis.
+const AXIS_DEADZONE = 4;
+
 function clampHandleDt(dt: number, side: 'in' | 'out', gap: number): number {
     const bound = Math.max(0.001, gap) * BEZIER_DT_LIMIT;
     return side === 'out'
@@ -193,6 +200,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const [isolatedLane, setIsolatedLane] = useState<'all' | 'scrollPos' | 'rotationSpeed' | 'cssOpacity' | 'depth' | 'size'>('all');
     const [showRhythmModal, setShowRhythmModal] = useState(false);
     const loopTrackRef = useRef<HTMLDivElement>(null);
+    const selectionTrackRef = useRef<HTMLDivElement>(null);
     const audioRef = useRef<HTMLAudioElement>(null);
     const audioUploadInputRef = useRef<HTMLInputElement>(null);
     const canUndo = useStore(s => s._past.length > 0);
@@ -595,23 +603,101 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     };
 
     /**
-     * Pointer-drag on the selection overlay area.
-     * Dragging up/down shifts intensity for all selected keyframes.
-     * Alt + drag up/down scales intensity away from minimum.
+     * Writes a new selection range, keeping everything that was set up when the
+     * region was first dragged out in step with it: the keyframe selection the
+     * intensity drag acts on, and the loop range — but the loop only while it
+     * still matches, so a loop deliberately moved elsewhere is left alone.
      */
-    const handleSelectionDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    const applySelection = (start: number, end: number) => {
+        const st = useStore.getState();
+        const prev = st.timeSelection;
+        const loopWasLinked = prev !== null
+            && Math.abs(st.loopStart - prev.start) < 1e-3
+            && Math.abs((st.loopEnd || 0) - prev.end) < 1e-3;
+
+        const s = +start.toFixed(2);
+        const e = +end.toFixed(2);
+        st.setTimeSelection({ start: s, end: e });
+        if (loopWasLinked) st.setLoopRange(s, e);
+        selectKeyframesInRange(s, e);
+    };
+
+    /**
+     * Edge drag on the selection region, mirroring the loop region's L/R handles.
+     * Resizing only changes which keyframes are selected; it never edits them.
+     */
+    const handleSelectionResize = (type: 'start' | 'end', e: React.PointerEvent<HTMLDivElement>) => {
         if (e.button !== 0) return;
         e.stopPropagation();
         e.preventDefault();
         const target = e.currentTarget;
         target.setPointerCapture(e.pointerId);
 
-        useStore.getState().pushHistory();
+        const trackRect = selectionTrackRef.current?.getBoundingClientRect();
+        const sel = useStore.getState().timeSelection;
+        if (!trackRect || !sel) return;
+        const seqDur = useStore.getState().sequenceDuration;
+
+        const onMove = (ev: PointerEvent) => {
+            const pos = Math.max(0, Math.min(seqDur, ((ev.clientX - trackRect.left) / trackRect.width) * seqDur));
+            if (type === 'start') applySelection(Math.min(sel.end - MIN_SELECTION, pos), sel.end);
+            else applySelection(sel.start, Math.max(sel.start + MIN_SELECTION, pos));
+        };
+
+        const onUp = () => {
+            target.removeEventListener('pointermove', onMove as any);
+            target.removeEventListener('pointerup', onUp as any);
+        };
+        target.addEventListener('pointermove', onMove as any);
+        target.addEventListener('pointerup', onUp as any);
+    };
+
+    /**
+     * Pointer-drag on the selection region's header bar. The first few pixels of
+     * movement pick the axis: sideways slides the whole region without resizing
+     * it (like the loop bar), up/down shifts intensity for all selected
+     * keyframes, and Alt + up/down scales intensity away from minimum.
+     */
+    const handleSelectionDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (e.button !== 0) return;
+        // The clear (✕) button sits inside this bar. Capturing the pointer here would
+        // retarget the click to the bar, so the button would never fire.
+        if ((e.target as HTMLElement).closest('button')) return;
+        e.stopPropagation();
+        e.preventDefault();
+        const target = e.currentTarget;
+        target.setPointerCapture(e.pointerId);
+
+        const trackRect = selectionTrackRef.current?.getBoundingClientRect();
+        const sel = useStore.getState().timeSelection;
+        const seqDur = useStore.getState().sequenceDuration;
+        const startX = e.clientX;
         const startY = e.clientY;
         const isAlt = e.altKey;
+        let mode: 'undecided' | 'move' | 'intensity' = 'undecided';
         let lastNormDelta = 0;
 
         const onMove = (ev: PointerEvent) => {
+            const dx = ev.clientX - startX;
+            const dy = ev.clientY - startY;
+
+            if (mode === 'undecided') {
+                if (Math.max(Math.abs(dx), Math.abs(dy)) < AXIS_DEADZONE) return;
+                mode = Math.abs(dx) > Math.abs(dy) ? 'move' : 'intensity';
+                // Only the intensity edit touches keyframes, so only it is undoable —
+                // sliding the region should not leave an empty step in the history.
+                if (mode === 'intensity') useStore.getState().pushHistory();
+            }
+
+            if (mode === 'move') {
+                if (!trackRect || !sel) return;
+                const span = sel.end - sel.start;
+                const deltaTime = (dx / trackRect.width) * seqDur;
+                const newStart = Math.max(0, Math.min(seqDur - span, sel.start + deltaTime));
+                applySelection(newStart, newStart + span);
+                return;
+            }
+
             const deltaPixels = startY - ev.clientY; // up = positive
             const normDelta = deltaPixels * 0.005; // normalised units per pixel
             const stepDelta = normDelta - lastNormDelta;
@@ -1468,7 +1554,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                 </div>
                 {/* Visual Time Selection Box Overlay (Clean & Unobtrusive) */}
                 {timeSelection && (
-                    <div className="absolute top-5 bottom-0 left-[120px] right-0 pointer-events-none z-40">
+                    <div ref={selectionTrackRef} className="absolute top-5 bottom-0 left-[120px] right-0 pointer-events-none z-40">
                         <div
                             className="absolute top-0 bottom-0 bg-cyan-500/10 border-x border-cyan-400/60 pointer-events-none shadow-[0_0_15px_rgba(6,182,212,0.15)] group/sel"
                             style={{
@@ -1476,9 +1562,21 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 width: `${((timeSelection.end - timeSelection.start) / sequenceDuration) * 100}%`
                             }}
                         >
-                            {/* Interactive Top Region Bar: Drag up/down to shift intensity of region keyframes, click ✕ to clear */}
+                            {/* Edge grips, the same idea as the loop region's L/R handles */}
                             <div
-                                className="absolute top-0 left-0 right-0 h-4 bg-cyan-500/30 hover:bg-cyan-500/50 border-b border-cyan-400/60 cursor-ns-resize pointer-events-auto flex items-center justify-between px-1.5 transition-colors"
+                                className="absolute top-0 -left-1 h-4 w-2 bg-cyan-400/70 hover:bg-cyan-200 rounded-l cursor-ew-resize pointer-events-auto z-10 transition-colors"
+                                onPointerDown={(e) => handleSelectionResize('start', e)}
+                                title="Drag to resize region start"
+                            />
+                            <div
+                                className="absolute top-0 -right-1 h-4 w-2 bg-cyan-400/70 hover:bg-cyan-200 rounded-r cursor-ew-resize pointer-events-auto z-10 transition-colors"
+                                onPointerDown={(e) => handleSelectionResize('end', e)}
+                                title="Drag to resize region end"
+                            />
+                            {/* Interactive Top Region Bar: drag sideways to move the region,
+                                up/down to shift intensity of region keyframes, click ✕ to clear */}
+                            <div
+                                className="absolute top-0 left-0 right-0 h-4 bg-cyan-500/30 hover:bg-cyan-500/50 border-b border-cyan-400/60 cursor-move pointer-events-auto flex items-center justify-between px-1.5 transition-colors"
                                 onPointerDown={handleSelectionDrag}
                                 onContextMenu={(e) => {
                                     e.preventDefault();
@@ -1488,7 +1586,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                     const clickTime = Math.max(0, Math.min(sequenceDuration, ((e.clientX - rect.left) / rect.width) * sequenceDuration));
                                     setAudioMenu({ visible: true, x: e.clientX, y: e.clientY, clickTime });
                                 }}
-                                title="Drag top bar up/down: adjust intensity of keyframes in region  |  Right-click: menu"
+                                title="Drag sideways: move region  |  Drag up/down: adjust intensity of keyframes in region  |  Right-click: menu"
                             >
                                 <span className="text-[8px] font-mono text-cyan-200 font-bold select-none pointer-events-none">
                                     REGION ({timeSelection.start.toFixed(1)}s - {timeSelection.end.toFixed(1)}s)
