@@ -115,6 +115,8 @@ interface EditorState {
     extractionStatus: 'idle' | 'extracting' | 'done' | 'error'; setExtractionStatus: (s: 'idle' | 'extracting' | 'done' | 'error') => void;
     /** Why the last extraction failed, so the panel can say more than "error". */
     extractionError: string | null; setExtractionError: (msg: string | null) => void;
+    /** Names of connected MIDI inputs, so the transport can say whether a controller is seen. */
+    midiInputs: string[]; setMidiInputs: (names: string[]) => void;
     isScrubbing: boolean; setIsScrubbing: (v: boolean) => void;
     // Whether the last autosave stored everything, dropped the recordings, or failed.
     autosaveStatus: 'ok' | 'trimmed' | 'failed'; setAutosaveStatus: (s: 'ok' | 'trimmed' | 'failed') => void;
@@ -308,6 +310,7 @@ export const useStore = create<EditorState>((set, get) => {
     extractionProgress: 0, setExtractionProgress: (p) => set({ extractionProgress: p }),
     extractionStatus: 'idle', setExtractionStatus: (s) => set({ extractionStatus: s }),
     extractionError: null, setExtractionError: (msg) => set({ extractionError: msg }),
+    midiInputs: [], setMidiInputs: (names) => set({ midiInputs: names }),
     isScrubbing: false, setIsScrubbing: (v) => set({ isScrubbing: v }),
     autosaveStatus: 'ok', setAutosaveStatus: (v) => set({ autosaveStatus: v }),
     scrollKeyframes: [],

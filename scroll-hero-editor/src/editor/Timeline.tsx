@@ -163,6 +163,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const activePreset = useStore(state => state.activePreset);
     
     const extractedFrames = useStore(s => s.extractedFrames);
+    const midiInputs = useStore(s => s.midiInputs);
     const rotationSpeed = useStore(s => s.rotationSpeed);
     const particleDepth = useStore(s => s.particleDepth);
     const particleSize = useStore(s => s.particleSize);
@@ -1651,6 +1652,18 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                         />
                         <span>s</span>
                     </div>
+                    {/* Whether a controller is actually being seen. Without this there is no way
+                        to tell an unmapped knob from an unplugged cable. */}
+                    {midiInputs.length > 0 && (
+                        <div
+                            className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-editor-accent-green/40 bg-editor-accent-green/10 text-editor-accent-green font-mono text-[9px] shrink-0"
+                            data-purpose="midi-status"
+                            title={`MIDI in: ${midiInputs.join(', ')}`}
+                        >
+                            <span className="w-1.5 h-1.5 rounded-full bg-editor-accent-green" />
+                            MIDI {midiInputs.length > 1 ? `×${midiInputs.length}` : ''}
+                        </div>
+                    )}
                     <div className="flex items-center text-editor-fg font-mono text-[11px] font-medium tracking-widest">
                         {new Date(seqTime * 1000).toISOString().slice(11, 23).replace('.', ':')}
                     </div>
@@ -2071,10 +2084,21 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     </div>
                     <div className="flex-1 relative overflow-hidden flex items-center bg-editor-accent-blue/[0.03]">
                         <div className="absolute inset-y-2 left-0 bg-editor-accent-blue/20 rounded-r" style={{ width: '100%' }} />
-                        <div className="absolute inset-y-0 left-0 right-0 flex items-center px-3">
-                            <span className="text-[9px] text-editor-accent-blue/60 font-mono z-10">
-                                {activePreset === 'frames' ? '▶ Active in viewport' : 'Click "Load as Scene" to preview'}
-                            </span>
+                        <div className="absolute inset-y-0 left-0 right-0 flex items-center gap-2 px-3">
+                            {/* This used to read 'Click "Load as Scene" to preview' with no such
+                                button anywhere in the app — the only thing that switched the
+                                viewport to the frames was running the extractor again. */}
+                            {activePreset === 'frames' ? (
+                                <span className="text-[9px] text-editor-accent-blue/60 font-mono z-10">▶ Active in viewport</span>
+                            ) : (
+                                <button
+                                    className="px-2 py-0.5 rounded border border-editor-accent-blue/50 bg-editor-accent-blue/10 hover:bg-editor-accent-blue/25 text-editor-accent-blue text-[9px] font-mono font-bold z-10 transition-colors"
+                                    title="Show this frame sequence in the viewport"
+                                    onClick={(e) => { e.stopPropagation(); useStore.getState().setActivePreset('frames'); }}
+                                >
+                                    Load as Scene
+                                </button>
+                            )}
                         </div>
                     </div>
                     <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-blue/40 z-40" onPointerDown={makeLaneDrag('videoFrames')} />

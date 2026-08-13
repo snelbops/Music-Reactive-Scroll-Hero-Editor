@@ -72,8 +72,8 @@ The proxy is only reachable through "Extract Frames" on the single master asset.
 pads scrub their clips directly, so they do not benefit from it yet — wiring per-pad proxies
 (extraction queue, storage in IndexedDB, automatic fallback) is the natural next step.
 
-The Video Frames lane says 'Click "Load as Scene" to preview', but no such button exists —
-the only thing that switches the viewport to the frame sequence is the Extract button.
+~~The Video Frames lane says 'Click "Load as Scene" to preview', but no such button exists.~~
+Fixed — the lane now has the button it was telling you to press.
 
 ---
 
@@ -106,5 +106,10 @@ Not feature requests, but open and worth keeping visible.
   state for that project — so seeding could never have helped an existing install. The clock
   now lives in `theatre/playhead.ts` and the position is mirrored into Theatre only to keep
   the Studio UI in step. Covered by `tests/e2e/transport.spec.mjs`.
-- **MIDI recording timing** was fixed but never tested against real hardware.
+- ~~**MIDI recording timing** was fixed but never tested against real hardware.~~ Now covered
+  by `tests/e2e/midi.spec.mjs`, which injects a fake MIDIAccess before the app boots and plays
+  notes and knob sweeps into it. Reintroducing the original bug collapses the recorded sweep
+  from ~2.1s of timeline to ~0.04s, so the check is real. The transport also shows a MIDI
+  indicator now, so an unplugged cable no longer looks like a mapping problem. Real hardware
+  is still worth a try, but the path is no longer unverified.
 - **Temporary build banner** in `Layout.tsx` to be removed when no longer useful.

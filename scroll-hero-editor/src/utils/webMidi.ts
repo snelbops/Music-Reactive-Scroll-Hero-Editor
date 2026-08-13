@@ -69,16 +69,28 @@ export function useWebMIDI() {
             }
         };
 
+        // Published so the transport can show whether a controller is actually being seen.
+        // Without it there is no way to tell a mapping problem from an unplugged cable.
+        const publishInputs = (access: MIDIAccess) => {
+            const names: string[] = [];
+            for (const input of access.inputs.values()) {
+                if (input.state !== 'disconnected') names.push(input.name || 'MIDI input');
+            }
+            useStore.getState().setMidiInputs(names);
+        };
+
         navigator.requestMIDIAccess().then(
             (access) => {
                 midiAccess = access;
                 for (const input of midiAccess.inputs.values()) {
                     input.onmidimessage = onMIDIMessage;
                 }
+                publishInputs(midiAccess);
                 midiAccess.onstatechange = (e: any) => {
                     if (e.port.type === 'input' && e.port.state === 'connected') {
                         e.port.onmidimessage = onMIDIMessage;
                     }
+                    if (midiAccess) publishInputs(midiAccess);
                 };
             },
             () => {
@@ -91,7 +103,9 @@ export function useWebMIDI() {
                 for (const input of midiAccess.inputs.values()) {
                     input.onmidimessage = null;
                 }
+                midiAccess.onstatechange = null;
             }
+            useStore.getState().setMidiInputs([]);
         };
     }, []);
 }
