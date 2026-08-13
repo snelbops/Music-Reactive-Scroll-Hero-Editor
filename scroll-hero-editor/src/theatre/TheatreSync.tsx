@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
-import { sceneParamsObj, cssOpacityObj, sheet } from './core';
+import { sceneParamsObj, cssOpacityObj } from './core';
+import { playhead } from './playhead';
 import { interpolateScrollAt, interpolateParamAt, type ParamKf } from '../utils/interpolate';
 
 /**
  * TheatreSync — logic-only component mounted at the app root.
  *
- * - RAF loop advances sheet.sequence.position (the clock) during playback
+ * - RAF loop advances playhead.position (the clock) during playback
  * - Synchronizes live audio playback with timeline position
  * - Interpolates scrollKeyframes at current time → setSceneProgress
  * - Scene params / CSS opacity wired through Theatre.js
@@ -44,11 +45,11 @@ export default function TheatreSync() {
         if (!audio || !audioUrl) return;
 
         if (isPlaying) {
-            audio.currentTime = sheet.sequence.position;
+            audio.currentTime = playhead.position;
             audio.play().catch((err) => console.warn('Audio playback error:', err));
         } else {
             audio.pause();
-            audio.currentTime = sheet.sequence.position;
+            audio.currentTime = playhead.position;
         }
     }, [isPlaying, audioUrl]);
 
@@ -78,8 +79,8 @@ export default function TheatreSync() {
         const lEnd = useStore.getState().loopEnd || sequenceDuration;
 
         // If starting playback outside loop range, snap to loopStart
-        if (loopActive && !recordingActive && (sheet.sequence.position >= lEnd || sheet.sequence.position < lStart)) {
-            sheet.sequence.position = lStart;
+        if (loopActive && !recordingActive && (playhead.position >= lEnd || playhead.position < lStart)) {
+            playhead.position = lStart;
             if (audioRef.current && audioUrl) {
                 audioRef.current.currentTime = lStart;
             }
@@ -91,7 +92,7 @@ export default function TheatreSync() {
         const tick = (now: number) => {
             if (lastTime !== null) {
                 const delta = now - lastTime;
-                const nextPos = sheet.sequence.position + delta / 1000;
+                const nextPos = playhead.position + delta / 1000;
                 const currentDuration = useStore.getState().sequenceDuration;
                 const isRec = useStore.getState().isRecording;
                 const isLp = useStore.getState().isLoop;
@@ -111,7 +112,7 @@ export default function TheatreSync() {
                 }
 
                 if (isLp && !isRec && (nextPos >= endL || nextPos < startL)) {
-                    sheet.sequence.position = startL;
+                    playhead.position = startL;
                     if (audioRef.current && audioUrl) {
                         audioRef.current.currentTime = startL;
                     }
@@ -134,7 +135,7 @@ export default function TheatreSync() {
                 }
 
                 if (!isLp && nextPos >= currentDuration && !isRec) {
-                    sheet.sequence.position = currentDuration;
+                    playhead.position = currentDuration;
                     if (audioRef.current && audioUrl) {
                         audioRef.current.pause();
                         audioRef.current.currentTime = currentDuration;
@@ -146,7 +147,7 @@ export default function TheatreSync() {
                     return;
                 }
 
-                sheet.sequence.position = nextPos;
+                playhead.position = nextPos;
                 // Auto-switch video pads during playback if multi-clip pad events were recorded
                 const padEvents = useStore.getState().padSwitchEvents;
                 if (padEvents.length > 0) {

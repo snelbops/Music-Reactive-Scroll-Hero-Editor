@@ -1,10 +1,9 @@
 import React, { useRef, useEffect, useLayoutEffect, useCallback, useState } from 'react';
 import { Play, Pause, Square, Music, Circle, ZoomIn, ZoomOut, Video, MousePointer2, Repeat, Eraser, Pen, Mouse, SlidersHorizontal, UploadCloud, Magnet, Undo2, Redo2, Grid, Pencil, TrendingUp } from 'lucide-react';
-import { onChange } from '@theatre/core';
 import { useStore } from '../store/useStore';
 import { saveMediaFile } from '../utils/mediaStore';
 import { useKickDrumData } from '../packages/useKickDrumData';
-import { sheet } from '../theatre/core';
+import { playhead } from '../theatre/playhead';
 import { interpolateParamAt, type ParamKf } from '../utils/interpolate';
 
 const LABEL_W = 120;
@@ -81,6 +80,9 @@ const BEZIER_DT_LIMIT = 0.45;
 const MIN_SELECTION = 0.05;
 // Pixels of pointer travel before a drag on the region header commits to an axis.
 const AXIS_DEADZONE = 4;
+// How near an existing selection edge a press counts as grabbing it rather than drawing
+// a new region. Aiming at a few pixels of handle is not a fair ask of a mouse.
+const EDGE_GRAB_PX = 8;
 
 function clampHandleDt(dt: number, side: 'in' | 'out', gap: number): number {
     const bound = Math.max(0.001, gap) * BEZIER_DT_LIMIT;
@@ -212,7 +214,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const draggingParamKfRef = useRef<any>(null);
     const [marqueeBox, setMarqueeBox] = useState<{ laneId: string; startX: number; startY: number; currentX: number; currentY: number } | null>(null);
     // Reactive time display — updated by onChange so it refreshes each frame during playback
-    const [seqTime, setSeqTime] = useState(() => sheet.sequence.position);
+    const [seqTime, setSeqTime] = useState(() => playhead.position);
     const [laneHeights, setLaneHeights] = useState<Record<string, number>>({});
     const laneH = (id: string, def = 40) => laneHeights[id] ?? Math.round(def * verticalZoom);
 
@@ -625,18 +627,21 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     /**
      * Edge drag on the selection region, mirroring the loop region's L/R handles.
      * Resizing only changes which keyframes are selected; it never edits them.
+     *
+     * `trackRect` is whichever element maps the full sequence across its width — the
+     * overlay for the grips, the lane's own track when the grab came from the wave lane.
+     * Both start 120px in from the same content box, so the two agree.
      */
-    const handleSelectionResize = (type: 'start' | 'end', e: React.PointerEvent<HTMLDivElement>) => {
-        if (e.button !== 0) return;
-        e.stopPropagation();
-        e.preventDefault();
-        const target = e.currentTarget;
-        target.setPointerCapture(e.pointerId);
-
-        const trackRect = selectionTrackRef.current?.getBoundingClientRect();
+    const beginSelectionResize = (
+        type: 'start' | 'end',
+        target: HTMLElement,
+        pointerId: number,
+        trackRect: DOMRect,
+    ) => {
         const sel = useStore.getState().timeSelection;
-        if (!trackRect || !sel) return;
+        if (!sel) return;
         const seqDur = useStore.getState().sequenceDuration;
+        target.setPointerCapture(pointerId);
 
         const onMove = (ev: PointerEvent) => {
             const pos = Math.max(0, Math.min(seqDur, ((ev.clientX - trackRect.left) / trackRect.width) * seqDur));
@@ -650,6 +655,15 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         };
         target.addEventListener('pointermove', onMove as any);
         target.addEventListener('pointerup', onUp as any);
+    };
+
+    const handleSelectionResize = (type: 'start' | 'end', e: React.PointerEvent<HTMLDivElement>) => {
+        if (e.button !== 0) return;
+        e.stopPropagation();
+        e.preventDefault();
+        const trackRect = selectionTrackRef.current?.getBoundingClientRect();
+        if (!trackRect) return;
+        beginSelectionResize(type, e.currentTarget, e.pointerId, trackRect);
     };
 
     /**
@@ -828,6 +842,21 @@ export default function Timeline({ height = 280 }: { height?: number }) {
             useStore.getState().setTimeSelection(null);
             useStore.getState().setSelectedKeyframes([]);
             return;
+        }
+
+        // Pressing near an existing region's edge resizes it. The grips are small and sit
+        // at the top of the lane, so without this a near miss silently threw the region
+        // away and started a new one from wherever the pointer happened to land.
+        const sel = useStore.getState().timeSelection;
+        if (alwaysSelect && sel) {
+            const tolerance = (EDGE_GRAB_PX / rect.width) * seqDurTrack;
+            const toStart = Math.abs(startTime - sel.start);
+            const toEnd = Math.abs(startTime - sel.end);
+            if (Math.min(toStart, toEnd) <= tolerance) {
+                e.stopPropagation();
+                beginSelectionResize(toStart <= toEnd ? 'start' : 'end', target, e.pointerId, rect);
+                return;
+            }
         }
 
         e.stopPropagation();
@@ -1047,11 +1076,11 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
     // Reactive TIME display — onChange fires whenever Theatre.js position changes (play, scrub, loop)
     useEffect(() => {
-        const unsub = onChange(sheet.sequence.pointer.position, (pos) => {
+        setSeqTime(playhead.position);
+        return playhead.onChange((pos) => {
             setSeqTime(pos);
             useStore.getState().setPlayheadPosition(pos);
         });
-        return unsub;
     }, []);
 
     // Sync HTML5 Audio element to playback position & seamless loop wrap
@@ -1060,7 +1089,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         if (!a || !audioUrl) return;
 
         if (isPlaying) {
-            const seqPos = sheet.sequence.position;
+            const seqPos = playhead.position;
             const diff = Math.abs(a.currentTime - seqPos);
             if (diff > 0.15) {
                 a.currentTime = Math.max(0, Math.min(a.duration || 300, seqPos));
@@ -1086,7 +1115,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
             // both listeners fired for one keypress and every undo stepped back twice.
             // Copy / Paste
             if (meta && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); useStore.getState().copySelectedKeyframes(); return; }
-            if (meta && (e.key === 'v' || e.key === 'V')) { e.preventDefault(); useStore.getState().pasteKeyframes(sheet.sequence.position); return; }
+            if (meta && (e.key === 'v' || e.key === 'V')) { e.preventDefault(); useStore.getState().pasteKeyframes(playhead.position); return; }
             // Tools (no meta key)
             if (!meta && (e.key === 'v' || e.key === 'V')) { setActiveTool('select'); return; }
             if (!meta && (e.key === 'p' || e.key === 'P')) { setActiveTool('pen'); return; }
@@ -1131,7 +1160,7 @@ export default function Timeline({ height = 280 }: { height?: number }) {
 
     const seekTo = useCallback((progress: number) => {
         const seqDur = useStore.getState().sequenceDuration;
-        sheet.sequence.position = progress * seqDur;
+        playhead.position = progress * seqDur;
         setSceneProgress(progress);
         scrollHistory.current = [];
         useStore.getState().applyParamKeyframesAt(progress * seqDur);
@@ -1166,11 +1195,12 @@ export default function Timeline({ height = 280 }: { height?: number }) {
         if (recordCountdown === null) return;
         if (recordCountdown === 0) {
             setRecordCountdown(null);
-            setRecordStartPosition(sheet.sequence.position / sequenceDuration);
+            setRecordStartPosition(playhead.position / sequenceDuration);
             clearRecordedEvents();
             setIsRecording(true);
+            // The RAF loop in TheatreSync is what advances the clock; Theatre's own
+            // play() would be a second one running against it.
             setIsPlaying(true);
-            sheet.sequence.play({ iterationCount: isLoop ? Infinity : 1 });
             return;
         }
         const t = setTimeout(() => setRecordCountdown(recordCountdown - 1), 1000);
@@ -1562,17 +1592,26 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                                 width: `${((timeSelection.end - timeSelection.start) / sequenceDuration) * 100}%`
                             }}
                         >
-                            {/* Edge grips, the same idea as the loop region's L/R handles */}
+                            {/* Edge grips, the same idea as the loop region's L/R handles.
+                                They run the height of the Audio Wave lane rather than just
+                                the header bar: an 8x16px target was small enough to miss,
+                                and a miss landed on the lane and drew a new region. */}
                             <div
-                                className="absolute top-0 -left-1 h-4 w-2 bg-cyan-400/70 hover:bg-cyan-200 rounded-l cursor-ew-resize pointer-events-auto z-10 transition-colors"
+                                className="absolute top-0 -left-[5px] h-10 w-2.5 cursor-ew-resize pointer-events-auto z-10 group/gripL"
                                 onPointerDown={(e) => handleSelectionResize('start', e)}
                                 title="Drag to resize region start"
-                            />
+                            >
+                                <div className="h-4 w-full bg-cyan-400/70 group-hover/gripL:bg-cyan-200 rounded-l transition-colors" />
+                                <div className="h-6 w-full bg-cyan-400/20 group-hover/gripL:bg-cyan-300/60 transition-colors" />
+                            </div>
                             <div
-                                className="absolute top-0 -right-1 h-4 w-2 bg-cyan-400/70 hover:bg-cyan-200 rounded-r cursor-ew-resize pointer-events-auto z-10 transition-colors"
+                                className="absolute top-0 -right-[5px] h-10 w-2.5 cursor-ew-resize pointer-events-auto z-10 group/gripR"
                                 onPointerDown={(e) => handleSelectionResize('end', e)}
                                 title="Drag to resize region end"
-                            />
+                            >
+                                <div className="h-4 w-full bg-cyan-400/70 group-hover/gripR:bg-cyan-200 rounded-r transition-colors" />
+                                <div className="h-6 w-full bg-cyan-400/20 group-hover/gripR:bg-cyan-300/60 transition-colors" />
+                            </div>
                             {/* Interactive Top Region Bar: drag sideways to move the region,
                                 up/down to shift intensity of region keyframes, click ✕ to clear */}
                             <div

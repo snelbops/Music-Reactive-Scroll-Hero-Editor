@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
-import { sheet } from '../theatre/core';
+import { playhead } from '../theatre/playhead';
 
 /**
  * Web MIDI API integration hook.
@@ -59,7 +59,7 @@ export function useWebMIDI() {
                         // scrollProgress — a 0..1 value, and one just overwritten with the
                         // CC value — so every recorded keyframe landed in the first second
                         // at a time equal to its own value.
-                        const t = sheet.sequence.position;
+                        const t = playhead.position;
                         store.addScrollKeyframe(t, normalizedValue, lastRecordedTimeRef.current ?? t);
                         lastRecordedTimeRef.current = t;
                     } else {

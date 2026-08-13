@@ -101,6 +101,30 @@ const secPerPx = created ? (created.end - created.start) / (waveBox.w * 0.3) : 0
     await shot(page, 'selection-resized');
 }
 
+// ── Aiming at the edge and missing must still resize, not throw the region away ──
+{
+    const missed = [];
+    for (const [dx, dy] of [[0, 14], [4, 4], [-6, 10]]) {
+        const before = await region(page);
+        const g = await endGrip.boundingBox();
+        const x = g.x + g.width / 2 + dx, y = g.y + g.height / 2 + dy;
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        await page.mouse.move(x + 40, y, { steps: 6 });
+        await page.mouse.up();
+        await page.waitForTimeout(300);
+        const after = await region(page);
+        missed.push({ dx, dy, kept: !!after && Math.abs(after.start - before.start) < 0.06 && after.end > before.end });
+    }
+    r.ok('a near miss on the edge resizes instead of starting a new region',
+        missed.every((m) => m.kept),
+        missed.map((m) => `(${m.dx},${m.dy}) ${m.kept ? 'ok' : 'lost the region'}`).join(' · '));
+
+    const g = await endGrip.boundingBox();
+    r.ok('the edge grip is a reasonable target', g.width >= 10 && g.height >= 32,
+        `${g.width}x${g.height}px`);
+}
+
 // ── An edge cannot be dragged through the opposite one ──
 {
     const before = await regionPct(page);
