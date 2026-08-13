@@ -4,7 +4,8 @@ import { launch, freshPage, project, createReporter } from './harness.mjs';
 const r = createReporter('punchin');
 const browser = await launch();
 const ctx = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
-const page = await freshPage(ctx);
+// The one spec that wants the shipped layout rather than the harness's ALL.
+const page = await freshPage(ctx, { isolate: 'default' });
 
 const laneVisible = (name) => page.evaluate((n) => [...document.querySelectorAll('span')]
     .some((s) => s.textContent?.trim() === n), name);
