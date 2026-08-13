@@ -32,17 +32,49 @@ Covered by `tests/e2e/selection.spec.mjs`.
 
 ---
 
-## FR-2 — Playback performance with high-resolution video · Open, needs a decision
+## FR-2 — Playback performance with high-resolution video · Proxy path done
 
-720p scrubs smoothly; higher resolutions stutter and can't keep up.
+720p scrubbed smoothly; higher resolutions stuttered and couldn't keep up.
 
-This is not primarily a browser limitation or a machine limitation — see
-"Why high-resolution video stutters" below for the mechanism and the options. The short
-version is that the app seeks to an arbitrary time on every scroll tick, which is the
-expensive way to read a long-GOP codec, and the proxy path that would avoid it exists but
-is currently a stub.
+Direction agreed: stay standalone and fix the proxy rather than move to a host application.
+Curve export for other tools is deferred.
 
-Decision needed on direction before any work starts.
+**Shipped**
+
+*Extraction* (`packages/ffmpegExtractor.ts`) was a stub: a fixed `fps=10, -frames:v 120` at
+full resolution as PNG, so it covered only the first 12 seconds of any clip and produced
+frames far too large to hold. It now:
+- reads the clip's real duration and height out of ffmpeg's own output, which works for
+  formats the browser itself cannot decode — the point of a proxy
+- picks a sampling rate that fits the whole clip inside a frame budget, lowering the rate
+  rather than truncating, so a ten-minute clip is covered end to end
+- downscales to 540p (never upscales) and writes JPEG instead of PNG
+- frees each frame from the wasm filesystem as it reads it, and terminates the core
+  afterwards instead of leaving its heap alive for the session
+- gives up with a readable message instead of spinning forever when the decoder stops
+  answering, which it does on clips too large for the wasm heap
+
+*Playback* (`preview/FrameSequenceScene.tsx`) uploaded every frame to the GPU before showing
+anything, so a proxy covering a whole clip was unusable by construction. Frames are now
+decoded on demand around the playhead through a capped cache (`packages/frameLoader.ts`),
+and video memory no longer grows with the clip's length.
+
+*Direct video scrubbing* (`preview/ScrollyVideoPlayer.tsx`) issued a seek on every scroll
+tick. A seek arriving while another is running is dropped by the browser, and on a
+high-resolution long-GOP file they arrive faster than they complete, so the picture fell
+behind a backlog of stale positions. It now holds only the newest target and applies it when
+the running seek lands.
+
+Covered by `tests/e2e/proxy.spec.mjs`.
+
+**Still open**
+
+The proxy is only reachable through "Extract Frames" on the single master asset. The video
+pads scrub their clips directly, so they do not benefit from it yet — wiring per-pad proxies
+(extraction queue, storage in IndexedDB, automatic fallback) is the natural next step.
+
+The Video Frames lane says 'Click "Load as Scene" to preview', but no such button exists —
+the only thing that switches the viewport to the frame sequence is the Extract button.
 
 ---
 

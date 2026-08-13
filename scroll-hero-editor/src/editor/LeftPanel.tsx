@@ -52,6 +52,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
     const setExtractionProgress = useStore(s => s.setExtractionProgress);
     const extractionStatus = useStore(s => s.extractionStatus);
     const setExtractionStatus = useStore(s => s.setExtractionStatus);
+    const extractionError = useStore(s => s.extractionError);
     const videoSyncMode = useStore(s => s.videoSyncMode);
     const setVideoSyncMode = useStore(s => s.setVideoSyncMode);
     const videoSpeedRatio = useStore(s => s.videoSpeedRatio);
@@ -86,6 +87,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
         if (!source) return;
         setExtractionStatus('extracting');
         setExtractionProgress(0);
+        useStore.getState().setExtractionError(null);
         try {
             const frames = await extractFrames(source, (p) => setExtractionProgress(p));
             setExtractedFrames(frames);
@@ -93,6 +95,7 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
             if (userInitiated) setActivePreset('frames');
         } catch (err) {
             console.error('ffmpeg extraction failed:', err);
+            useStore.getState().setExtractionError(err instanceof Error ? err.message : String(err));
             setExtractionStatus('error');
         }
     };
@@ -421,6 +424,11 @@ export default function LeftPanel({ width = 220 }: { width?: number }) {
                                     <Film className="w-3 h-3" />
                                     {extractionStatus === 'extracting' ? `Extracting (${Math.round(extractionProgress * 100)}%)` : 'Extract Frames (FFmpeg)'}
                                 </button>
+                                {extractionStatus === 'error' && (
+                                    <div className="text-[9px] text-red-400 leading-snug" data-purpose="extraction-error">
+                                        {extractionError || 'Extraction failed.'}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </section>

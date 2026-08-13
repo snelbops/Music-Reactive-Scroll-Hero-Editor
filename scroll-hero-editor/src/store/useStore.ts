@@ -76,6 +76,8 @@ interface EditorState {
     extractedFrames: Blob[]; setExtractedFrames: (frames: Blob[]) => void;
     extractionProgress: number; setExtractionProgress: (p: number) => void;
     extractionStatus: 'idle' | 'extracting' | 'done' | 'error'; setExtractionStatus: (s: 'idle' | 'extracting' | 'done' | 'error') => void;
+    /** Why the last extraction failed, so the panel can say more than "error". */
+    extractionError: string | null; setExtractionError: (msg: string | null) => void;
     isScrubbing: boolean; setIsScrubbing: (v: boolean) => void;
     // Whether the last autosave stored everything, dropped the recordings, or failed.
     autosaveStatus: 'ok' | 'trimmed' | 'failed'; setAutosaveStatus: (s: 'ok' | 'trimmed' | 'failed') => void;
@@ -268,6 +270,7 @@ export const useStore = create<EditorState>((set, get) => {
     extractedFrames: [], setExtractedFrames: (frames) => set({ extractedFrames: frames }),
     extractionProgress: 0, setExtractionProgress: (p) => set({ extractionProgress: p }),
     extractionStatus: 'idle', setExtractionStatus: (s) => set({ extractionStatus: s }),
+    extractionError: null, setExtractionError: (msg) => set({ extractionError: msg }),
     isScrubbing: false, setIsScrubbing: (v) => set({ isScrubbing: v }),
     autosaveStatus: 'ok', setAutosaveStatus: (v) => set({ autosaveStatus: v }),
     scrollKeyframes: [],
