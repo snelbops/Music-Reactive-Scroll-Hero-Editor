@@ -6,24 +6,29 @@ Status: **Open** = noted, not started · **Agreed** = approved to build · **Don
 
 ---
 
-## FR-1 — Resizable audio selection · Open
+## FR-1 — Resizable audio selection · Done
 
-The blue time-selection region on the Audio Wave lane can be created but not adjusted. The
-loop region above it has draggable edges; the selection should behave the same way.
+The blue time-selection region on the Audio Wave lane could be created but not adjusted.
+It now behaves like the loop region above it.
 
-**Wanted**
-- Drag either edge to change start/end
-- Drag the middle to move the whole region without resizing
-- Ideally the same grab affordance and cursor as the loop region, so it reads as the same idea
+**Shipped**
+- Cyan grips on both edges, drag to change start/end, same shape and `ew-resize` cursor as
+  the loop region's L/R handles
+- Drag the header bar sideways to slide the whole region without resizing it
+- The header bar's existing up/down intensity drag (and Alt for scaling) is unchanged — the
+  first few pixels of the drag pick the axis, so one bar does both without a modifier
 
-**Notes for implementation**
-The loop region already does this in `Timeline.tsx` via `handleLoopDrag('start' | 'end' | 'bar')`,
-so the interaction pattern exists and can be reused rather than reinvented. The selection is
-`timeSelection` in the store, set through `setTimeSelection`. The region header already renders
-its own bar with a clear (✕) button, which is the natural place to hang the edge handles.
+**Decisions made**
+- Resizing never edits keyframes. It only changes which keyframes are selected, exactly as
+  dragging out a new region does, so the intensity drag afterwards acts on the right ones.
+  Nothing is re-generated.
+- The loop range still follows the selection while the two match, since they are set together
+  when a region is first dragged out. A loop deliberately moved elsewhere is left alone.
 
-Worth deciding at the same time: whether resizing the selection should also re-run whatever
-generated automation from it, or leave existing keyframes alone.
+**Fixed along the way:** the ✕ clear button never worked. The header bar captured the pointer
+on `pointerdown`, which retargets the click away from the button.
+
+Covered by `tests/e2e/selection.spec.mjs`.
 
 ---
 
