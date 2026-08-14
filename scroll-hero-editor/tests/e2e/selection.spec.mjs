@@ -1,6 +1,6 @@
 // The blue time-selection region: resizing by its edges, moving it, and keeping the
 // intensity drag and clear button that already lived on its header bar.
-import { launch, freshPage, pickTool, laneBox, laneDots, setTimelineTop, createReporter, shot } from './harness.mjs';
+import { launch, freshPage, pickTool, laneBox, laneDots, setTimelineTop, showAllLanes, createReporter, shot } from './harness.mjs';
 
 const r = createReporter('selection');
 const browser = await launch();
@@ -140,6 +140,9 @@ const secPerPx = created ? (created.end - created.start) / (waveBox.w * 0.3) : 0
 // ── Dragging the header sideways moves the whole region ──
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(2500);
+// A reload comes back on the app's scroll-only default, so the lane layout has to be
+// re-established — freshPage only did it for the first load.
+await showAllLanes(page);
 await setTimelineTop(page, 150);
 await selectRegion(page, 0.3, 0.6);
 {

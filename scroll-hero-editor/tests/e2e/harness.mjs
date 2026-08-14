@@ -32,8 +32,24 @@ export async function launch() {
     return chromium.launch(executablePath ? { executablePath } : {});
 }
 
+
+/**
+ * Switch the timeline out of its scroll-only default.
+ *
+ * The editor opens isolated to Scroll POS, so any spec that works on another lane has to
+ * undo that first — the same ALL button a user would click. `freshPage` and `seededPage` do
+ * it by default; pass `{ isolate: 'default' }` to see the layout the app actually ships with.
+ */
+export async function showAllLanes(page) {
+    const all = page.locator('button', { hasText: /^ALL$/ }).first();
+    if (await all.count()) {
+        await all.click();
+        await page.waitForTimeout(300);
+    }
+}
+
 /** A page on a clean slate: no saved project, no stored media. */
-export async function freshPage(ctx) {
+export async function freshPage(ctx, { isolate = 'all' } = {}) {
     const page = await ctx.newPage();
     await page.goto(APP_URL, { waitUntil: 'domcontentloaded' });
     await page.evaluate(() => {
@@ -42,6 +58,7 @@ export async function freshPage(ctx) {
     });
     await page.goto(APP_URL, { waitUntil: 'networkidle' });
     await page.waitForTimeout(3000);
+    if (isolate === 'all') await showAllLanes(page);
     return page;
 }
 
@@ -65,6 +82,7 @@ export async function seededPage(ctx, mutateSource, beforeLoad) {
     }, mutateSource);
     await page.goto(APP_URL, { waitUntil: 'networkidle' });
     await page.waitForTimeout(4000);
+    await showAllLanes(page);
     return page;
 }
 

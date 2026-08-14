@@ -200,7 +200,10 @@ export default function Timeline({ height = 280 }: { height?: number }) {
     const [activeTool, setActiveTool] = useState<'select' | 'pen' | 'draw' | 'line' | 'eraser'>('select');
     const [linePreview, setLinePreview] = useState<{ laneId: string; startX: number; startY: number; currentX: number; currentY: number; startTime: number; startVal: number; currentTime: number; currentVal: number } | null>(null);
     const [snapToBeat, setSnapToBeat] = useState(false);
-    const [isolatedLane, setIsolatedLane] = useState<'all' | 'scrollPos' | 'rotationSpeed' | 'cssOpacity' | 'depth' | 'size'>('all');
+    // Opens on the Scroll POS lane alone. Scroll is the effect this project is built around,
+    // and the other automation lanes are noise while working on it — they are one click away
+    // on the isolate row above, and nothing about them has changed.
+    const [isolatedLane, setIsolatedLane] = useState<'all' | 'scrollPos' | 'rotationSpeed' | 'cssOpacity' | 'depth' | 'size'>('scrollPos');
     const [showRhythmModal, setShowRhythmModal] = useState(false);
     const loopTrackRef = useRef<HTMLDivElement>(null);
     const selectionTrackRef = useRef<HTMLDivElement>(null);
@@ -1820,7 +1823,8 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     </div>
                 )}
 
-                {(isolatedLane === 'all') && (
+                {/* The waveform is what the automation is being written against, so isolating
+                    a lane keeps it — hiding it would take away the reference, not the noise. */}
                 <div className="flex border-b border-editor-border group relative" style={{ height: laneH('audio') }}>
                     <div
                         className={`w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border sticky left-0 z-[70] overflow-hidden cursor-pointer transition-colors ${selectedLane === 'audio' ? 'bg-editor-surface-hover border-l-2 border-editor-accent-blue text-editor-fg font-semibold' : 'bg-editor-panel text-editor-fg hover:bg-editor-surface'}`}
@@ -1916,7 +1920,6 @@ export default function Timeline({ height = 280 }: { height?: number }) {
                     </div>
                     <div className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize opacity-0 group-hover:opacity-100 bg-editor-accent-blue/40 z-40" onPointerDown={makeLaneDrag('audio')} />
                 </div>
-                )}
                 {(isolatedLane === 'all') && (
                 <div className="flex border-b border-editor-border group relative" style={{ height: 40 }}>
                     <div className="w-[120px] shrink-0 flex items-center justify-between px-3 border-r border-editor-border bg-editor-panel text-editor-fg sticky left-0 z-[70] overflow-hidden">

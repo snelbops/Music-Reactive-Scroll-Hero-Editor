@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import { playhead } from '../theatre/playhead';
+import { createPunchIn } from './punchIn';
 
 /**
  * Web MIDI API integration hook.
@@ -8,9 +9,9 @@ import { playhead } from '../theatre/playhead';
  * and MIDI pads to Video Pads 1-4.
  */
 export function useWebMIDI() {
-    // Start of the span the current knob sweep has overwritten, matching how the mouse
-    // and scroll recorders overdub.
-    const lastRecordedTimeRef = useRef<number | null>(null);
+    // Overdub span for the current knob sweep, shared with the scroll recorders so every
+    // input punches in the same way.
+    const punchIn = useRef(createPunchIn()).current;
 
     useEffect(() => {
         if (!navigator.requestMIDIAccess) return;
@@ -60,10 +61,9 @@ export function useWebMIDI() {
                         // CC value — so every recorded keyframe landed in the first second
                         // at a time equal to its own value.
                         const t = playhead.position;
-                        store.addScrollKeyframe(t, normalizedValue, lastRecordedTimeRef.current ?? t);
-                        lastRecordedTimeRef.current = t;
+                        store.addScrollKeyframe(t, normalizedValue, punchIn.at(t));
                     } else {
-                        lastRecordedTimeRef.current = null;
+                        punchIn.reset();
                     }
                 }
             }
