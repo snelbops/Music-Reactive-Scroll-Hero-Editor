@@ -12,6 +12,12 @@ https://github.com/snelbops/Music-Reactive-Scroll-Hero-Editor
 ## Scroll Keyframe System
 See `memory/project_scroll_keyframes.md` — custom automation system, recording, overdub, UI resize, countdown, all committed to main.
 
+## Current handoff
+See `memory/handoff-desktop-and-scroll-blend.md` — Tauri desktop spike (working), plus three
+open items with diagnosis/design already done: the export leaving the app in a broken state,
+scroll blend modes, and tracked scratch files. Work sits on branch
+`claude/review-desktop-app-plan-k2v1nc`.
+
 ## Build Status
 **Phase 1 (live-scene-preview): COMPLETE** — 3 plans executed, pushed to GitHub
 
