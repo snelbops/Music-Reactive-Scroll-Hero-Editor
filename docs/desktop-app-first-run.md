@@ -34,6 +34,17 @@ Check it worked:
 cargo --version
 ```
 
+**It must report 1.85 or newer.** If Rust was already installed from before, it may well be
+older — update it with:
+
+```
+rustup update stable
+```
+
+An out-of-date toolchain fails partway through the first build with `feature edition2024 is
+required`, naming some crate you have never heard of. That message means "your Rust is too
+old", nothing more.
+
 ## Get the branch
 
 ```

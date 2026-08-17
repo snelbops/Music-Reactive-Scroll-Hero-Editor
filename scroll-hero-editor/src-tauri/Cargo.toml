@@ -6,7 +6,11 @@ authors = ["John Snel"]
 license = ""
 repository = "https://github.com/snelbops/Music-Reactive-Scroll-Hero-Editor"
 edition = "2021"
-rust-version = "1.77.2"
+# Tauri itself only needs 1.77.2, but a transitive dependency in Cargo.lock (time-core)
+# uses the 2024 edition, which cargo did not stabilise until 1.85. Without this line the
+# failure surfaces as "feature `edition2024` is required" against an unfamiliar crate
+# rather than as a toolchain-too-old message.
+rust-version = "1.85"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
