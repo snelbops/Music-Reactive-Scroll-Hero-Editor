@@ -60,7 +60,11 @@ code before the fix lands. Export, then check the pad still scrubs.
 
 ---
 
-## Open item 2 — scroll blend modes (agreed in principle, not started)
+## Open item 2 — scroll blend modes (design only, nothing built)
+
+**Nothing here is implemented.** No file under `scroll-hero-editor/src/` has changed on this
+branch — verified against `main`. The Scroll POS lane behaves exactly as it always has. Not
+multiply, not wobble, not accumulate. What follows is design.
 
 **The problem.** An audio-derived envelope (RMS) sits mostly in the bottom of the lane. It
 carries rhythm but no progression, so on its own it never walks the video from start to
@@ -116,6 +120,37 @@ Open question: project-wide or per-lane. Project-wide is simpler and probably ri
 
 RMS likely wants smoothing and a gamma curve before it feels good, but get the accumulation
 working first.
+
+### The envelope is not actually available yet
+
+Found after this note was first written, and it changes the build order. `useKickDrumData` is
+called in exactly one place — `editor/Timeline.tsx` — purely to draw the waveform. Its
+`beats`/`waveform` never reach the store or `theatre/TheatreSync.tsx`, so there is no audio
+signal in the playback evaluation path at all. The maths above assumes `envelope(t)` is
+available to `interpolateScrollAt`, and today it is not. Plumbing it through is the first
+piece of work, not a detail.
+
+**Settled: sample a precomputed envelope by playhead time. Do not use a live `AnalyserNode`.**
+`interpolateScrollAt` is shared by three consumers — live playback, `export/exportVideo.ts`,
+and `remotion/ScrollHeroRemotion.tsx`. A real-time analyser on the `<audio>` element cannot
+reproduce in a headless Remotion render, so scroll would silently differ between what gets
+tuned and what gets exported. Determinism outranks responsiveness here.
+
+Check whether the existing 512-bar resolution is fine enough for scroll motion before
+committing to it — it was chosen for drawing a waveform, and may step visibly when driving
+position. Resample finer if so.
+
+**Apply the mode inside `interpolateScrollAt`, not at the call sites.** `TheatreSync` alone
+calls it three times (normal tick, loop restart, end of sequence); handling the mode at each
+call site would make looping behave differently from linear playback.
+
+### Build order
+
+1. Get a deterministic envelope into the evaluation path, sampled by playhead time. This is
+   the real work.
+2. Add the mode switch inside `interpolateScrollAt`, with `'curve'` returning exactly today's
+   values so saved projects are untouched.
+3. Add the dropdown on the Scroll POS lane.
 
 ---
 
