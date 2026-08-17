@@ -253,6 +253,11 @@ Then the workflow itself:
 - The app lives in `scroll-hero-editor/`, not the repo root. `npm install` at the root
   installs the BMAD tooling, not the app. `tauri-action` needs `projectPath: scroll-hero-editor`,
   and the `npm install` step needs a `working-directory` to match.
+- **`npm install` fails in this project even from the right directory.** `@theatre/r3f@0.7.2`
+  peer-depends on `@react-three/fiber@^8.13.6` and the project is on 9.5.0, so npm stops with
+  `ERESOLVE`. Locally it wants `--legacy-peer-deps`; in CI that means `npm ci --legacy-peer-deps`
+  or an `.npmrc` committed with `legacy-peer-deps=true`. Without it the workflow cannot get
+  past its second step.
 - **Two `package.json` files disagree about the version.** The root is `1.1.0`, the app is
   `1.9.0`. `__VERSION__` and the version the updater compares against both come from the app
   one, so a tag has to track `scroll-hero-editor/package.json` — and `v1.9.0` is already the
