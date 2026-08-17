@@ -167,9 +167,12 @@ jobs:
 
 # Review of the plan above
 
-Written against the codebase as of `6cf0c58`. The plan's mechanics are sound — the
-auto-update pipeline in particular is close to right. What follows is where it does not
-match this repository, and what I would change.
+Written against the codebase as of `6cf0c58`, revalidated at `a92acce`. The plan's shape is
+sound and the framework choice is probably right. What follows is where it does not match
+this repository, and what I would change.
+
+The auto-update pipeline needs the most work: as written it would build, publish, and then
+never update anything — see §3.
 
 See also `docs/future-plans-ableton-desktop.md`, which covers the Ableton side and reaches
 the same framework conclusion by a different route.
@@ -198,8 +201,13 @@ what will actually decide this. Three things in this app sit on that fault line:
   `navigator.requestMIDIAccess`; under WKWebView that call is likely absent, and MIDI would
   have to be reimplemented natively (Rust `midir`) and bridged into JS. Electron keeps Web
   MIDI because it bundles Chromium.
-- **MediaRecorder codecs.** `src/export/exportVideo.ts` falls back through
-  `video/webm;codecs=vp9`. Safari's MediaRecorder does not support VP8/VP9.
+- **MediaRecorder codecs.** `src/export/exportVideo.ts` picks a MIME type by walking a list
+  and testing `isTypeSupported`. The MP4 list leads with `avc1`, which WKWebView does
+  support, so MP4 capture degrades gracefully. The WebM list does not: every entry on it is
+  VP8/VP9, none of which Safari's MediaRecorder supports, and the final fallback is a bare
+  `mimeType = 'video/webm'` that was never tested at all. Under WKWebView that reaches the
+  `MediaRecorder` constructor unsupported and throws. Either drop the WebM option on desktop
+  or make the fallback the first *supported* type rather than a guess.
 - **SharedArrayBuffer.** `vite.config.ts` sets COOP/COEP headers for ffmpeg.wasm. Those are
   a dev-server setting; getting them onto Tauri's custom protocol is fiddly. Moot if the
   desktop build uses native ffmpeg, which it should.
@@ -207,13 +215,53 @@ what will actually decide this. Three things in this app sit on that fault line:
 **Verify Web MIDI in WKWebView before committing to Tauri.** It is the cheapest question to
 answer and the most expensive to get wrong.
 
-## 3. Errors in the GitHub Actions workflow
+## 3. The release pipeline would build but never update
+
+Section 5 is the most detailed part of the plan and the part with the most missing pieces.
+Taken as written it produces a working `.dmg` and a self-updater that finds nothing.
+
+**The updater artifacts are never generated.** Tauri 2 only emits them when the bundle asks
+for it:
+
+```json
+{ "bundle": { "createUpdaterArtifacts": true } }
+```
+
+Without that there is no `latest.json` and no signature, so the endpoint in Step 2 is a 404
+forever. Nothing in the plan sets it.
+
+**The `.dmg` is not the update artifact.** Step 4 says the release uploads `latest.json`
+"alongside the `.dmg`", and Step 5 has the app updating from it. It cannot. On macOS the
+updater consumes `<app>.app.tar.gz` plus its `.sig` — the `.dmg` is the first-install
+format only. Both need to be on the release.
+
+**The plugin is only half-installed.** Step 3 shows the React hook, which is the last part.
+Before it works you need the npm packages (`@tauri-apps/plugin-updater`,
+`@tauri-apps/plugin-process`), the matching Rust crates registered in `lib.rs`
+(`app.handle().plugin(tauri_plugin_updater::Builder::new().build())`), and the permissions
+in `src-tauri/capabilities/default.json` — Tauri 2 denies uninvited plugin calls, so
+`check()` fails at runtime without an `updater:default` entry.
+
+**Signing needs the passphrase too.** `npx tauri signer generate` prompts for one. If you
+set it, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` must be in the workflow env beside the key, or
+the bundler cannot sign and the build fails late. Simplest is to generate the key with an
+empty passphrase and still pass the (empty) secret.
+
+Then the workflow itself:
 
 - `uses: setup-node@v4` → `actions/setup-node@v4`.
 - The app lives in `scroll-hero-editor/`, not the repo root. `npm install` at the root
-  installs the BMAD tooling, not the app. `tauri-action` needs `projectPath: scroll-hero-editor`.
+  installs the BMAD tooling, not the app. `tauri-action` needs `projectPath: scroll-hero-editor`,
+  and the `npm install` step needs a `working-directory` to match.
+- **Two `package.json` files disagree about the version.** The root is `1.1.0`, the app is
+  `1.9.0`. `__VERSION__` and the version the updater compares against both come from the app
+  one, so a tag has to track `scroll-hero-editor/package.json` — and `v1.9.0` is already the
+  current version, meaning the first tagged release needs a bump before it means anything.
+- `macos-latest` is Apple Silicon. That is fine for your own machine, but the build it
+  produces will not run on an Intel Mac. Universal binaries need
+  `args: --target universal-apple-darwin` plus both Rust targets installed.
 - `npm run tauri build` takes minutes, not seconds — Rust compiles, and the first build is
-  much longer than later ones.
+  much longer than later ones. Section 4's "in seconds" is wrong.
 
 ## 4. Missing: Apple notarization
 
@@ -227,9 +275,12 @@ fiddling, and it belongs in the plan.
 It is listed under "Add Native Features (Optional)". It is the largest single win:
 
 - Proxy builds drop from ~9s for a short clip to well under a second.
-- The wasm heap ceiling disappears. That ceiling is why proxies are capped at 480p today —
-  above roughly 170k output pixels per frame the wasm core stops answering rather than
-  failing (see `packages/ffmpegExtractor.ts` and its deadline guard).
+- The wasm heap ceiling disappears. That ceiling is why proxies are capped at 480p, and the
+  cap turned out to be optimistic: 480p failed outright on a real machine, so
+  `packages/ffmpegExtractor.ts` now steps down through 360p, 240p and 180p when the core
+  traps or stops answering. How far it has to fall varies by machine and by browser, which
+  means the proxy quality a user actually gets is not something the app can promise. Native
+  ffmpeg removes the whole ladder — and the deadline guard, and the retry, and the caveat.
 
 ## 6. A correction to the premise
 
