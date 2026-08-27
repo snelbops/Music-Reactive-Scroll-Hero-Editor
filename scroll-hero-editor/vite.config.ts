@@ -126,8 +126,19 @@ export default defineConfig({
     // @ffmpeg/ffmpeg uses a worker internally — exclude from Vite pre-bundling
     exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'],
   },
+  // Tauri prints Rust compiler errors into this same terminal; clearing the screen
+  // between rebuilds throws them away before they can be read.
+  clearScreen: false,
   server: {
     allowedHosts: true,
+    // Pinned rather than left to drift. The desktop shell loads http://localhost:5173 and
+    // the e2e suite targets the same port, so silently moving to 5174 when the port is
+    // busy would point the window at nothing — the failure the Remotion export already had
+    // when it assumed a second server on 5174.
+    port: 5173,
+    strictPort: true,
+    // Rust build output churns constantly and is not part of the frontend.
+    watch: { ignored: ["**/src-tauri/**"] },
     // Required for SharedArrayBuffer used by ffmpeg WASM
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',

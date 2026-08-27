@@ -273,3 +273,124 @@ isolated:
 
 Keep new platform-dependent work behind those five, and the port stays a set of swapped
 implementations rather than a rewrite.
+
+---
+
+# The scaffold
+
+Added on the `claude/playhead-controller-param-glitches-hhdlzv` branch. It is the wrapper
+and nothing else — no native ffmpeg, no native MIDI, no updater. The point is to make the
+first local run a real test rather than an afternoon of setup.
+
+**It has never been run.** It was written in a Linux container, which cannot build or launch
+a macOS app, so everything below is unverified on the platform it targets. What *was* checked
+here is listed at the end.
+
+## What is in it
+
+| Path | What it is |
+|---|---|
+| `scroll-hero-editor/src-tauri/` | The Rust crate: `Cargo.toml`, `build.rs`, `src/main.rs`, `src/lib.rs` |
+| `scroll-hero-editor/src-tauri/tauri.conf.json` | Window 1600×1000, dev URL `:5173`, build output `../dist`, bundle targets `app` + `dmg` |
+| `scroll-hero-editor/src-tauri/icons/` | Placeholder icon — a waveform in the project's purple/teal. Replace with `npx tauri icon path/to/art.png` |
+| `.github/workflows/release.yml` | Tag `v*` → macOS build → **draft** release, arm64 and Intel |
+| `scroll-hero-editor/.npmrc` | `legacy-peer-deps=true`, which this tree already needed |
+
+`package.json` gains `tauri`, `tauri:dev` and `tauri:build`. `vite.config.ts` pins the dev
+server to 5173 with `strictPort`, since the desktop window is configured to load that exact
+address and drifting to 5174 would point it at nothing.
+
+## Running it the first time
+
+```bash
+cd scroll-hero-editor
+npm install          # picks up @tauri-apps/cli
+npm run tauri:dev    # first run compiles Rust — minutes, not seconds
+```
+
+Rust must be present: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`, plus
+Xcode command line tools (`xcode-select --install`).
+
+`tauri:dev` starts Vite itself. Do not have `npm run dev` already running or the port will
+be taken and `strictPort` will stop it — which is the intended behaviour, not a bug.
+
+## What to look at, in order
+
+The three questions from §7, and the fastest way to answer each. Open devtools with
+right-click → Inspect Element.
+
+1. **Does the wrapper work at all?** In the console:
+   `await __TAURI__.core.invoke('platform_info')`
+   Returns `{ os, arch, ffmpeg }`. If that answers, the JS↔Rust bridge is live. `ffmpeg` is
+   the version string of an ffmpeg on `PATH`, or `null` — which also settles how much work
+   the bundled-ffmpeg step will be.
+2. **Does the preview render?** Load a project and watch the viewport. THREE/WebGL, the
+   proxy canvas, the waveform. This is WKWebView, not Chromium.
+3. **Does Web MIDI exist?** `typeof navigator.requestMIDIAccess` — `"undefined"` means it
+   must be reimplemented natively, and the MIDI chip in the timeline will stay dark.
+
+Also worth a look, because each is a known fault line rather than a guess:
+
+- **Audio.** Web Audio in WKWebView needs a user gesture before it will start. If the
+  waveform is silent until you click something, that is why.
+- **Proxy extraction.** ffmpeg.wasm in the dev window should behave as it does in Chrome —
+  the COOP/COEP headers come from the Vite dev server, which is still serving the page.
+  In a **built** app it is served over Tauri's own protocol with no such headers, so if
+  proxies work in `tauri:dev` and fail in `tauri:build`, that is the cause.
+- **Export.** It will report unavailable, correctly. The Remotion renderer is dev-server
+  middleware; a built app has no backend. That is `src/export/exporter.ts` doing its job,
+  and replacing it is the actual porting work.
+
+## Deliberately left out
+
+- **The updater.** It needs a signing keypair generated on your machine (`npx tauri signer
+  generate`); a placeholder public key in the config would fail the build. The workflow has
+  the env var commented in place for when the key exists.
+- **Notarization.** Same — needs an Apple Developer account. Until then the release is a
+  draft and the build is unsigned, so opening it on another Mac means right-click → Open.
+- **Native plugins** (dialog, fs, shell). Each one adds a capabilities file and another
+  thing that can fail on a first run. Add them when there is a reason to.
+
+## Verified here, and not
+
+Checked, in this Linux container:
+
+- **The Rust crate compiles** — `cargo check` clean against
+  `x86_64-unknown-linux-gnu`. That needed GTK and WebKitGTK dev packages
+  (`libgtk-3-dev libwebkit2gtk-4.1-dev libsoup-3.0-dev librsvg2-dev`), which a Mac does
+  not: there the system webview is WKWebView and no such packages exist. The check is
+  worth more than it looks, because `tauri::generate_context!` runs at compile time —
+  it parses `tauri.conf.json` and reads every icon in the bundle list, so a malformed
+  config or a bad `icns` fails the build rather than the first launch.
+- **The icons** are well-formed PNG and `icns` (written by hand — no ImageMagick here).
+- **`tauri info`** resolves the config: dev URL, `frontendDist`, React/Vite detected.
+- **The web app** still type-checks and builds (`npm run build`).
+- **The e2e suite** still passes, 12/12 specs, with the dev server pinned to 5173.
+
+Not checked, and not checkable from Linux: that the macOS bundle builds, that the window
+opens, or anything at all about WKWebView's behaviour — Web MIDI, Web Audio, MediaRecorder
+codecs, WebGL. Those are the first run's job, and the list above is deliberately ordered
+so the cheapest answers come first.
+
+### The ignore rules, and how they went wrong
+
+Worth recording, because the first attempt failed twice over.
+
+The rules for the Rust build output were written into the repository-root `.gitignore`
+as `src-tauri/target/`. A pattern containing a slash anchors to the directory holding the
+`.gitignore`, so it matched a path that does not exist — the crate is one level down,
+under `scroll-hero-editor/`. Nothing was ignored.
+
+By then `cargo check` had run, and a `git add -A` in the following commit swept the
+whole build tree in: **2,859 files, 1.08 GB**. Moving the rules to
+`scroll-hero-editor/src-tauri/.gitignore` stopped anything *new* being added but did not
+untrack what was already committed — `.gitignore` never does.
+
+The check that was supposed to catch this did not, and the reason is worth knowing:
+`git add -A --dry-run` lists files it *would newly stage*. Files already tracked and
+unchanged print nothing — identical output to files correctly ignored. It cannot tell the
+two apart, so it was the wrong instrument. `git ls-files <path>` answers the actual
+question: is this tracked?
+
+The branch was rebuilt from `main` with only the eighteen real files, so the artifacts are
+absent from its history rather than merely untracked.

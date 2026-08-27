@@ -1,0 +1,81 @@
+name: Release Desktop App
+
+# Tagging a version builds the macOS bundle and publishes it as a draft release.
+#
+# Draft, not published: an unsigned build will not open on anyone else's Mac without
+# right-click → Open, so it should not go out as a finished release until notarization is
+# wired up. See docs/desktop-app-plan.md §4.
+on:
+  push:
+    tags:
+      - 'v*'
+  # Lets the workflow itself be checked without minting a tag.
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    permissions:
+      contents: write
+    # Both architectures: a build made on Apple silicon will not run on an Intel Mac.
+    # macos-13 is the last Intel runner; macos-14 and later are arm64.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            target: aarch64-apple-darwin
+          - runner: macos-13
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The app is not at the repository root — installing there would pull the BMAD
+      # tooling and none of the app's dependencies.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: scroll-hero-editor/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: scroll-hero-editor/src-tauri -> target
+          key: ${{ matrix.target }}
+
+      # The lockfile records every platform variant of the Tauri CLI, darwin included, so
+      # `npm ci` resolves on both runners. scroll-hero-editor/.npmrc supplies the
+      # legacy-peer-deps this tree needs; without it the install fails on @theatre/r3f.
+      - name: Install dependencies
+        working-directory: scroll-hero-editor
+        run: npm ci --no-audit --no-fund
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signing and notarization. Without these the build still succeeds — it is simply
+          # unsigned, and Gatekeeper blocks it on any Mac but the one that built it.
+          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          #
+          # Only needed once the updater plugin is configured with a public key.
+          # TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        with:
+          projectPath: scroll-hero-editor
+          args: --target ${{ matrix.target }}
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('v0.0.0-run{0}', github.run_number) }}
+          releaseName: Scroll Hero Editor ${{ github.ref_type == 'tag' && github.ref_name || github.run_number }}
+          releaseBody: |
+            Unsigned build. On first launch macOS will refuse to open it —
+            right-click the app and choose Open, then confirm.
+          releaseDraft: true
+          prerelease: false
